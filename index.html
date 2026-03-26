@@ -273,7 +273,7 @@ function MainApp({sb,token,onLogout}){
   const gMap=useMemo(()=>Object.fromEntries(guests.map(g=>[g.id,g])),[guests]);
 
   // ─── PLAN ───
-  const PlanView=()=>{const days=Array.from({length:14},(_,i)=>addD(ws,i));const[modal,setModal]=useState(null);
+  const PlanView=()=>{const days=Array.from({length:14},(_,i)=>addD(ws,i));const[modal,setModal]=useState(null);const[hover,setHover]=useState(null);const hoverTimer=useRef(null);
     return<div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",gap:8,alignItems:"center"}}><Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))}><I n="cL" s={16}/></Btn><Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn><Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))}><I n="cR" s={16}/></Btn><span style={{fontSize:14,fontWeight:600}}>{fd(ws)} – {fd(addD(ws,13))}</span></div>
