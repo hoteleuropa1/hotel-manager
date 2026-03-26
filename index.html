@@ -135,7 +135,7 @@ const ConfigScreen=({onConnect})=>{
 };
 
 // ─── AUTH ───
-const AuthScreen=({sb,onAuth,onBack})=>{
+    const AuthScreen=({sb,onAuth})=>{
   const[em,setEm]=useState("");const[pw,setPw]=useState("");const[reg,setReg]=useState(false);
   const[err,setErr]=useState("");const[ld,setLd]=useState(false);const[sp,setSp]=useState(false);
   const go=async()=>{
@@ -161,7 +161,7 @@ const AuthScreen=({sb,onAuth,onBack})=>{
 };
 
 // ─── RESERVATION DETAIL MODAL (PMS Style) ───
-const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,onClose,onRefresh,showToast})=>{
+const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,hotelInfo:hi,onClose,onRefresh,showToast})=>{
   const[tab,setTab]=useState("res");
   const[gf,setGf]=useState(guest||{});
   const[rf,setRf]=useState(res);
@@ -184,6 +184,23 @@ const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,onClose
   const nights=dBet(rf.check_in,rf.check_out);
   const roomPrice=gP(room,unitTypes);
   const roomTotal=nights*roomPrice;
+  const calcTax=(total,taxType,taxRate,s1p,s1r,s2p,s2r)=>{
+    if(taxType==="gemischt"&&s1p&&s1r!=null&&s2p&&s2r!=null){
+      const g1=total*(s1p/100),g2=total*(s2p/100);
+      const n1=Math.round(g1/(1+s1r/100)*100)/100,n2=Math.round(g2/(1+s2r/100)*100)/100;
+      return{net:n1+n2,tax:total-(n1+n2),gross:total,detail:`${s1p}%×${s1r}% + ${s2p}%×${s2r}%`};
+    }
+    const r=taxRate||7;const net=Math.round(total/(1+r/100)*100)/100;
+    return{net,tax:total-net,gross:total,detail:`${r}%`};
+  };
+
+  const roomTaxInfo=calcTax(roomTotal,"einfach",7);
+  const itemsTaxDetails=items.filter(i=>i.item_type==="product").map(it=>{
+    const prod=allProducts.find(p=>p.id===it.product_id);
+    return{...it,taxInfo:calcTax(parseFloat(it.total_price||0),prod?.tax_type||it.tax_type||"einfach",prod?.tax_rate||it.tax_rate||7,prod?.tax_split_1_pct||it.tax_split_1_pct,prod?.tax_split_1_rate||it.tax_split_1_rate,prod?.tax_split_2_pct||it.tax_split_2_pct,prod?.tax_split_2_rate||it.tax_split_2_rate)};
+  });
+  const totalNet=roomTaxInfo.net+itemsTaxDetails.reduce((s,i)=>s+i.taxInfo.net,0);
+  const totalTax=roomTaxInfo.tax+itemsTaxDetails.reduce((s,i)=>s+i.taxInfo.tax,0);
   const itemsTotal=items.filter(i=>i.item_type==="product").reduce((s,i)=>s+parseFloat(i.total_price||0),0);
   const grandTotal=roomTotal+itemsTotal;
   const totalPaid=payments.filter(p=>p.status==="eingegangen").reduce((s,p)=>s+parseFloat(p.amount||0),0);
@@ -223,6 +240,69 @@ const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,onClose
     }catch(e){showToast(e.message,"error")}
   };
 
+  // ─── E-MAIL TEMPLATES ───
+  const emailLayout=(content)=>`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><div style="max-width:600px;margin:0 auto;padding:24px"><div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08)"><div style="background:linear-gradient(135deg,#3B82F6,#1D4ED8);padding:32px;text-align:center"><h1 style="color:#fff;margin:0;font-size:24px;font-weight:800">${hotelInfo?.name||'Hotel'}</h1><p style="color:rgba(255,255,255,.8);margin:8px 0 0;font-size:14px">${hotelInfo?.address||''}</p></div><div style="padding:32px">${content}</div><div style="background:#F9FAFB;padding:24px 32px;border-top:1px solid #E5E7EB;text-align:center;font-size:12px;color:#6B7280"><p style="margin:0 0 4px"><strong>${hotelInfo?.name||''}</strong></p><p style="margin:0 0 4px">${hotelInfo?.address||''}</p><p style="margin:0">Tel: ${hotelInfo?.phone||''} | ${hotelInfo?.email||''}</p></div></div></div></body></html>`;
+
+  const detailsTable=(rows)=>`<div style="background:#F9FAFB;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #E5E7EB"><table style="width:100%;font-size:14px;border-collapse:collapse">${rows.map(([l,v])=>`<tr><td style="padding:6px 0;color:#6B7280;width:40%"><strong>${l}</strong></td><td style="padding:6px 0;color:#111827">${v}</td></tr>`).join('')}</table></div>`;
+
+  const priceTable=(items,total,net,tax)=>`<div style="background:#F0F9FF;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #BFDBFE"><table style="width:100%;font-size:14px;border-collapse:collapse">${items.map(i=>`<tr><td style="padding:6px 0">${i.l}</td><td style="padding:6px 0;text-align:right">${i.v}</td></tr>`).join('')}<tr><td colspan="2" style="padding:8px 0"><hr style="border:none;border-top:1px solid #BFDBFE"></td></tr><tr><td style="padding:4px 0;color:#6B7280;font-size:12px">Netto</td><td style="padding:4px 0;color:#6B7280;font-size:12px;text-align:right">€ ${net}</td></tr><tr><td style="padding:4px 0;color:#6B7280;font-size:12px">MwSt.</td><td style="padding:4px 0;color:#6B7280;font-size:12px;text-align:right">€ ${tax}</td></tr><tr><td style="padding:8px 0;font-size:20px;font-weight:800;color:#1E40AF">Gesamt</td><td style="padding:8px 0;font-size:20px;font-weight:800;color:#1E40AF;text-align:right">€ ${total}</td></tr></table></div>`;
+
+  const buildEmailData=()=>{
+    const g=guest||{};const n=nights;const rp=roomPrice;const rt=roomTotal;
+    const pItems=[{l:`${ut?.name} – Zi. ${room.name} (${n} N. × € ${fmt(rp)})`,v:`€ ${fmt(rt)}`},...items.filter(i=>i.item_type==="product").map(i=>({l:`${i.quantity}× ${i.description}`,v:`€ ${fmt(i.total_price)}`}))];
+    const net=fmt(totalNet);const tax=fmt(totalTax);const total=fmt(grandTotal);
+    const details=[['Kategorie',ut?.name||''],['Zimmer',`${room.name} · ${room.floor}. OG`],['Anreise',fd(rf.check_in)],['Abreise',fd(rf.check_out)],['Nächte',n],['Personen',`${rf.adults} Erw.${rf.children>0?`, ${rf.children} Kinder`:''}`]];
+    if(ut?.amenities?.length)details.push(['Ausstattung',ut.amenities.join(', ')]);
+    return{g,pItems,net,tax,total,details};
+  };
+
+  const genAngebotHtml=()=>{
+    const{g,pItems,net,tax,total,details}=buildEmailData();
+    const baseUrl=window.location.origin;
+    const acceptUrl=`${baseUrl}/api/offer-response?token=${res.offer_token}&action=accept`;
+    const declineUrl=`${baseUrl}/api/offer-response?token=${res.offer_token}&action=decline`;
+    return emailLayout(`<h2 style="color:#111827;margin:0 0 8px;font-size:20px">Ihr Angebot</h2><p style="color:#6B7280;font-size:15px;line-height:1.6;margin:0 0 20px">${g.salutation?g.salutation+' ':'Sehr geehrte/r '}${g.last_name},<br><br>vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot:</p>${detailsTable(details)}${priceTable(pItems,total,net,tax)}${rf.notes?`<p style="color:#6B7280;font-size:13px;font-style:italic">📝 ${rf.notes}</p>`:''}
+    <div style="margin:28px 0;text-align:center"><p style="color:#6B7280;font-size:14px;margin-bottom:16px">Bitte teilen Sie uns Ihre Entscheidung mit:</p><a href="${acceptUrl}" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:16px;margin:0 8px">✓ Annehmen</a> <a href="${declineUrl}" style="display:inline-block;background:#EF4444;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:16px;margin:0 8px">✗ Ablehnen</a></div>
+    <p style="color:#6B7280;font-size:13px;line-height:1.6">Dieses Angebot ist 7 Tage gültig. Bei Fragen: <a href="tel:${hotelInfo?.phone}" style="color:#3B82F6">${hotelInfo?.phone}</a> oder <a href="mailto:${hotelInfo?.email}" style="color:#3B82F6">${hotelInfo?.email}</a></p><p style="color:#374151;font-size:14px;margin-top:20px">Mit freundlichen Grüßen,<br><strong>${hotelInfo?.name}</strong></p>`);
+  };
+
+  const genBestaetigungHtml=()=>{
+    const{g,pItems,net,tax,total,details}=buildEmailData();
+    return emailLayout(`<div style="background:#D1FAE5;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px"><span style="font-size:28px">✓</span><p style="color:#065F46;font-weight:700;font-size:16px;margin:8px 0 0">Reservierung bestätigt</p></div><h2 style="color:#111827;margin:0 0 8px;font-size:20px">Ihre Reservierungsbestätigung</h2><p style="color:#6B7280;font-size:15px;line-height:1.6;margin:0 0 20px">${g.salutation?g.salutation+' ':'Sehr geehrte/r '}${g.last_name},<br><br>wir freuen uns, Ihre Reservierung bestätigen zu können.${res.reservation_number?`<br>Reservierungsnr.: <strong style="color:#111;font-size:18px">${res.reservation_number}</strong>`:''}</p>${detailsTable([...details.slice(0,2),['Anreise',fd(rf.check_in)+' (Check-in ab 15:00)'],['Abreise',fd(rf.check_out)+' (Check-out bis 11:00)'],...details.slice(4)])}${priceTable(pItems,total,net,tax)}${parseFloat(rf.deposit_required)>0?`<div style="background:#FEF3C7;border-radius:10px;padding:16px;margin:16px 0;border:1px solid #F59E0B"><p style="margin:0;color:#92400E;font-weight:600">💳 Anzahlung: € ${fmt(rf.deposit_required)}</p>${rf.deposit_due?`<p style="margin:4px 0 0;color:#92400E;font-size:13px">Fällig bis: ${fd(rf.deposit_due)}</p>`:''}</div>`:''}<p style="color:#6B7280;font-size:13px;line-height:1.6">Bei Fragen: <a href="tel:${hotelInfo?.phone}" style="color:#3B82F6">${hotelInfo?.phone}</a> oder <a href="mailto:${hotelInfo?.email}" style="color:#3B82F6">${hotelInfo?.email}</a></p><p style="color:#374151;font-size:14px;margin-top:20px">Wir freuen uns auf Ihren Besuch!<br><strong>${hotelInfo?.name}</strong></p>`);
+  };
+
+  const genStornoHtml=()=>{
+    const{g}=buildEmailData();
+    return emailLayout(`<div style="background:#FEE2E2;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px"><span style="font-size:28px">✗</span><p style="color:#991B1B;font-weight:700;font-size:16px;margin:8px 0 0">Stornierung</p></div><h2 style="color:#111827;margin:0 0 8px;font-size:20px">Stornierungsbestätigung</h2><p style="color:#6B7280;font-size:15px;line-height:1.6;margin:0 0 20px">${g.salutation?g.salutation+' ':'Sehr geehrte/r '}${g.last_name},<br><br>hiermit bestätigen wir die Stornierung Ihrer Reservierung:</p>${detailsTable([...(res.reservation_number?[['Reservierungsnr.',res.reservation_number]]:[]),['Zimmer',`${room.name} – ${ut?.name}`],['Zeitraum',`${fd(rf.check_in)} – ${fd(rf.check_out)}`]])}<p style="color:#6B7280;font-size:14px;line-height:1.6">Sollten Sie erneut eine Reservierung wünschen, stehen wir Ihnen gerne zur Verfügung.</p><p style="color:#374151;font-size:14px;margin-top:20px">Mit freundlichen Grüßen,<br><strong>${hotelInfo?.name}</strong></p>`);
+  };
+
+  const[sending,setSending]=useState(false);
+  const[emailPreview,setEmailPreview]=useState(null);
+
+  const sendEmail=async(type)=>{
+    setSending(true);
+    try{
+      const g=guest||{};
+      let subject='',html='';
+      if(type==='angebot'){subject=`Ihr Angebot – ${ut?.name} Zimmer ${room.name} | ${hotelInfo?.name}`;html=genAngebotHtml()}
+      if(type==='bestaetigung'){subject=`Reservierungsbestätigung #${res.reservation_number||''} | ${hotelInfo?.name}`;html=genBestaetigungHtml()}
+      if(type==='storno'){subject=`Stornierungsbestätigung | ${hotelInfo?.name}`;html=genStornoHtml()}
+
+      const r=await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:g.email,subject,html,emailType:type})});
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.error||d.details||'Fehler');
+
+      if(type==='angebot')await api.patch("reservations",res.id,{offer_sent_at:new Date().toISOString()});
+      if(type==='bestaetigung')await api.patch("reservations",res.id,{confirmation_sent_at:new Date().toISOString()});
+
+      showToast(`${type==='angebot'?'Angebot':type==='bestaetigung'?'Bestätigung':'Stornierung'} an ${g.email} gesendet!`);
+      setEmailPreview(null);
+    }catch(e){showToast('E-Mail Fehler: '+e.message,'error')}
+    setSending(false);
+  };
+
+  const hotelInfo=hi;
+
   const u=(k,v)=>setRf(p=>({...p,[k]:v}));
   const ug=(k,v)=>setGf(p=>({...p,[k]:v}));
 
@@ -245,6 +325,29 @@ const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,onClose
         <Btn v="danger" sz="sm" onClick={()=>updateStatus("storniert")}><I n="trash" s={14}/> Stornieren</Btn>
       </div>
     </div>
+
+    <div style={{display:"flex",gap:8,marginBottom:16,padding:"12px 16px",background:"#F9FAFB",borderRadius:10,flexWrap:"wrap",alignItems:"center"}}>
+      <span style={{fontSize:12,fontWeight:600,color:"#374151",marginRight:8}}><I n="mail" s={14} st={{verticalAlign:-3,marginRight:4}}/> E-Mail:</span>
+      <Btn v="primary" sz="sm" disabled={sending} onClick={()=>setEmailPreview('angebot')}><I n="send" s={13}/> Angebot senden</Btn>
+      <Btn v="success" sz="sm" disabled={sending} onClick={()=>setEmailPreview('bestaetigung')}><I n="check" s={13}/> Bestätigung senden</Btn>
+      <Btn v="danger" sz="sm" disabled={sending} onClick={()=>setEmailPreview('storno')}><I n="xc" s={13}/> Storno senden</Btn>
+      {res.offer_sent_at&&<span style={{fontSize:11,color:"#6B7280"}}>Angebot gesendet: {fd(res.offer_sent_at)}</span>}
+      {res.confirmation_sent_at&&<span style={{fontSize:11,color:"#6B7280"}}>Bestätigung: {fd(res.confirmation_sent_at)}</span>}
+    </div>
+
+    {emailPreview&&<Modal title={`E-Mail Vorschau – ${emailPreview==='angebot'?'Angebot':emailPreview==='bestaetigung'?'Bestätigung':'Stornierung'}`} onClose={()=>setEmailPreview(null)} width={660}>
+      <div style={{marginBottom:12,fontSize:13,color:"#6B7280"}}>
+        <div><strong>An:</strong> {guest?.email}</div>
+        <div><strong>Kopie:</strong> {hi?.email||'info@hotel-europa-ruesselsheim.de'}</div>
+      </div>
+      <div style={{border:"1px solid #E5E7EB",borderRadius:10,overflow:"hidden",maxHeight:400,overflowY:"auto"}}>
+        <iframe srcDoc={emailPreview==='angebot'?genAngebotHtml():emailPreview==='bestaetigung'?genBestaetigungHtml():genStornoHtml()} style={{width:"100%",height:400,border:"none"}}/>
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
+        <Btn v="ghost" onClick={()=>setEmailPreview(null)}>Abbrechen</Btn>
+        <Btn disabled={sending||!guest?.email} onClick={()=>sendEmail(emailPreview)}><I n="send" s={14}/> {sending?'Wird gesendet...':'Jetzt senden'}</Btn>
+      </div>
+    </Modal>}
 
     <Tab tabs={tabs} active={tab} onChange={setTab}/>
 
@@ -278,6 +381,8 @@ const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,onClose
               <td style={{padding:"10px 12px"}}><div style={{display:"flex",gap:4}}><button onClick={()=>removeItem(it.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></div></td>
             </tr>)}
             <tr style={{background:"#F0FDF4"}}><td></td><td style={{padding:"10px 12px",fontWeight:700}}>GESAMT</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:16,color:"#059669"}}>€ {fmt(grandTotal)}</td><td></td></tr>
+            <tr style={{background:"#F9FAFB"}}><td></td><td style={{padding:"6px 12px",fontSize:11,color:"#6B7280"}}>davon Netto</td><td style={{padding:"6px 12px",textAlign:"right",fontSize:11,color:"#6B7280"}}>€ {fmt(totalNet)}</td><td></td></tr>
+            <tr style={{background:"#F9FAFB"}}><td></td><td style={{padding:"6px 12px",fontSize:11,color:"#6B7280"}}>davon MwSt. (Übern. 7%{itemsTaxDetails.some(i=>i.taxInfo.detail.includes("×"))?" / Verpfl. gem.":""})</td><td style={{padding:"6px 12px",textAlign:"right",fontSize:11,color:"#6B7280"}}>€ {fmt(totalTax)}</td><td></td></tr>
           </tbody>
         </table>
         <div style={{display:"flex",gap:8,marginTop:12}}>
@@ -539,7 +644,7 @@ function MainApp({sb,token,onLogout}){
         </table>
         {aRms.length===0&&<div style={{padding:40,textAlign:"center",color:"#9CA3AF"}}>Keine aktiven Zimmer.</div>}
       </div>
-      {modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>;})()}
+      {modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} hotelInfo={hi} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>;})()}
       {modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
     </div>;
   };
@@ -673,12 +778,13 @@ function MainApp({sb,token,onLogout}){
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><span style={{color:"#6B7280"}}>{prods.length} Produkte</span><Btn sz="sm" onClick={()=>setModal({type:"add"})}><I n="plus" s={14}/> Neues Produkt</Btn></div>
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-          <thead><tr style={{background:"#F9FAFB"}}>{["Produkt","Kategorie","Einheit","Preis","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead>
+          <thead><tr style={{background:"#F9FAFB"}}>{["Produkt","Kategorie","Einheit","Preis","MwSt.","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead>
           <tbody>{prods.map(p=><tr key={p.id} style={{opacity:p.active?1:.5,borderBottom:"1px solid #F3F4F6"}}>
             <td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{p.name}</div>{p.description&&<div style={{fontSize:11,color:"#6B7280"}}>{p.description}</div>}</td>
             <td style={{padding:"10px 12px"}}>{p.category}</td>
             <td style={{padding:"10px 12px"}}>{p.unit}</td>
             <td style={{padding:"10px 12px",fontWeight:600}}>{parseFloat(p.price)>0?`€ ${fmt(p.price)}`:"Gratis"}</td>
+            <td style={{padding:"10px 12px",fontSize:11}}>{(p.tax_type||"einfach")==="gemischt"?<span style={{color:"#8B5CF6"}}>{p.tax_split_1_pct}%×{p.tax_split_1_rate}% + {p.tax_split_2_pct}%×{p.tax_split_2_rate}%</span>:<span>{p.tax_rate||7}%</span>}</td>
             <td style={{padding:"10px 12px",fontSize:11,fontWeight:600,color:p.active?"#059669":"#9CA3AF"}}>{p.active?"Aktiv":"Inaktiv"}</td>
             <td style={{padding:"10px 12px"}}><div style={{display:"flex",gap:4}}>
               <button onClick={()=>setModal({type:"edit",prod:p})} style={{background:"none",border:"none",cursor:"pointer",color:"#6B7280"}}><I n="edit" s={15}/></button>
