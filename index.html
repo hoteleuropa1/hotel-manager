@@ -161,7 +161,7 @@ const AuthScreen=({sb,onAuth,onBack})=>{
 };
 
 // ─── RESERVATION DETAIL MODAL (PMS Style) ───
-const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,onClose,onRefresh,showToast})=>{
+const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,hotelInfo:hi,onClose,onRefresh,showToast})=>{
   const[tab,setTab]=useState("res");
   const[gf,setGf]=useState(guest||{});
   const[rf,setRf]=useState(res);
