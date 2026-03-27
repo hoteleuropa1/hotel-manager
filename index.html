@@ -206,7 +206,6 @@ const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,hotelIn
   const totalPaid=payments.filter(p=>p.status==="eingegangen").reduce((s,p)=>s+parseFloat(p.amount||0),0);
   const balance=grandTotal-totalPaid;
 
-  const hi=hotelInfo;
   const saveGuest=async()=>{
     setSaving(true);
     try{await api.patch("guests",guest.id,gf);showToast("Gast gespeichert")}catch(e){showToast(e.message,"error")}
