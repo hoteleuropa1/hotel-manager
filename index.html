@@ -559,7 +559,7 @@ function MainApp({sb,token,onLogout}){
         </table>
         {aRms.length===0&&<div style={{padding:40,textAlign:"center",color:"#9CA3AF"}}>Keine aktiven Zimmer.</div>}
       </div>
-      {modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>;})()}
+      {modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} hotelInfo={hi} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>;})()}
       {modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
     </div>;
   };
