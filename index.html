@@ -481,12 +481,11 @@ const RoomEditor=({room,unitTypes,onSave,onClose})=>{
 
 // ─── MAIN APP ───
 function App(){
-  const[sbc,setSbc]=useState(()=>{const u=localStorage.getItem("hm_url"),k=localStorage.getItem("hm_key");return u&&k?{url:u,key:k}:null});
-  const[token,setToken]=useState(null);const[user,setUser]=useState(null);
-  if(!sbc)return<ConfigScreen onConnect={(u,k)=>setSbc({url:u,key:k})}/>;
-  if(!token)return<AuthScreen sb={sbc} onAuth={(t,u)=>{setToken(t);setUser(u)}} onBack={()=>{localStorage.removeItem("hm_url");localStorage.removeItem("hm_key");setSbc(null)}}/>;
-  return<MainApp sb={sbc} token={token} onLogout={()=>{setToken(null);setUser(null)}}/>;
-}
+      const[token,setToken]=useState(null);const[user,setUser]=useState(null);
+      const sb={url:"https://ztdtkncoyrkvdpytwuhy.supabase.co",key:"sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT"};
+      if(!token)return<AuthScreen sb={sb} onAuth={(t,u)=>{setToken(t);setUser(u)}}/>;
+      return<MainApp sb={sb} token={token} user={user} onLogout={()=>{setToken(null);setUser(null)}}/>;
+    }
 
 function MainApp({sb,token,onLogout}){
   const api=useAPI(sb.url,sb.key,token);
