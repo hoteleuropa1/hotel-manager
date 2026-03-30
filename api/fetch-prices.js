@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       `- ID ${c.id} "${c.name}": Basispreis ${c.base_price} EUR, Mindestpreis ${c.min_price} EUR\n  Belegung: ${JSON.stringify(c.occupancy)}`
     ).join("\n");
 
-    const prompt = `You are a hotel revenue management AI for "Hotel Europa Ruesselsheim" (3-star, rating 7.5/10, near Frankfurt Airport).
+    const prompt = `You are a hotel revenue management AI for "Hotel Europa Ruesselsheim" (3-star, rating 6.5/10, near Frankfurt Airport).
 
 Search for current hotel prices near Ruesselsheim, Frankfurt Airport, Kelsterbach, Raunheim on Booking.com for the period ${dateFrom} to ${dateTo}.
 
@@ -48,7 +48,7 @@ PRICING RULES:
 - Compare our prices vs competitor prices for similar room types
 - Consider our 3-star / 7.5 rating positioning
 
-IMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no backticks, no explanation before or after.
+IMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no backticks, no explanation before or after. No newlines inside JSON string values. Keep all reason strings short (max 10 words) and on one line.
 Use this exact format:
 {"competitors":[{"name":"hotel name","stars":3,"rating":8.0,"priceRange":"65-95 EUR"}],"suggestions":{${categories.map(c => `"${c.id}":[{"date":"YYYY-MM-DD","price":75,"reason":"kurzer deutscher Grund"}]`).join(",")}},"marketSummary":"2-3 Saetze auf Deutsch ueber aktuelle Marktsituation"}`;
 
@@ -112,12 +112,28 @@ Use this exact format:
 
     let parsed;
     try {
-      parsed = JSON.parse(match[0]);
+      // Control characters und problematische Zeichen entfernen
+      let jsonStr = match[0]
+        .replace(/[\x00-\x1F\x7F]/g, " ")  // Control chars -> Space
+        .replace(/\n/g, " ")
+        .replace(/\r/g, " ")
+        .replace(/\t/g, " ")
+        .replace(/\\n/g, " ")
+        .replace(/\s+/g, " ");
+      parsed = JSON.parse(jsonStr);
     } catch (parseErr) {
-      return res.status(500).json({
-        error: "JSON-Parse-Fehler: " + parseErr.message,
-        raw: match[0].slice(0, 500)
-      });
+      // Zweiter Versuch: aggressiveres Cleaning
+      try {
+        let jsonStr2 = match[0]
+          .replace(/[^\x20-\x7E\xC0-\xFF{}[\]:,".\-0-9]/g, " ")
+          .replace(/\s+/g, " ");
+        parsed = JSON.parse(jsonStr2);
+      } catch (parseErr2) {
+        return res.status(500).json({
+          error: "JSON-Parse-Fehler: " + parseErr2.message,
+          raw: match[0].slice(0, 500)
+        });
+      }
     }
 
     // Grounding-Quellen extrahieren (falls vorhanden)
