@@ -56,7 +56,14 @@ PRICING RULES:
 
 IMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no backticks, no explanation before or after. No newlines inside JSON string values. Keep all reason strings short (max 8 words), use only ASCII characters (no umlauts, write ae oe ue ss instead). No special quotes or dashes.
 Use this exact format:
-{"competitors":[{"name":"hotel name","stars":3,"rating":8.0,"priceRange":"65-95 EUR"}],"suggestions":{${categories.map(c => `"${c.id}":[{"date":"YYYY-MM-DD","price":75,"reason":"kurzer deutscher Grund"}]`).join(",")}},"marketSummary":"2-3 Saetze auf Deutsch ueber aktuelle Marktsituation"}`;
+{"competitors":[{"name":"hotel name","stars":3,"rating":8.0,"priceRange":"65-95 EUR"}],"suggestions":{${categories.map(c => `"${c.id}":[{"date":"YYYY-MM-DD","price":75,"reason":"kurzer grund"}]`).join(",")}},"marketSummary":"2-3 short sentences in German about market"}
+
+CRITICAL RULES FOR JSON:
+- All prices MUST be integers in EUR (Euro), no decimals, no currency symbols
+- Use the EXACT category IDs I gave you: ${categories.map(c => c.id).join(", ")}
+- Dates MUST be formatted as YYYY-MM-DD with zero-padded months and days
+- Keep reason strings under 8 words, ASCII only (ae oe ue instead of umlauts)
+- No trailing commas, no comments, no extra text outside JSON`;
 
     // Google Gemini API mit Google Search Grounding
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
