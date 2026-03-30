@@ -253,7 +253,7 @@ function MainApp({sb,token,onLogout}){
     const autoRef=React.useRef(null);
     useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]=true});setSelCats(m)},[uts]);
 
-    useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]=Math.round((u.base_price||80)*0.65)});setMinPrices(m)},[uts]);
+    useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]=u.min_price||Math.round((u.base_price||80)*0.65)});setMinPrices(m)},[uts]);
     useEffect(()=>{if(autoP){autoRef.current=setInterval(()=>fetchPrices(),30*60000);return()=>clearInterval(autoRef.current)}else{if(autoRef.current)clearInterval(autoRef.current)}},[autoP]);
 
     const getOcc=(tid,date)=>{const ds=toDS(date);const tr=aRms.filter(r=>r.unit_type_id==tid);const oc=tr.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&!["abgelehnt","checkedout","storniert"].includes(rv.status))).length;return{oc,tot:tr.length,pct:tr.length?Math.round(oc/tr.length*100):0}};
