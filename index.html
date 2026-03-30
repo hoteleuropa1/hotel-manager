@@ -243,9 +243,17 @@ function MainApp({sb,token,onLogout}){
   const[hi,setHi]=useState(null);const[uts,setUts]=useState([]);const[rms,setRms]=useState([]);
   const[ress,setRess]=useState([]);const[guests,setGuests]=useState([]);const[products,setProducts]=useState([]);
   const[ld,setLd]=useState(true);
+  // Pricing state (auf MainApp-Ebene damit es nicht verloren geht)
+  const[pSugg,setPSugg]=useState({});const[pLoad,setPLoad]=useState(false);const[pErr,setPErr]=useState(null);
+  const[lastUpd,setLastUpd]=useState(null);const[comps,setComps]=useState(null);const[showComp,setShowComp]=useState(false);
+  const[autoP,setAutoP]=useState(false);const[minPrices,setMinPrices]=useState({});
+  const[fetchPeriod,setFetchPeriod]=useState(14);const[selCats,setSelCats]=useState({});
+  const[customFrom,setCustomFrom]=useState(toDS(new Date()));const[customTo,setCustomTo]=useState(toDS(addD(new Date(),14)));
+  const[debugInfo,setDebugInfo]=useState("");
 
   const load=useCallback(async()=>{setLd(true);try{const[h,u,r,rv,g,p]=await Promise.all([api.get("hotel_info","limit=1"),api.get("unit_types","order=sort_order"),api.get("rooms","order=name"),api.get("reservations","order=created_at.desc"),api.get("guests","order=last_name"),api.get("products","order=sort_order")]);setHi(h[0]||{});setUts(u);setRms(r);setRess(rv);setGuests(g);setProducts(p)}catch(e){show("Ladefehler: "+e.message,"error")}setLd(false)},[api]);
   useEffect(()=>{load()},[]);
+  useEffect(()=>{if(uts.length){var m={};var s={};uts.forEach(function(u){m[u.id]=u.min_price||Math.round((u.base_price||80)*0.65);s[u.id]=true});setMinPrices(m);setSelCats(s)}},[uts]);
   const saveUT=async(d,id)=>{try{if(id)await api.patch("unit_types",id,d);else await api.post("unit_types",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
   const delUT=async id=>{try{await api.del("unit_types",id);await load();show("Geloescht")}catch(e){show(e.message,"error")}};
   const saveRoom=async(d,id)=>{try{if(id)await api.patch("rooms",id,d);else await api.post("rooms",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
@@ -257,16 +265,7 @@ function MainApp({sb,token,onLogout}){
   const PlanView=()=>{
     const days=Array.from({length:14},(_,i)=>addD(ws,i));
     const[modal,setModal]=useState(null);
-    const[pSugg,setPSugg]=useState({});const[pLoad,setPLoad]=useState(false);const[pErr,setPErr]=useState(null);
-    const[lastUpd,setLastUpd]=useState(null);const[comps,setComps]=useState(null);const[showComp,setShowComp]=useState(false);
-    const[autoP,setAutoP]=useState(false);const[minPrices,setMinPrices]=useState({});
-    const[fetchPeriod,setFetchPeriod]=useState(14);
-    const[selCats,setSelCats]=useState({});
-    const[customFrom,setCustomFrom]=useState(toDS(new Date()));
-    const[customTo,setCustomTo]=useState(toDS(addD(new Date(),14)));
-    const[debugInfo,setDebugInfo]=useState("");
     const autoRef=React.useRef(null);
-    useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]=true});setSelCats(m)},[uts]);
 
     useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]=u.min_price||Math.round((u.base_price||80)*0.65)});setMinPrices(m)},[uts]);
     useEffect(()=>{if(autoP){autoRef.current=setInterval(()=>fetchPrices(),30*60000);return()=>clearInterval(autoRef.current)}else{if(autoRef.current)clearInterval(autoRef.current)}},[autoP]);
