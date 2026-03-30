@@ -56,7 +56,13 @@ PRICING RULES:
 
 IMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no backticks, no explanation before or after. No newlines inside JSON string values. Keep all reason strings short (max 8 words), use only ASCII characters (no umlauts, write ae oe ue ss instead). No special quotes or dashes.
 Use this exact format:
-{"competitors":[{"name":"hotel name","stars":3,"rating":8.0,"priceRange":"65-95 EUR"}],"suggestions":{${categories.map(c => `"${c.id}":[{"date":"YYYY-MM-DD","price":75,"reason":"kurzer grund"}]`).join(",")}},"marketSummary":"2-3 short sentences in German about market"}
+{"competitors":[{"name":"hotel name","stars":3,"rating":8.0,"price1p":55,"price2p":75,"price3p":95}],"suggestions":{${categories.map(c => `"${c.id}":[{"date":"YYYY-MM-DD","price":75,"reason":"kurzer grund"}]`).join(",")}},"marketSummary":"2-3 short sentences in German about market"}
+
+In the competitors array:
+- price1p = cheapest price for 1 person (Einzelzimmer equivalent)
+- price2p = cheapest price for 2 persons (Doppelzimmer equivalent)  
+- price3p = cheapest price for 3 persons (Dreibettzimmer equivalent)
+- Use 0 if not available
 
 CRITICAL RULES FOR JSON:
 - All prices MUST be integers in EUR (Euro), no decimals, no currency symbols
