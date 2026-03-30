@@ -1,205 +1,199 @@
 // api/fetch-prices.js
-// Vercel Serverless Function - Google Gemini API mit Google Search Grounding
-// Environment Variable in Vercel setzen: GOOGLE_AI_KEY
-// Kostenlos: 500 Suchanfragen/Tag im Free Tier
-// API Key holen: aistudio.google.com -> Get API key -> Create API key
+// Vercel Serverless Function - Google Gemini mit Google Search
+// Environment Variable: GOOGLE_AI_KEY (von aistudio.google.com)
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "Nur POST erlaubt" });
 
   const apiKey = process.env.GOOGLE_AI_KEY;
   if (!apiKey) {
-    return res.status(500).json({
-      error: "GOOGLE_AI_KEY nicht gesetzt. Bitte in Vercel Environment Variables eintragen. Key holen: aistudio.google.com"
-    });
+    return res.status(500).json({ error: "GOOGLE_AI_KEY fehlt in Vercel Environment Variables" });
   }
 
   try {
-    const { categories, dateFrom, dateTo } = req.body;
-
+    const { categories, dateFrom, dateTo } = req.body || {};
     if (!categories || !categories.length) {
-      return res.status(400).json({ error: "Keine Kategorien ausgewaehlt" });
+      return res.status(400).json({ error: "Keine Kategorien gesendet" });
     }
 
-    const catLines = categories.map(c =>
-      `- ID ${c.id} "${c.name}": Basispreis ${c.base_price} EUR, Mindestpreis ${c.min_price} EUR\n  Belegung: ${JSON.stringify(c.occupancy)}`
-    ).join("\n");
+    // Personen-Zuordnung
+    function getPersons(name) {
+      var n = (name || "").toLowerCase();
+      if (n.indexOf("einzel") >= 0 || n.indexOf("single") >= 0 || n.indexOf("ez") >= 0) return 1;
+      if (n.indexOf("drei") >= 0 || n.indexOf("triple") >= 0 || n.indexOf("3b") >= 0) return 3;
+      if (n.indexOf("famili") >= 0 || n.indexOf("family") >= 0) return 4;
+      return 2;
+    }
 
-    const prompt = `You are a hotel revenue management AI for "Hotel Europa Ruesselsheim" (3-star, rating 7.5/10, near Frankfurt Airport).
+    var catText = "";
+    var idList = [];
+    for (var i = 0; i < categories.length; i++) {
+      var c = categories[i];
+      var p = getPersons(c.name);
+      idList.push(String(c.id));
+      catText += '- ID "' + c.id + '" name "' + c.name + '" = ' + p + ' person(s), base ' + c.base_price + ' EUR, min ' + c.min_price + ' EUR\n';
+    }
 
-Search for current hotel prices near Ruesselsheim, Frankfurt Airport, Kelsterbach, Raunheim on Booking.com for the period ${dateFrom} to ${dateTo}.
+    var searchInstructions = "";
+    for (var i = 0; i < categories.length; i++) {
+      var c = categories[i];
+      var p = getPersons(c.name);
+      searchInstructions += '- For "' + c.name + '": search Booking.com for ' + p + ' adult(s)\n';
+    }
 
-ROOM TYPE OCCUPANCY RULES (important for price comparison):
-- "Einzelzimmer" / "Single" = 1 person occupancy -> compare with single rooms at competitors
-- "Doppelzimmer" / "Zweibettzimmer" / "Double" / "Twin" = 2 person occupancy -> compare with double/twin rooms
-- "Dreibettzimmer" / "Triple" = 3 person occupancy -> compare with triple rooms or double+extra bed
-- "Familienzimmer" / "Family" = 3-4 person occupancy -> compare with family rooms
+    var suggFormat = "";
+    for (var i = 0; i < categories.length; i++) {
+      if (i > 0) suggFormat += ",";
+      suggFormat += '"' + categories[i].id + '":[{"date":"' + dateFrom + '","price":70,"reason":"example"}]';
+    }
 
-OUR ROOM CATEGORIES:
-${catLines}
+    var prompt = 'You are a hotel pricing AI for Hotel Europa Ruesselsheim (3-star, 7.5/10 rating, near Frankfurt Airport).\n\n';
+    prompt += 'TASK: Search Booking.com for hotel prices near Ruesselsheim and Frankfurt Airport.\n';
+    prompt += 'Search period: ' + dateFrom + ' to ' + dateTo + '\n\n';
+    prompt += 'IMPORTANT: On Booking.com you search by NUMBER OF PERSONS, not room name.\n';
+    prompt += searchInstructions + '\n';
+    prompt += 'Our categories:\n' + catText + '\n';
+    prompt += 'RULES:\n';
+    prompt += '- All prices in EUR as integers\n';
+    prompt += '- Never below minimum price\n';
+    prompt += '- Occupancy >80%: price 10-20% above market\n';
+    prompt += '- Occupancy <50%: price 5-15% below market but above minimum\n';
+    prompt += '- Weekend Fri/Sat: +10-15%\n\n';
+    prompt += 'Reply with ONLY this JSON, nothing else:\n';
+    prompt += '{"competitors":[{"name":"Hotel X","stars":3,"rating":8,"price1p":55,"price2p":75,"price3p":95}],"suggestions":{' + suggFormat + '},"marketSummary":"kurze marktinfo"}\n\n';
+    prompt += 'STRICT RULES:\n';
+    prompt += '- Use EXACTLY these IDs: ' + idList.join(', ') + '\n';
+    prompt += '- Dates as YYYY-MM-DD with zero padding\n';
+    prompt += '- Prices as integers in EUR\n';
+    prompt += '- No umlauts (use ae oe ue ss)\n';
+    prompt += '- No newlines inside strings\n';
+    prompt += '- No markdown or backticks\n';
+    prompt += '- Only valid JSON, nothing before or after';
 
-PRICING RULES:
-- Never suggest below minimum price for each category
-- High occupancy >80%: price 10-20% above market average
-- Low occupancy <50%: price 5-15% below market but always above minimum
-- Weekend (Friday/Saturday) premium +10-15%
-- Compare our prices vs competitor prices for MATCHING room types (single vs single, double vs double etc.)
-- Consider our 3-star / 7.5 rating positioning
+    console.log("fetch-prices: sending to Gemini, cats=" + categories.length + ", period=" + dateFrom + " to " + dateTo);
 
-IMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no backticks, no explanation before or after. No newlines inside JSON string values. Keep all reason strings short (max 8 words), use only ASCII characters (no umlauts, write ae oe ue ss instead). No special quotes or dashes.
-Use this exact format:
-{"competitors":[{"name":"hotel name","stars":3,"rating":8.0,"price1p":55,"price2p":75,"price3p":95}],"suggestions":{${categories.map(c => `"${c.id}":[{"date":"YYYY-MM-DD","price":75,"reason":"kurzer grund"}]`).join(",")}},"marketSummary":"2-3 short sentences in German about market"}
+    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
 
-In the competitors array:
-- price1p = cheapest price for 1 person (Einzelzimmer equivalent)
-- price2p = cheapest price for 2 persons (Doppelzimmer equivalent)  
-- price3p = cheapest price for 3 persons (Dreibettzimmer equivalent)
-- Use 0 if not available
-
-CRITICAL RULES FOR JSON:
-- All prices MUST be integers in EUR (Euro), no decimals, no currency symbols
-- Use the EXACT category IDs I gave you: ${categories.map(c => c.id).join(", ")}
-- Dates MUST be formatted as YYYY-MM-DD with zero-padded months and days
-- Keep reason strings under 8 words, ASCII only (ae oe ue instead of umlauts)
-- No trailing commas, no comments, no extra text outside JSON`;
-
-    // Google Gemini API mit Google Search Grounding
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-    const resp = await fetch(geminiUrl, {
+    var geminiResp = await fetch(geminiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{
-          role: "user",
-          parts: [{ text: prompt }]
-        }],
-        tools: [{
-          google_search: {}
-        }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 4096
-        }
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        tools: [{ google_search: {} }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
       })
     });
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error("Gemini API error:", errText);
-      return res.status(resp.status).json({
-        error: `Google Gemini API Fehler ${resp.status}: ${errText.slice(0, 300)}`
-      });
+    if (!geminiResp.ok) {
+      var errBody = await geminiResp.text();
+      console.error("Gemini error " + geminiResp.status + ": " + errBody.slice(0, 300));
+      return res.status(500).json({ error: "Gemini API " + geminiResp.status + ": " + errBody.slice(0, 200) });
     }
 
-    const data = await resp.json();
+    var data = await geminiResp.json();
 
-    // Text aus Gemini-Antwort extrahieren
-    let fullText = "";
-    if (data.candidates && data.candidates[0]) {
-      const parts = data.candidates[0].content?.parts || [];
-      for (const part of parts) {
-        if (part.text) fullText += part.text;
+    // Text extrahieren
+    var fullText = "";
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      var parts = data.candidates[0].content.parts || [];
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].text) fullText += parts[i].text;
       }
     }
 
+    console.log("fetch-prices: got text length=" + fullText.length);
+
     if (!fullText) {
-      return res.status(500).json({
-        error: "Keine Textantwort von Gemini erhalten",
-        raw: JSON.stringify(data).slice(0, 500)
-      });
+      return res.status(500).json({ error: "Keine Antwort von Gemini", raw: JSON.stringify(data).slice(0, 300) });
     }
 
-    // JSON aus Antwort extrahieren
-    const clean = fullText.replace(/```json|```/g, "").trim();
-    const match = clean.match(/\{[\s\S]*"suggestions"[\s\S]*\}/);
+    // JSON finden
+    var clean = fullText.replace(/```json/g, "").replace(/```/g, "").trim();
+    var match = clean.match(/\{[\s\S]*"suggestions"[\s\S]*\}/);
 
     if (!match) {
-      return res.status(500).json({
-        error: "Keine strukturierten Preisdaten in Antwort gefunden",
-        raw: clean.slice(0, 500)
-      });
+      console.error("fetch-prices: no JSON found in: " + clean.slice(0, 500));
+      return res.status(500).json({ error: "Kein JSON in Antwort", raw: clean.slice(0, 500) });
     }
 
-    let parsed;
+    // JSON bereinigen und parsen - 3 Versuche
+    var parsed = null;
+    var jsonRaw = match[0];
+
+    // Versuch 1: Bereinigen
     try {
-      // Control characters und problematische Zeichen entfernen
-      let jsonStr = match[0]
-        .replace(/[\x00-\x1F\x7F]/g, " ")
-        .replace(/\n/g, " ")
-        .replace(/\r/g, " ")
-        .replace(/\t/g, " ")
-        .replace(/\\n/g, " ")
-        .replace(/\\/g, "\\\\")  // Escape backslashes
-        .replace(/\\\\\"/g, '\\"')  // Fix double-escaped quotes
-        .replace(/\\\\\\\\/g, "\\\\")  // Fix over-escaped backslashes
-        .replace(/\s+/g, " ")
-        .replace(/,\s*}/g, "}")  // Trailing commas
-        .replace(/,\s*]/g, "]");  // Trailing commas in arrays
-      parsed = JSON.parse(jsonStr);
-    } catch (parseErr) {
-      // Zweiter Versuch: nur ASCII behalten
+      var s = jsonRaw;
+      s = s.replace(/[\x00-\x1F\x7F]/g, " ");
+      s = s.replace(/\\n/g, " ");
+      s = s.replace(/\n/g, " ");
+      s = s.replace(/\r/g, " ");
+      s = s.replace(/\t/g, " ");
+      s = s.replace(/\s+/g, " ");
+      s = s.replace(/,\s*}/g, "}");
+      s = s.replace(/,\s*]/g, "]");
+      parsed = JSON.parse(s);
+      console.log("fetch-prices: parsed on attempt 1");
+    } catch (e1) {
+      console.log("fetch-prices: attempt 1 failed: " + e1.message);
+      // Versuch 2: nur ASCII
       try {
-        let jsonStr2 = match[0]
-          .replace(/[^\x20-\x7E{}[\]:,".\-0-9a-zA-Z ]/g, "")
-          .replace(/\s+/g, " ")
-          .replace(/,\s*}/g, "}")
-          .replace(/,\s*]/g, "]");
-        parsed = JSON.parse(jsonStr2);
-      } catch (parseErr2) {
-        // Dritter Versuch: Suggestions manuell extrahieren
+        var s2 = jsonRaw.replace(/[^\x20-\x7E]/g, " ").replace(/\s+/g, " ");
+        s2 = s2.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
+        parsed = JSON.parse(s2);
+        console.log("fetch-prices: parsed on attempt 2");
+      } catch (e2) {
+        console.log("fetch-prices: attempt 2 failed: " + e2.message);
+        // Versuch 3: Regex-Extraktion
         try {
-          const suggestions = {};
-          const sugRegex = /"(\d+)"\s*:\s*\[([\s\S]*?)\]/g;
-          let sm;
-          while ((sm = sugRegex.exec(match[0])) !== null) {
-            const catId = sm[1];
-            const items = [];
-            const itemRegex = /"date"\s*:\s*"([^"]+)"[\s\S]*?"price"\s*:\s*(\d+)/g;
-            let im;
-            while ((im = itemRegex.exec(sm[2])) !== null) {
-              items.push({ date: im[1], price: parseInt(im[2]), reason: "" });
+          var suggestions = {};
+          for (var ci = 0; ci < categories.length; ci++) {
+            var cid = String(categories[ci].id);
+            var items = [];
+            // Suche nach date/price Paaren
+            var dateRx = /\"date\"\s*:\s*\"(\d{4}-\d{1,2}-\d{1,2})\"\s*,\s*\"price\"\s*:\s*(\d+)/g;
+            var dm;
+            while ((dm = dateRx.exec(jsonRaw)) !== null) {
+              items.push({ date: dm[1], price: parseInt(dm[2]), reason: "" });
             }
-            if (items.length > 0) suggestions[catId] = items;
+            if (items.length > 0) {
+              // Teile items gleichmaessig auf Kategorien auf
+              var perCat = Math.ceil(items.length / categories.length);
+              var start = ci * perCat;
+              var end = Math.min(start + perCat, items.length);
+              suggestions[cid] = items.slice(start, end);
+            }
           }
           if (Object.keys(suggestions).length > 0) {
-            parsed = { suggestions, competitors: [], marketSummary: "Daten teilweise extrahiert" };
+            parsed = { suggestions: suggestions, competitors: [], marketSummary: "Daten extrahiert (Fallback)" };
+            console.log("fetch-prices: parsed on attempt 3 (regex)");
           } else {
-            return res.status(500).json({
-              error: "JSON-Parse-Fehler nach 3 Versuchen",
-              raw: match[0].slice(0, 800)
-            });
+            return res.status(500).json({ error: "JSON nicht parsebar nach 3 Versuchen", raw: jsonRaw.slice(0, 500) });
           }
-        } catch (parseErr3) {
-          return res.status(500).json({
-            error: "JSON-Parse-Fehler: " + parseErr3.message,
-            raw: match[0].slice(0, 800)
-          });
+        } catch (e3) {
+          return res.status(500).json({ error: "Parse-Fehler: " + e3.message, raw: jsonRaw.slice(0, 500) });
         }
       }
     }
 
-    // Grounding-Quellen extrahieren (falls vorhanden)
-    const groundingMeta = data.candidates?.[0]?.groundingMetadata;
-    if (groundingMeta?.groundingChunks) {
-      parsed.sources = groundingMeta.groundingChunks
-        .filter(c => c.web)
-        .map(c => ({ title: c.web.title, url: c.web.uri }))
-        .slice(0, 5);
+    // Grounding-Quellen
+    var gm = data.candidates && data.candidates[0] && data.candidates[0].groundingMetadata;
+    if (gm && gm.groundingChunks) {
+      parsed.sources = [];
+      for (var i = 0; i < Math.min(gm.groundingChunks.length, 5); i++) {
+        var ch = gm.groundingChunks[i];
+        if (ch.web) parsed.sources.push({ title: ch.web.title, url: ch.web.uri });
+      }
     }
 
+    console.log("fetch-prices: success, suggestion keys=" + Object.keys(parsed.suggestions || {}).join(","));
     return res.status(200).json({ success: true, data: parsed });
 
   } catch (err) {
-    console.error("fetch-prices error:", err);
+    console.error("fetch-prices: exception: " + err.message);
     return res.status(500).json({ error: err.message });
   }
 }
