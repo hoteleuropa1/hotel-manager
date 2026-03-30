@@ -45,7 +45,7 @@ const h=useCallback(()=>{const hd={"Content-Type":"application/json",Prefer:"ret
 return useMemo(()=>({
 get:async(t,q="")=>{const r=await fetch(url+"/rest/v1/"+t+"?"+q,{headers:h()});if(!r.ok)throw new Error(r.status);return r.json()},
 post:async(t,d)=>{const r=await fetch(url+"/rest/v1/"+t,{method:"POST",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}return r.json()},
-patch:async(t,id,d)=>{const r=await fetch(url+"/rest/v1/"+t+"?id=eq."+id,{method:"PATCH",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}return r.json()},
+patch:async(t,id,d)=>{const q=String(id).includes("=")?id:"id=eq."+id;const r=await fetch(url+"/rest/v1/"+t+"?"+q,{method:"PATCH",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}return r.json()},
 del:async(t,id)=>{const q=String(id).includes("=")?id:"id=eq."+id;const r=await fetch(url+"/rest/v1/"+t+"?"+q,{method:"DELETE",headers:h()});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}}
 }),[url,h])}
 
@@ -174,7 +174,7 @@ const[ress,setRess]=useState([]);const[guests,setGuests]=useState([]);const[prod
 const[ld,setLd]=useState(true);
 
 // PRICING STATE - lives here so it survives tab switches and toasts
-const pRef=useRef({sugg:{},load:false,err:null,lastUpd:null,comps:null,showComp:false,debug:"",period:14,selCats:{},minPrices:{},customFrom:toDS(new Date()),customTo:toDS(addD(new Date(),14))});
+const pRef=useRef({sugg:{},load:false,err:null,lastUpd:null,comps:null,showComp:false,debug:"",period:14,selCats:{},minPrices:{},customFrom:toDS(new Date()),customTo:toDS(addD(new Date(),14)),savedPrices:{}});
 const[pTick,setPTick]=useState(0);
 const pForce=()=>setPTick(t=>t+1);
 const pr=pRef.current;
@@ -218,13 +218,17 @@ pr.comps=result.data;pr.lastUpd=new Date();pr.debug+="\nErfolg! Nur abgerufene K
 
 const getP=(tid,d)=>{const cid=String(tid);const a=pr.sugg[cid];if(!a)return null;const ds=toDS(d);const found=a.find(e=>{if(!e||!e.date)return false;return e.date===ds});return found?found.price:null};
 
+const saveDailyPrice=async(utId,date,price)=>{try{const ds=typeof date==="string"?date:toDS(date);await api.post("daily_prices",{unit_type_id:utId,date:ds,price:price,source:"vorschlag"});pr.savedPrices[utId+"_"+ds]=price;pForce();show(price+" EUR gespeichert fuer "+ds)}catch(e){if(e.message&&e.message.includes("409")||e.message&&e.message.includes("duplicate")||e.message&&e.message.includes("23505")){try{await api.patch("daily_prices","unit_type_id=eq."+utId+"&date=eq."+date,{price:price,source:"vorschlag"});pr.savedPrices[utId+"_"+ds]=price;pForce();show(price+" EUR aktualisiert fuer "+ds)}catch(e2){show(e2.message,"error")}}else{show(e.message,"error")}}};
+
+const saveAllSuggestions=async()=>{const keys=Object.keys(pr.sugg);let count=0;for(const cid of keys){const arr=pr.sugg[cid];if(!Array.isArray(arr))continue;for(const item of arr){if(item.price&&item.date){const min=pr.minPrices[cid]||0;const price=Math.max(item.price,min);try{await api.post("daily_prices",{unit_type_id:cid,date:item.date,price:price,source:"vorschlag"});pr.savedPrices[cid+"_"+item.date]=price;count++}catch(e){try{await api.patch("daily_prices","unit_type_id=eq."+cid+"&date=eq."+item.date,{price:price,source:"vorschlag"});pr.savedPrices[cid+"_"+item.date]=price;count++}catch(e2){}}}}}pForce();show(count+" Tagespreise gespeichert")};
+
 // ─── BELEGUNGSPLAN ───
 const PlanView=()=>{
 const days=Array.from({length:14},(_,i)=>addD(ws,i));
 const[modal,setModal]=useState(null);
 const goMonth=n=>{const d=new Date(ws);d.setMonth(d.getMonth()+n);d.setDate(1);setWs(d)};
 const goYear=n=>{const d=new Date(ws);d.setFullYear(d.getFullYear()+n);d.setDate(1);setWs(d)};
-const PBadge=({price,base,min})=>{if(pr.load)return<div style={{width:28,height:14,background:"#E2E8F0",borderRadius:4,margin:"0 auto"}}/>;if(!price)return<span style={{color:"#CBD5E1",fontSize:10}}>-</span>;const cl=Math.max(price,min||0);const diff=cl-base;const pct=base>0?Math.round(diff/base*100):0;const c=diff>2?"#DC2626":diff<-2?"#059669":"#6B7280";const bg=diff>2?"#FEF2F2":diff<-2?"#ECFDF5":"#F9FAFB";return<div style={{background:bg,borderRadius:6,padding:"2px 4px",textAlign:"center"}}><div style={{fontSize:11,fontWeight:800,color:c}}>{cl} EUR</div>{diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>0?"+":""}{pct}%</div>}</div>};
+const PBadge=({price,base,min,utId,date})=>{if(pr.load)return<div style={{width:28,height:14,background:"#E2E8F0",borderRadius:4,margin:"0 auto"}}/>;if(!price)return<span style={{color:"#CBD5E1",fontSize:10}}>-</span>;const cl=Math.max(price,min||0);const diff=cl-base;const pct=base>0?Math.round(diff/base*100):0;const c=diff>2?"#DC2626":diff<-2?"#059669":"#6B7280";const bg=diff>2?"#FEF2F2":diff<-2?"#ECFDF5":"#F9FAFB";const saved=pr.savedPrices&&pr.savedPrices[utId+"_"+date];return<div onClick={()=>saveDailyPrice(utId,date,cl)} title={"Klick = "+cl+" EUR als Tagespreis speichern"} style={{background:saved?"#D1FAE5":bg,borderRadius:6,padding:"2px 4px",textAlign:"center",cursor:"pointer",border:saved?"2px solid #10B981":"2px solid transparent"}}><div style={{fontSize:11,fontWeight:800,color:saved?"#059669":c}}>{cl} EUR</div>{diff!==0&&!saved&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>0?"+":""}{pct}%</div>}{saved&&<div style={{fontSize:7,color:"#059669",fontWeight:700}}>GESPEICHERT</div>}</div>};
 
 return<div>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
