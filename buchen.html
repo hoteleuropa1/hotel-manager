@@ -61,7 +61,7 @@ var HE="info@hotel-europa-ruesselsheim.de";
 var HW="www.hotel-europa-ruesselsheim.de";
 var LOGO="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";
 
-var state={step:1,cats:[],rooms:[],reservations:[],selCat:null,checkIn:"",checkOut:"",adults:1,children:0,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",loading:true,saving:false,error:"",success:false,resNumber:""};
+var state={step:1,cats:[],rooms:[],reservations:[],dailyPrices:{},selCat:null,checkIn:"",checkOut:"",adults:1,children:0,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",loading:true,saving:false,error:"",success:false,resNumber:""};
 
 function sb(path,method,body){
   var opts={method:method||"GET",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}};
@@ -72,7 +72,32 @@ function sb(path,method,body){
 
 function fd(d){var t=new Date(d);return t.getDate().toString().padStart(2,"0")+"."+(t.getMonth()+1).toString().padStart(2,"0")+"."+t.getFullYear()}
 function nights(){if(!state.checkIn||!state.checkOut)return 0;return Math.max(0,Math.round((new Date(state.checkOut)-new Date(state.checkIn))/864e5))}
-function totalPrice(){if(!state.selCat)return 0;return nights()*state.selCat.base_price}
+function getPriceForDate(catId,dateStr){
+  var key=catId+"_"+dateStr;
+  if(state.dailyPrices[key])return state.dailyPrices[key];
+  var cat=state.cats.find(function(c){return c.id===catId});
+  return cat?cat.base_price:0;
+}
+function totalPrice(){
+  if(!state.selCat||!state.checkIn||!state.checkOut)return 0;
+  var total=0;var n=nights();
+  for(var i=0;i<n;i++){
+    var d=new Date(state.checkIn);d.setDate(d.getDate()+i);
+    var ds=d.getFullYear()+"-"+(d.getMonth()+1).toString().padStart(2,"0")+"-"+d.getDate().toString().padStart(2,"0");
+    total+=getPriceForDate(state.selCat.id,ds);
+  }
+  return total;
+}
+function avgPrice(catId){
+  if(!state.checkIn||!state.checkOut)return 0;
+  var total=0;var n=nights();if(n===0)return 0;
+  for(var i=0;i<n;i++){
+    var d=new Date(state.checkIn);d.setDate(d.getDate()+i);
+    var ds=d.getFullYear()+"-"+(d.getMonth()+1).toString().padStart(2,"0")+"-"+d.getDate().toString().padStart(2,"0");
+    total+=getPriceForDate(catId,ds);
+  }
+  return Math.round(total/n);
+}
 
 function availableRooms(){
   if(!state.selCat||!state.checkIn||!state.checkOut)return[];
