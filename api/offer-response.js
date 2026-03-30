@@ -1,147 +1,212 @@
 // api/offer-response.js
-// Gast klickt auf Annehmen/Ablehnen Link in der E-Mail
+// Handles guest accept/decline of offers
+// Sends automatic confirmation email on accept
 
-module.exports = async function handler(req, res) {
-  const { token, action } = req.query;
+const SB_URL = "https://ztdtkncoyrkvdpytwuhy.supabase.co";
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY || "sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT";
+const RESEND_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL = process.env.FROM_EMAIL || "onboarding@resend.dev";
 
-  if (!token || !action) {
-    return res.status(400).send(errorPage("Ungültiger Link", "Dieser Link ist nicht gültig."));
+const LOGO = "https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";
+const HN = "Hotel Europa";
+const HA = "Marktplatz 1";
+const HC = "65428 Ruesselsheim";
+const HP = "015903081422";
+const HE = "info@hotel-europa-ruesselsheim.de";
+const HW = "www.hotel-europa-ruesselsheim.de";
+
+function fd(d) {
+  var t = new Date(d);
+  return t.getDate().toString().padStart(2, "0") + "." + (t.getMonth() + 1).toString().padStart(2, "0") + "." + t.getFullYear();
+}
+
+function fmt(n) {
+  return parseFloat(n || 0).toFixed(2);
+}
+
+var emailFooter = '<table style="background-color:#ABA596;font-family:arial,sans-serif;font-size:13px;color:#ffffff;padding:10px;" width="575"><tr><td><b>' + HN + '</b><br>' + HA + '<br>' + HC + '<br>Tel.: ' + HP + '<br>E-Mail: <a style="color:#ffffff;text-decoration:none;" href="mailto:' + HE + '">' + HE + '</a><br><a href="http://' + HW + '" target="_blank" style="color:#ffffff;text-decoration:none;">' + HW + '</a></td></tr></table>';
+
+async function sbFetch(path, method, body) {
+  var opts = {
+    method: method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SB_KEY,
+      "Authorization": "Bearer " + SB_KEY,
+      "Prefer": "return=representation"
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  var r = await fetch(SB_URL + "/rest/v1/" + path, opts);
+  if (!r.ok) {
+    var t = await r.text();
+    throw new Error(r.status + ": " + t.slice(0, 200));
+  }
+  if (method === "GET" || method === "PATCH") return r.json();
+  return null;
+}
+
+async function sendConfirmationEmail(reservation, guest, unitType) {
+  if (!RESEND_KEY) {
+    console.log("offer-response: no RESEND_API_KEY, skipping email");
+    return;
+  }
+  if (!guest.email) {
+    console.log("offer-response: no guest email, skipping");
+    return;
   }
 
-  const sbUrl = process.env.SUPABASE_URL || "https://ztdtkncoyrkvdpytwuhy.supabase.co";
-  const sbKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || "";
+  var greet = (guest.salutation || "Sehr geehrte/r") + " " + (guest.last_name || "Gast");
+  var nights = Math.round((new Date(reservation.check_out) - new Date(reservation.check_in)) / 86400000);
+  var catName = unitType ? unitType.name : "Zimmer";
+
+  var html = '<table width="100%" style="width:100%;max-width:650px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0">';
+  html += '<tr><td><img src="' + LOGO + '" width="100%" style="width:100%;"/></td></tr>';
+  html += '<tr><td height="20"></td></tr>';
+  html += '<tr><td><h1 style="font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#58585a;margin:0;">Ihre Reservierungsbestaetigung</h1></td></tr>';
+  html += '<tr><td style="border:1px solid #ccc;padding:10px;">';
+  html += '<table width="100%"><tr><td width="96" style="text-align:center;vertical-align:top;">';
+  html += '<div style="width:64px;height:64px;background:#10B981;border-radius:32px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:32px;">&#10003;</div>';
+  html += '</td><td width="10"></td><td style="font-family:Arial,sans-serif;font-size:14px;">';
+  html += greet + ',<br><br>vielen Dank fuer Ihre Reservierung!<br><br>';
+  html += 'Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr></table></td></tr>';
+  html += '<tr><td height="10"></td></tr>';
+  html += '<tr><td style="border:1px solid #ccc;padding:10px;background:#e7e7e7;text-align:center;font-family:Arial,sans-serif;font-size:14px;">';
+  html += 'Gesamtpreis:<br><span style="font-size:24px;font-weight:bold;">EUR ' + fmt(reservation.total_price) + '</span><br>inkl. Steuern</td></tr>';
+  html += '<tr><td height="20"></td></tr>';
+  html += '<tr><td><h1 style="font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#58585a;margin:0;">Ihre Buchung</h1></td></tr>';
+  html += '<tr><td><table width="100%" cellspacing="0"><tr>';
+  html += '<td style="width:50%;border:1px solid #ccc;padding:10px;vertical-align:top;font-family:Arial,sans-serif;font-size:14px;">';
+  html += '<table width="100%">';
+  html += '<tr><td>Gebuchte Kategorie:</td><td>' + catName + '</td></tr>';
+  html += '<tr><td>Anreise:</td><td>' + fd(reservation.check_in) + '</td></tr>';
+  html += '<tr><td>Abreise:</td><td>' + fd(reservation.check_out) + '</td></tr>';
+  html += '<tr><td>Naechte:</td><td>' + nights + '</td></tr>';
+  html += '<tr><td>Erwachsene:</td><td>' + (reservation.adults || 1) + '</td></tr>';
+  html += '<tr><td>Kinder:</td><td>' + (reservation.children || 0) + '</td></tr>';
+  html += '</table></td>';
+  html += '<td style="width:50%;border:1px solid #ccc;padding:10px;vertical-align:top;font-family:Arial,sans-serif;font-size:14px;">';
+  html += '<table width="100%">';
+  html += '<tr><td>Anrede:</td><td>' + (guest.salutation || "") + '</td></tr>';
+  html += '<tr><td>Name:</td><td>' + (guest.first_name || "") + ' ' + (guest.last_name || "") + '</td></tr>';
+  html += '<tr><td>Adresse:</td><td>' + (guest.address || "") + '</td></tr>';
+  html += '<tr><td>PLZ / Ort:</td><td>' + (guest.zip || "") + ' ' + (guest.city || "") + '</td></tr>';
+  html += '<tr><td>Land:</td><td>' + (guest.country || "DE") + '</td></tr>';
+  html += '</table></td></tr></table></td></tr>';
+  html += '<tr><td height="20"></td></tr>';
+  html += '<tr><td>' + emailFooter + '</td></tr></table>';
 
   try {
-    // Reservierung über Token finden
-    const findRes = await fetch(
-      `${sbUrl}/rest/v1/reservations?offer_token=eq.${token}&select=*`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
-    );
-    const reservations = await findRes.json();
+    var r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + RESEND_KEY
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: guest.email,
+        subject: "Ihre Reservierungsbestaetigung - " + HN,
+        html: html
+      })
+    });
+    var result = await r.json();
+    console.log("offer-response: confirmation email sent to " + guest.email, result);
+  } catch (e) {
+    console.error("offer-response: email error:", e.message);
+  }
+}
+
+export default async function handler(req, res) {
+  var token = req.query.token;
+  var action = req.query.action;
+
+  if (!token || !action) {
+    return res.status(400).send(errorPage("Ungueltiger Link", "Token oder Aktion fehlt."));
+  }
+
+  try {
+    // Find reservation by offer_token
+    var reservations = await sbFetch("reservations?offer_token=eq." + token + "&limit=1", "GET");
 
     if (!reservations || reservations.length === 0) {
-      return res.status(404).send(errorPage("Nicht gefunden", "Dieses Angebot wurde nicht gefunden oder ist abgelaufen."));
+      return res.status(404).send(errorPage("Nicht gefunden", "Dieses Angebot wurde nicht gefunden oder ist bereits abgelaufen."));
     }
 
-    const reservation = reservations[0];
+    var reservation = reservations[0];
 
     if (reservation.status !== "angebot") {
-      return res.status(400).send(successPage(
-        reservation.status === "reservierung" ? "Bereits bestätigt" : "Nicht mehr gültig",
-        reservation.status === "reservierung" 
-          ? "Dieses Angebot wurde bereits angenommen. Ihre Reservierung ist bestätigt!" 
-          : "Dieses Angebot ist nicht mehr gültig.",
-        reservation.status === "reservierung" ? "#10B981" : "#6B7280"
-      ));
+      return res.status(400).send(infoPage("Bereits bearbeitet", "Dieses Angebot wurde bereits " + (reservation.status === "reservierung" ? "angenommen" : reservation.status === "abgelehnt" ? "abgelehnt" : "bearbeitet") + "."));
     }
 
     if (action === "accept") {
-      // Status auf Reservierung setzen
-      await fetch(
-        `${sbUrl}/rest/v1/reservations?id=eq.${reservation.id}`,
-        {
-          method: "PATCH",
-          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json", Prefer: "return=representation" },
-          body: JSON.stringify({ status: "reservierung", offer_accepted_at: new Date().toISOString() })
-        }
-      );
+      // Update status to reservierung
+      await sbFetch("reservations?id=eq." + reservation.id, "PATCH", {
+        status: "reservierung",
+        accepted_at: new Date().toISOString()
+      });
 
-      // Gast-Daten holen für Bestätigungsmail
-      const guestRes = await fetch(
-        `${sbUrl}/rest/v1/guests?id=eq.${reservation.guest_id}&select=*`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
-      );
-      const guests = await guestRes.json();
-      const guest = guests[0];
+      // Load guest data
+      var guests = await sbFetch("guests?id=eq." + reservation.guest_id + "&limit=1", "GET");
+      var guest = guests && guests.length > 0 ? guests[0] : {};
 
-      // Zimmer-Daten holen
-      const roomRes = await fetch(
-        `${sbUrl}/rest/v1/rooms?id=eq.${reservation.room_id}&select=*`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
-      );
-      const rooms = await roomRes.json();
-      const room = rooms[0];
-
-      // Unit Type holen
-      const utRes = await fetch(
-        `${sbUrl}/rest/v1/unit_types?id=eq.${room.unit_type_id}&select=*`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
-      );
-      const unitTypes = await utRes.json();
-      const ut = unitTypes[0];
-
-      // Hotel Info holen
-      const hiRes = await fetch(
-        `${sbUrl}/rest/v1/hotel_info?select=*&limit=1`,
-        { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
-      );
-      const hotelInfos = await hiRes.json();
-      const hi = hotelInfos[0] || {};
-
-      // Automatische Bestätigungsmail senden
-      if (guest && guest.email) {
-        const nights = Math.round((new Date(reservation.check_out) - new Date(reservation.check_in)) / 86400000);
-        const fd = d => { const t = new Date(d); return `${t.getDate().toString().padStart(2,"0")}.${(t.getMonth()+1).toString().padStart(2,"0")}.${t.getFullYear()}`; };
-        const fmt = n => parseFloat(n || 0).toFixed(2);
-
-        const confirmHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#F3F4F6;font-family:sans-serif"><div style="max-width:600px;margin:0 auto;padding:24px"><div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08)"><div style="background:linear-gradient(135deg,#3B82F6,#1D4ED8);padding:32px;text-align:center"><h1 style="color:#fff;margin:0;font-size:24px">${hi.name || 'Hotel'}</h1><p style="color:rgba(255,255,255,.8);margin:8px 0 0;font-size:14px">${hi.address || ''}</p></div><div style="padding:32px"><div style="background:#D1FAE5;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px"><p style="color:#065F46;font-weight:700;font-size:16px;margin:0">✓ Reservierung bestätigt</p></div><h2 style="margin:0 0 8px;font-size:20px">Ihre Reservierungsbestätigung</h2><p style="color:#6B7280;font-size:15px;line-height:1.6">${guest.salutation ? guest.salutation + ' ' : 'Sehr geehrte/r '}${guest.last_name},<br><br>vielen Dank! Ihre Reservierung ist hiermit bestätigt.</p><div style="background:#F9FAFB;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #E5E7EB"><table style="width:100%;font-size:14px"><tr><td style="padding:6px 0;color:#6B7280"><strong>Zimmer</strong></td><td>${room.name} – ${ut ? ut.name : ''}</td></tr><tr><td style="padding:6px 0;color:#6B7280"><strong>Anreise</strong></td><td>${fd(reservation.check_in)} (Check-in ab 15:00)</td></tr><tr><td style="padding:6px 0;color:#6B7280"><strong>Abreise</strong></td><td>${fd(reservation.check_out)} (Check-out bis 11:00)</td></tr><tr><td style="padding:6px 0;color:#6B7280"><strong>Nächte</strong></td><td>${nights}</td></tr><tr><td style="padding:6px 0;color:#6B7280"><strong>Personen</strong></td><td>${reservation.adults} Erw.${reservation.children > 0 ? ', ' + reservation.children + ' Kinder' : ''}</td></tr><tr><td style="padding:6px 0;color:#6B7280"><strong>Preis</strong></td><td style="font-weight:700">€ ${fmt(reservation.total_price)}</td></tr></table></div><p style="color:#374151;margin-top:20px">Wir freuen uns auf Ihren Besuch!<br><strong>${hi.name || ''}</strong></p></div><div style="background:#F9FAFB;padding:24px;border-top:1px solid #E5E7EB;text-align:center;font-size:12px;color:#6B7280"><p style="margin:0">${hi.name || ''} · ${hi.address || ''} · ${hi.phone || ''}</p></div></div></div></body></html>`;
-
-        const resendKey = process.env.RESEND_API_KEY;
-        const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
-        const fromName = process.env.FROM_NAME || hi.name || "Hotel";
-        const ccEmail = process.env.CC_EMAIL || fromEmail;
-
-        if (resendKey) {
-          await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${resendKey}` },
-            body: JSON.stringify({
-              from: `${fromName} <${fromEmail}>`,
-              to: [guest.email],
-              cc: [ccEmail],
-              subject: `Reservierungsbestätigung – ${ut ? ut.name : ''} Zimmer ${room.name} | ${hi.name || 'Hotel'}`,
-              html: confirmHtml
-            })
-          });
-          console.log(`✅ Bestätigungsmail automatisch gesendet an ${guest.email}`);
+      // Load unit type via room
+      var unitType = null;
+      if (reservation.room_id) {
+        var rooms = await sbFetch("rooms?id=eq." + reservation.room_id + "&limit=1", "GET");
+        if (rooms && rooms.length > 0) {
+          var unitTypes = await sbFetch("unit_types?id=eq." + rooms[0].unit_type_id + "&limit=1", "GET");
+          if (unitTypes && unitTypes.length > 0) unitType = unitTypes[0];
         }
       }
 
+      // Send automatic confirmation email
+      await sendConfirmationEmail(reservation, guest, unitType);
+
+      // Update confirmation_sent_at
+      await sbFetch("reservations?id=eq." + reservation.id, "PATCH", {
+        confirmation_sent_at: new Date().toISOString()
+      });
+
       return res.status(200).send(successPage(
         "Vielen Dank!",
-        "Ihr Angebot wurde angenommen. Sie erhalten in Kürze eine Reservierungsbestätigung per E-Mail.",
-        "#10B981"
+        "Ihre Reservierung wurde bestaetigt. Sie erhalten in Kuerze eine Reservierungsbestaetigung per E-Mail.",
+        guest.first_name
       ));
 
     } else if (action === "decline") {
-      await fetch(
-        `${sbUrl}/rest/v1/reservations?id=eq.${reservation.id}`,
-        {
-          method: "PATCH",
-          headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "abgelehnt", offer_declined_at: new Date().toISOString() })
-        }
-      );
+      await sbFetch("reservations?id=eq." + reservation.id, "PATCH", {
+        status: "abgelehnt",
+        declined_at: new Date().toISOString()
+      });
 
-      return res.status(200).send(successPage(
-        "Angebot abgelehnt",
-        "Schade! Sollten Sie es sich anders überlegen, kontaktieren Sie uns gerne.",
-        "#EF4444"
+      return res.status(200).send(infoPage(
+        "Schade!",
+        "Wir bedauern, dass Sie das Angebot nicht annehmen moechten. Wir wuerden uns freuen, Sie ein anderes Mal bei uns begruessen zu duerfen!"
       ));
+
+    } else {
+      return res.status(400).send(errorPage("Ungueltige Aktion", "Bitte verwenden Sie die Links aus der E-Mail."));
     }
 
-    return res.status(400).send(errorPage("Ungültige Aktion", "Bitte nutzen Sie die Links aus der E-Mail."));
-
-  } catch (error) {
-    console.error("Offer response error:", error);
-    return res.status(500).send(errorPage("Fehler", "Es ist ein Fehler aufgetreten. Bitte kontaktieren Sie uns direkt."));
+  } catch (e) {
+    console.error("offer-response error:", e.message);
+    return res.status(500).send(errorPage("Fehler", "Ein technischer Fehler ist aufgetreten. Bitte kontaktieren Sie uns direkt unter " + HP + "."));
   }
-};
-
-function successPage(title, message, color) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body style="margin:0;padding:0;background:#F3F4F6;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh"><div style="background:#fff;border-radius:20px;padding:48px;max-width:440px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.1)"><div style="width:64px;height:64px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;margin:0 auto 20px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="${color === '#10B981' ? 'M20 6L9 17l-5-5' : 'M18 6L6 18M6 6l12 12'}"/></svg></div><h1 style="font-size:24px;font-weight:800;margin:0 0 12px">${title}</h1><p style="color:#6B7280;font-size:16px;line-height:1.6">${message}</p></div></body></html>`;
 }
 
-function errorPage(title, message) {
-  return successPage(title, message, "#6B7280");
+function pageWrapper(icon, color, title, message, name) {
+  return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>' + title + ' - ' + HN + '</title></head><body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,sans-serif;"><div style="max-width:500px;margin:60px auto;padding:24px;"><div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08);text-align:center;">'
+    + '<div style="padding:40px 32px;">'
+    + '<div style="width:80px;height:80px;border-radius:40px;background:' + color + ';display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;"><span style="font-size:40px;color:#fff;">' + icon + '</span></div>'
+    + '<h1 style="font-size:24px;font-weight:bold;color:#111;margin:0 0 12px;">' + title + '</h1>'
+    + (name ? '<p style="font-size:16px;color:#6B7280;margin:0 0 8px;">Hallo ' + name + '!</p>' : '')
+    + '<p style="font-size:15px;color:#6B7280;line-height:1.6;margin:0;">' + message + '</p>'
+    + '</div>'
+    + '<div style="background:#ABA596;padding:16px 32px;"><p style="margin:0;color:#fff;font-size:13px;font-weight:bold;">' + HN + '</p><p style="margin:4px 0 0;color:rgba(255,255,255,0.8);font-size:12px;">' + HA + ', ' + HC + ' | Tel.: ' + HP + '</p></div>'
+    + '</div></div></body></html>';
 }
+
+function successPage(title, msg, name) { return pageWrapper("&#10003;", "#10B981", title, msg, name); }
+function infoPage(title, msg) { return pageWrapper("&#8505;", "#F59E0B", title, msg); }
+function errorPage(title, msg) { return pageWrapper("&#10007;", "#EF4444", title, msg); }
