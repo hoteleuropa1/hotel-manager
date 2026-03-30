@@ -29,26 +29,35 @@ export default async function handler(req, res) {
       return 2;
     }
 
+    // Einfache IDs fuer Gemini (UUIDs sind zu komplex)
+    var simpleIds = {};
+    var reverseIds = {};
+    for (var i = 0; i < categories.length; i++) {
+      var simpleId = String(i + 1);
+      simpleIds[categories[i].id] = simpleId;
+      reverseIds[simpleId] = categories[i].id;
+    }
+
     var catText = "";
-    var idList = [];
     for (var i = 0; i < categories.length; i++) {
       var c = categories[i];
       var p = getPersons(c.name);
-      idList.push(String(c.id));
-      catText += '- ID "' + c.id + '" name "' + c.name + '" = ' + p + ' person(s), base ' + c.base_price + ' EUR, min ' + c.min_price + ' EUR\n';
+      var sid = simpleIds[c.id];
+      catText += '- ID "' + sid + '" name "' + c.name + '" = ' + p + ' person(s), base ' + c.base_price + ' EUR, min ' + c.min_price + ' EUR\n';
     }
 
     var searchInstructions = "";
     for (var i = 0; i < categories.length; i++) {
       var c = categories[i];
       var p = getPersons(c.name);
-      searchInstructions += '- For "' + c.name + '": search Booking.com for ' + p + ' adult(s)\n';
+      searchInstructions += '- For "' + c.name + '" (ID "' + simpleIds[c.id] + '"): search Booking.com for ' + p + ' adult(s)\n';
     }
 
     var suggFormat = "";
     for (var i = 0; i < categories.length; i++) {
       if (i > 0) suggFormat += ",";
-      suggFormat += '"' + categories[i].id + '":[{"date":"' + dateFrom + '","price":70,"reason":"example"}]';
+      var sid = simpleIds[categories[i].id];
+      suggFormat += '"' + sid + '":[{"date":"' + dateFrom + '","price":70,"reason":"example"}]';
     }
 
     var prompt = 'You are a hotel pricing AI for Hotel Europa Ruesselsheim (3-star, 6.2/10 rating, near Frankfurt Airport).\n\n';
@@ -81,7 +90,9 @@ export default async function handler(req, res) {
     prompt += '- "Guenstigstes Angebot im Markt" = we are cheapest\n';
     prompt += '- "Min-Preis, Markt bei 55EUR" = we hit our minimum, market is higher\n\n';
     prompt += 'STRICT RULES:\n';
-    prompt += '- Use EXACTLY these IDs: ' + idList.join(', ') + '\n';
+    prompt += '- Use EXACTLY these simple IDs: ' + categories.map(function(c,i){return String(i+1)}).join(', ') + '\n';
+    prompt += '- You MUST return suggestions for ALL ' + categories.length + ' categories, not just one\n';
+    prompt += '- Each category MUST have entries for every day in the period\n';
     prompt += '- Dates as YYYY-MM-DD with zero padding\n';
     prompt += '- Prices as integers in EUR\n';
     prompt += '- No umlauts (use ae oe ue ss)\n';
@@ -193,6 +204,37 @@ export default async function handler(req, res) {
         }
       }
     }
+
+    // Simple IDs zurueck auf echte UUIDs mappen
+    var mappedSugg = {};
+    var suggKeys = Object.keys(parsed.suggestions || {});
+    console.log("fetch-prices: suggestion keys from Gemini: " + suggKeys.join(", "));
+
+    for (var i = 0; i < suggKeys.length; i++) {
+      var sKey = suggKeys[i];
+      var realId = reverseIds[sKey];
+      if (realId) {
+        // Direkt-Match ueber simple ID
+        mappedSugg[realId] = parsed.suggestions[sKey];
+        console.log("fetch-prices: mapped " + sKey + " -> " + realId + " (" + parsed.suggestions[sKey].length + " days)");
+      } else if (i < categories.length) {
+        // Fallback: Position
+        mappedSugg[categories[i].id] = parsed.suggestions[sKey];
+        console.log("fetch-prices: position-mapped " + sKey + " -> " + categories[i].id);
+      }
+    }
+
+    // Falls weniger Keys als Kategorien: auch per Position zuordnen
+    if (suggKeys.length < categories.length && suggKeys.length > 0) {
+      for (var i = 0; i < categories.length; i++) {
+        if (!mappedSugg[categories[i].id] && i < suggKeys.length) {
+          mappedSugg[categories[i].id] = parsed.suggestions[suggKeys[i]];
+          console.log("fetch-prices: fallback-mapped " + suggKeys[i] + " -> " + categories[i].id);
+        }
+      }
+    }
+
+    parsed.suggestions = mappedSugg;
 
     // Grounding-Quellen
     var gm = data.candidates && data.candidates[0] && data.candidates[0].groundingMetadata;
