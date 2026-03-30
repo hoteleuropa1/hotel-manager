@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Zimmer buchen - Hotel Europa</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F9FAFB;color:#111}
+.wrap{max-width:900px;margin:0 auto;padding:20px}
+h1{font-size:26px;font-weight:800;color:#2D2040;margin-bottom:4px}
+h2{font-size:20px;font-weight:700;color:#2D2040;margin-bottom:16px}
+.sub{font-size:14px;color:#6B7280;margin-bottom:24px}
+.steps{display:flex;gap:8px;margin-bottom:28px}
+.step{flex:1;padding:10px;border-radius:10px;text-align:center;font-size:13px;font-weight:600;background:#E5E7EB;color:#6B7280;transition:all .2s}
+.step.active{background:#2D2040;color:#fff}
+.step.done{background:#10B981;color:#fff}
+.card{background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:16px;cursor:pointer;transition:all .15s}
+.card:hover{border-color:#3B6BE8;box-shadow:0 4px 12px rgba(59,107,232,.12)}
+.card.selected{border:2px solid #3B6BE8;box-shadow:0 4px 16px rgba(59,107,232,.15)}
+.card-body{padding:20px}
+.cat-name{font-size:18px;font-weight:700;color:#111;margin-bottom:4px}
+.cat-info{font-size:13px;color:#6B7280;margin-bottom:8px}
+.cat-price{font-size:24px;font-weight:800;color:#3B6BE8}
+.cat-price span{font-size:14px;font-weight:500;color:#6B7280}
+.cat-img{width:100%;height:180px;object-fit:cover;background:#E5E7EB;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
+input,select{width:100%;padding:10px 14px;border:1px solid #D1D5DB;border-radius:10px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box}
+input:focus,select:focus{border-color:#3B6BE8;box-shadow:0 0 0 3px rgba(59,107,232,.1)}
+.field{margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;transition:all .15s;width:100%}
+.btn-primary{background:#3B6BE8;color:#fff}.btn-primary:hover{background:#2D5AD0}
+.btn-ghost{background:#fff;color:#6B7280;border:1px solid #D1D5DB}.btn-ghost:hover{background:#F9FAFB}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.price-box{background:#F0F4FF;border-radius:12px;padding:20px;margin:16px 0;display:flex;justify-content:space-between;align-items:center}
+.price-total{font-size:28px;font-weight:800;color:#2D2040}
+.price-detail{font-size:13px;color:#6B7280}
+.avail{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.avail.yes{background:#D1FAE5;color:#059669}
+.avail.no{background:#FEE2E2;color:#DC2626}
+.success-box{text-align:center;padding:60px 20px}
+.success-icon{width:80px;height:80px;border-radius:40px;background:#10B981;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:40px;color:#fff}
+.footer{background:#ABA596;border-radius:12px;padding:20px;color:#fff;font-size:13px;margin-top:24px}
+.footer a{color:#fff}
+.not-avail{opacity:.5;pointer-events:none}
+@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}.wrap{padding:12px}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">Laden...</div>
+<script>
+var SB_URL="https://ztdtkncoyrkvdpytwuhy.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0ZHRrbmNveXJrdmRweXR3dWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDk4OTYsImV4cCI6MjA5MDA4NTg5Nn0.dS6lxpphLtzoKvYNkc5I_otoGSHu99o42gT9q0By61o";
+
+var HN="Hotel Europa";
+var HA="Marktplatz 1, 65428 Ruesselsheim";
+var HP="015903081422";
+var HE="info@hotel-europa-ruesselsheim.de";
+var HW="www.hotel-europa-ruesselsheim.de";
+var LOGO="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";
+
+var state={step:1,cats:[],rooms:[],reservations:[],selCat:null,checkIn:"",checkOut:"",adults:1,children:0,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",loading:true,saving:false,error:"",success:false,resNumber:""};
+
+function sb(path,method,body){
+  var opts={method:method||"GET",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}};
+  if(method==="POST"||method==="PATCH")opts.headers["Prefer"]="return=representation";
+  if(body)opts.body=JSON.stringify(body);
+  return fetch(SB_URL+"/rest/v1/"+path,opts).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
+}
+
+function fd(d){var t=new Date(d);return t.getDate().toString().padStart(2,"0")+"."+(t.getMonth()+1).toString().padStart(2,"0")+"."+t.getFullYear()}
+function nights(){if(!state.checkIn||!state.checkOut)return 0;return Math.max(0,Math.round((new Date(state.checkOut)-new Date(state.checkIn))/864e5))}
+function totalPrice(){if(!state.selCat)return 0;return nights()*state.selCat.base_price}
+
+function availableRooms(){
+  if(!state.selCat||!state.checkIn||!state.checkOut)return[];
+  var catRooms=state.rooms.filter(function(r){return r.unit_type_id===state.selCat.id&&r.active});
+  return catRooms.filter(function(room){
+    return!state.reservations.some(function(res){
+      return res.room_id===room.id&&res.status!=="abgelehnt"&&res.status!=="storniert"&&res.status!=="checkedout"&&state.checkIn<res.check_out&&state.checkOut>res.check_in;
+    });
+  });
+}
+
+function render(){
+  var app=document.getElementById("app");
+  var n=nights();
+  var avail=availableRooms();
+  var tp=totalPrice();
+
+  var html='<div style="text-align:center;margin-bottom:20px"><img src="'+LOGO+'" style="max-width:300px;width:100%;margin-bottom:12px"/><h1>Zimmer buchen</h1><p class="sub">Direkt buchen - bester Preis garantiert!</p></div>';
+
+  // Steps
+  html+='<div class="steps"><div class="step '+(state.step>=1?(state.step>1?"done":"active"):"")+'">1. Zeitraum</div><div class="step '+(state.step>=2?(state.step>2?"done":"active"):"")+'">2. Zimmer</div><div class="step '+(state.step>=3?(state.step>3?"done":"active"):"")+'">3. Ihre Daten</div><div class="step '+(state.step>=4?"active":"")+'">4. Fertig</div></div>';
+
+  if(state.loading){html+='<div style="text-align:center;padding:40px;color:#6B7280">Laden...</div>';app.innerHTML=html;return}
+
+  // STEP 1: DATE + PERSONS
+  if(state.step===1){
+    var today=new Date().toISOString().split("T")[0];
+    var tomorrow=new Date(Date.now()+864e5).toISOString().split("T")[0];
+    html+='<h2>Wann moechten Sie reisen?</h2>';
+    html+='<div class="grid2"><div class="field"><label>Anreise</label><input type="date" id="ci" value="'+(state.checkIn||today)+'" min="'+today+'"/></div><div class="field"><label>Abreise</label><input type="date" id="co" value="'+(state.checkOut||tomorrow)+'" min="'+tomorrow+'"/></div></div>';
+    html+='<div class="grid2"><div class="field"><label>Erwachsene</label><select id="ad">';
+    for(var i=1;i<=6;i++)html+='<option value="'+i+'"'+(state.adults===i?" selected":"")+'>'+i+'</option>';
+    html+='</select></div><div class="field"><label>Kinder</label><select id="ch">';
+    for(var i=0;i<=4;i++)html+='<option value="'+i+'"'+(state.children===i?" selected":"")+'>'+i+'</option>';
+    html+='</select></div></div>';
+    html+='<button class="btn btn-primary" onclick="goStep2()">Verfuegbarkeit pruefen</button>';
+  }
+
+  // STEP 2: ROOM SELECTION
+  if(state.step===2){
+    html+='<h2>Verfuegbare Zimmer: '+fd(state.checkIn)+' - '+fd(state.checkOut)+' ('+n+' '+(n===1?"Nacht":"Naechte")+')</h2>';
+    if(state.cats.length===0){html+='<p style="color:#6B7280">Keine Kategorien gefunden.</p>'}
+    state.cats.forEach(function(cat){
+      var catRooms=state.rooms.filter(function(r){return r.unit_type_id===cat.id&&r.active});
+      var freeRooms=catRooms.filter(function(room){
+        return!state.reservations.some(function(res){
+          return res.room_id===room.id&&res.status!=="abgelehnt"&&res.status!=="storniert"&&res.status!=="checkedout"&&state.checkIn<res.check_out&&state.checkOut>res.check_in;
+        });
+      });
+      var isAvail=freeRooms.length>0;
+      var sel=state.selCat&&state.selCat.id===cat.id;
+      html+='<div class="card'+(sel?" selected":"")+(isAvail?"":" not-avail")+'" onclick="selectCat(\''+cat.id+'\')">';
+      html+='<div class="cat-img" style="'+(cat.image_url?"background-image:url("+cat.image_url+");background-size:cover;background-position:center":"")+'">'+(!cat.image_url?cat.name:"")+'</div>';
+      html+='<div class="card-body"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="cat-name">'+cat.name+'</div><div class="cat-info">Max. '+cat.capacity+' Personen | '+catRooms.length+' Zimmer</div></div><div style="text-align:right"><div class="cat-price">'+cat.base_price+' EUR <span>/ Nacht</span></div>';
+      if(n>0)html+='<div style="font-size:13px;color:#6B7280;margin-top:2px">Gesamt: <strong>'+(cat.base_price*n)+' EUR</strong></div>';
+      html+='</div></div>';
+      html+='<div style="margin-top:8px"><span class="avail '+(isAvail?"yes":"no")+'">'+(isAvail?freeRooms.length+" verfuegbar":"Ausgebucht")+'</span></div>';
+      html+='</div></div>';
+    });
+    html+='<div style="display:flex;gap:12px;margin-top:16px"><button class="btn btn-ghost" onclick="goBack(1)">Zurueck</button><button class="btn btn-primary"'+(state.selCat?"":" disabled")+' onclick="goStep3()">Weiter</button></div>';
+  }
+
+  // STEP 3: GUEST DATA
+  if(state.step===3){
+    html+='<h2>Ihre Daten</h2>';
+    html+='<div class="price-box"><div><div class="price-detail">'+state.selCat.name+' | '+fd(state.checkIn)+' - '+fd(state.checkOut)+' | '+n+' '+(n===1?"Nacht":"Naechte")+'</div><div class="price-detail">'+state.adults+' Erwachsene'+(state.children>0?", "+state.children+" Kinder":"")+'</div></div><div class="price-total">'+tp+' EUR</div></div>';
+    html+='<div class="grid3"><div class="field"><label>Anrede *</label><select id="sal"><option value="Herr"'+(state.salutation==="Herr"?" selected":"")+'>Herr</option><option value="Frau"'+(state.salutation==="Frau"?" selected":"")+'>Frau</option><option value="Firma"'+(state.salutation==="Firma"?" selected":"")+'>Firma</option></select></div><div class="field"><label>Vorname *</label><input id="fn" value="'+esc(state.first_name)+'" placeholder="Max"/></div><div class="field"><label>Nachname *</label><input id="ln" value="'+esc(state.last_name)+'" placeholder="Mustermann"/></div></div>';
+    if(state.salutation==="Firma")html+='<div class="field"><label>Firmenname *</label><input id="comp" value="'+esc(state.company)+'" placeholder="Firma GmbH"/></div>';
+    html+='<div class="grid2"><div class="field"><label>E-Mail *</label><input type="email" id="em" value="'+esc(state.email)+'" placeholder="max@beispiel.de"/></div><div class="field"><label>Telefon</label><input id="ph" value="'+esc(state.phone)+'" placeholder="+49 ..."/></div></div>';
+    html+='<div class="field"><label>Strasse und Hausnummer</label><input id="addr" value="'+esc(state.address)+'"/></div>';
+    html+='<div class="grid3"><div class="field"><label>PLZ</label><input id="zip" value="'+esc(state.zip)+'"/></div><div class="field"><label>Ort</label><input id="city" value="'+esc(state.city)+'"/></div><div class="field"><label>Land</label><input id="country" value="'+esc(state.country||"DE")+'"/></div></div>';
+    if(state.error)html+='<div style="background:#FEE2E2;color:#DC2626;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:12px">'+state.error+'</div>';
+    html+='<div style="display:flex;gap:12px;margin-top:8px"><button class="btn btn-ghost" onclick="goBack(2)">Zurueck</button><button class="btn btn-primary" id="bookbtn"'+(state.saving?" disabled":"")+' onclick="doBook()">'+(state.saving?"Buchung wird verarbeitet...":"Jetzt verbindlich buchen")+'</button></div>';
+    html+='<p style="font-size:11px;color:#9CA3AF;margin-top:12px;text-align:center">Mit Klick auf "Jetzt verbindlich buchen" akzeptieren Sie unsere Buchungsbedingungen.</p>';
+  }
+
+  // STEP 4: SUCCESS
+  if(state.step===4){
+    html+='<div class="success-box"><div class="success-icon">&#10003;</div><h2 style="margin-bottom:8px">Vielen Dank fuer Ihre Buchung!</h2><p style="font-size:15px;color:#6B7280;margin-bottom:20px">'+state.salutation+' '+state.last_name+', Ihre Reservierung wurde erfolgreich erstellt.</p>';
+    html+='<div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;text-align:left;max-width:400px;margin:0 auto"><table style="width:100%;font-size:14px"><tr><td style="padding:4px 0;color:#6B7280">Buchungsnr.:</td><td style="padding:4px 0;font-weight:700">'+state.resNumber+'</td></tr><tr><td style="padding:4px 0;color:#6B7280">Zimmer:</td><td style="padding:4px 0;font-weight:600">'+state.selCat.name+'</td></tr><tr><td style="padding:4px 0;color:#6B7280">Anreise:</td><td style="padding:4px 0">'+fd(state.checkIn)+'</td></tr><tr><td style="padding:4px 0;color:#6B7280">Abreise:</td><td style="padding:4px 0">'+fd(state.checkOut)+'</td></tr><tr><td style="padding:4px 0;color:#6B7280">Naechte:</td><td style="padding:4px 0">'+n+'</td></tr><tr><td style="padding:4px 0;color:#6B7280">Gesamt:</td><td style="padding:4px 0;font-size:18px;font-weight:800;color:#2D2040">'+tp+' EUR</td></tr></table></div>';
+    html+='<p style="font-size:13px;color:#6B7280;margin-top:16px">Eine Bestaetigung wurde an <strong>'+esc(state.email)+'</strong> gesendet.</p>';
+    html+='<button class="btn btn-ghost" style="max-width:300px;margin:20px auto 0" onclick="resetBooking()">Neue Buchung</button></div>';
+  }
+
+  // Footer
+  html+='<div class="footer"><strong>'+HN+'</strong><br>'+HA+'<br>Tel.: '+HP+' | E-Mail: <a href="mailto:'+HE+'">'+HE+'</a><br><a href="http://'+HW+'" target="_blank">'+HW+'</a></div>';
+
+  app.innerHTML=html;
+}
+
+function esc(s){return(s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
+
+function goStep2(){
+  state.checkIn=document.getElementById("ci").value;
+  state.checkOut=document.getElementById("co").value;
+  state.adults=parseInt(document.getElementById("ad").value)||1;
+  state.children=parseInt(document.getElementById("ch").value)||0;
+  if(!state.checkIn||!state.checkOut||state.checkIn>=state.checkOut){alert("Bitte gueltigen Zeitraum waehlen");return}
+  state.step=2;state.selCat=null;render();
+}
+
+function selectCat(id){
+  state.selCat=state.cats.find(function(c){return c.id===id})||null;
+  render();
+}
+
+function goStep3(){
+  if(!state.selCat)return;
+  state.step=3;state.error="";render();
+}
+
+function goBack(step){state.step=step;state.error="";render()}
+
+function doBook(){
+  state.salutation=document.getElementById("sal").value;
+  state.first_name=document.getElementById("fn").value.trim();
+  state.last_name=document.getElementById("ln").value.trim();
+  state.email=document.getElementById("em").value.trim();
+  state.phone=document.getElementById("ph").value.trim();
+  state.address=document.getElementById("addr").value.trim();
+  state.zip=document.getElementById("zip").value.trim();
+  state.city=document.getElementById("city").value.trim();
+  state.country=document.getElementById("country").value.trim()||"DE";
+  if(state.salutation==="Firma"){var ce=document.getElementById("comp");state.company=ce?ce.value.trim():""}
+
+  if(!state.first_name||!state.last_name){state.error="Bitte Vor- und Nachname eingeben";render();return}
+  if(!state.email||!state.email.includes("@")){state.error="Bitte gueltige E-Mail-Adresse eingeben";render();return}
+  if(state.salutation==="Firma"&&!state.company){state.error="Bitte Firmennamen eingeben";render();return}
+
+  var avail=availableRooms();
+  if(avail.length===0){state.error="Leider ist diese Kategorie im gewaehlten Zeitraum nicht mehr verfuegbar.";render();return}
+
+  state.saving=true;state.error="";render();
+  var room=avail[0];
+
+  // Create guest
+  var guestData={salutation:state.salutation,first_name:state.first_name,last_name:state.last_name,email:state.email,phone:state.phone,address:state.address,zip:state.zip,city:state.city,country:state.country};
+  if(state.company)guestData.company=state.company;
+
+  sb("guests",  "POST",guestData).then(function(gs){
+    var guest=gs[0];
+    var token="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16)});
+    return sb("reservations","POST",{
+      room_id:room.id,guest_id:guest.id,check_in:state.checkIn,check_out:state.checkOut,
+      status:"reservierung",adults:state.adults,children:state.children,
+      total_price:totalPrice(),source:"website",offer_token:token,notes:"Online-Direktbuchung"
+    }).then(function(rs){
+      state.resNumber=rs[0].reservation_number||rs[0].id.toString().slice(0,8).toUpperCase();
+      // Send confirmation email
+      return fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        to:state.email,subject:"Ihre Reservierungsbestaetigung - "+HN,
+        html:buildConfirmationHtml(guest,rs[0]),emailType:"bestaetigung"
+      })}).catch(function(){});
+    });
+  }).then(function(){
+    state.saving=false;state.step=4;render();
+  }).catch(function(e){
+    state.saving=false;state.error="Buchungsfehler: "+e.message;render();
+  });
+}
+
+function buildConfirmationHtml(guest,res){
+  var n=nights();var greet=(state.salutation||"Sehr geehrte/r")+" "+state.last_name;
+  var h='<table width="100%" style="width:100%;max-width:650px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0">';
+  h+='<tr><td><img src="'+LOGO+'" width="100%" style="width:100%"/></td></tr>';
+  h+='<tr><td height="20"></td></tr>';
+  h+='<tr><td><h1 style="font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#58585a;margin:0;">Ihre Reservierungsbestaetigung</h1></td></tr>';
+  h+='<tr><td style="border:1px solid #ccc;padding:15px;font-size:14px;">'+greet+',<br><br>vielen Dank fuer Ihre Reservierung ueber unsere Website!<br><br>Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr>';
+  h+='<tr><td height="10"></td></tr>';
+  h+='<tr><td style="border:1px solid #ccc;padding:15px;background:#e7e7e7;text-align:center;font-family:Arial,sans-serif;font-size:14px;">Gesamtpreis:<br><span style="font-size:24px;font-weight:bold;">EUR '+totalPrice().toFixed(2)+'</span><br>inkl. Steuern</td></tr>';
+  h+='<tr><td height="15"></td></tr>';
+  h+='<tr><td><h2 style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#58585a;">Ihre Buchung</h2></td></tr>';
+  h+='<tr><td style="border:1px solid #ccc;padding:15px;font-size:14px;"><table width="100%">';
+  h+='<tr><td>Zimmerkategorie:</td><td><strong>'+state.selCat.name+'</strong></td></tr>';
+  h+='<tr><td>Anreise:</td><td>'+fd(state.checkIn)+'</td></tr>';
+  h+='<tr><td>Abreise:</td><td>'+fd(state.checkOut)+'</td></tr>';
+  h+='<tr><td>Naechte:</td><td>'+n+'</td></tr>';
+  h+='<tr><td>Erwachsene:</td><td>'+state.adults+'</td></tr>';
+  if(state.children>0)h+='<tr><td>Kinder:</td><td>'+state.children+'</td></tr>';
+  h+='</table></td></tr>';
+  h+='<tr><td height="20"></td></tr>';
+  h+='<tr><td style="background-color:#ABA596;padding:15px;color:#fff;font-size:13px;"><strong>'+HN+'</strong><br>'+HA+'<br>Tel.: '+HP+'<br>E-Mail: '+HE+'<br>'+HW+'</td></tr></table>';
+  return h;
+}
+
+function resetBooking(){
+  state.step=1;state.selCat=null;state.first_name="";state.last_name="";state.email="";state.phone="";state.address="";state.zip="";state.city="";state.company="";state.error="";state.success=false;
+  loadData();
+}
+
+function loadData(){
+  state.loading=true;render();
+  Promise.all([
+    sb("unit_types?order=sort_order","GET"),
+    sb("rooms?active=eq.true&order=name","GET"),
+    sb("reservations?status=neq.storniert&status=neq.abgelehnt&status=neq.checkedout&select=id,room_id,check_in,check_out,status","GET")
+  ]).then(function(results){
+    state.cats=results[0];state.rooms=results[1];state.reservations=results[2];
+    state.loading=false;render();
+  }).catch(function(e){
+    state.loading=false;state.error="Laden fehlgeschlagen: "+e.message;render();
+  });
+}
+
+loadData();
+</script>
+</body>
+</html>
