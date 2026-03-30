@@ -743,10 +743,287 @@ function MainApp({sb,token,onLogout}){
       </div>
     </div>;
   };
+// ─── PRICING VIEW ───
+  const PricingView=()=>{
+    const[pSugg,setPSugg]=useState({});
+    const[pLoad,setPLoad]=useState(false);
+    const[pErr,setPErr]=useState(null);
+    const[lastUpd,setLastUpd]=useState(null);
+    const[comps,setComps]=useState(null);
+    const[showComp,setShowComp]=useState(false);
+    const[showCfg,setShowCfg]=useState(false);
+    const[autoP,setAutoP]=useState(false);
+    const[minPrices,setMinPrices]=useState({});
+    const[editCell,setEditCell]=useState(null);
+    const[editVal,setEditVal]=useState("");
+
+    const days=Array.from({length:14},(_,i)=>addD(ws,i));
+
+    useEffect(()=>{
+      const m={};uts.forEach(u=>{m[u.id]=Math.round((u.base_price||80)*0.65)});
+      setMinPrices(m);
+    },[uts]);
+
+    useEffect(()=>{
+      if(!autoP)return;
+      const iv=setInterval(()=>fetchPrices(),30*60000);
+      return()=>clearInterval(iv);
+    },[autoP]);
+
+    const getOcc=(tid,date)=>{
+      const ds=toDS(date);
+      const tr=aRms.filter(r=>r.unit_type_id==tid);
+      const oc=tr.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&!["abgelehnt","checkedout","storniert"].includes(rv.status))).length;
+      return{oc,tot:tr.length,pct:tr.length?Math.round(oc/tr.length*100):0};
+    };
+
+    const totOcc=(date)=>{
+      const ds=toDS(date);
+      const oc=aRms.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&!["abgelehnt","checkedout","storniert"].includes(rv.status))).length;
+      return{oc,tot:aRms.length,pct:aRms.length?Math.round(oc/aRms.length*100):0};
+    };
+
+    const fetchPrices=async()=>{
+      setPLoad(true);setPErr(null);
+      try{
+        const occD={};
+        uts.forEach(ut=>{
+          occD[ut.id]=days.map(d=>{
+            const o=getOcc(ut.id,d);
+            return{date:toDS(d),weekday:["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()],occupied:o.oc,total:o.tot,pct:o.pct};
+          });
+        });
+
+        const prompt="You are a hotel revenue management AI for \"Hotel Europa Ruesselsheim\" (3-star, rating 7.5/10, near Frankfurt Airport).\n\nSearch Booking.com for current hotel prices near Ruesselsheim, Frankfurt Airport, Kelsterbach, Raunheim for "+toDS(days[0])+" to "+toDS(days[13])+".\n\nOUR ROOM CATEGORIES:\n"+uts.map(ut=>"- ID "+ut.id+" \""+ut.name+"\": Basispreis "+ut.base_price+"EUR, Mindestpreis "+(minPrices[ut.id]||39)+"EUR\n  Belegung: "+JSON.stringify(occD[ut.id])).join("\n")+"\n\nRULES:\n- Never suggest below minimum price\n- High occupancy >80%: price 10-20% above market\n- Low occupancy <50%: price 5-15% below market but above minimum\n- Weekend Fr/Sa premium +10-15%\n- Compare vs competitor prices\n\nRespond ONLY valid JSON (no markdown no backticks):\n{\"competitors\":[{\"name\":\"string\",\"stars\":0,\"rating\":0,\"priceRange\":\"string\"}],\"suggestions\":{\""+uts.map(u=>u.id).join("\":[...],\"")+"\":[{\"date\":\"YYYY-MM-DD\",\"price\":0,\"reason\":\"short German reason\"}]},\"marketSummary\":\"2-3 German sentences\"}";
+
+        const resp=await fetch("https://api.anthropic.com/v1/messages",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
+            tools:[{type:"web_search_20250305",name:"web_search"}],
+            messages:[{role:"user",content:prompt}]})
+        });
+        if(!resp.ok)throw new Error("API "+resp.status);
+        const data=await resp.json();
+        const txt=data.content?.filter(b=>b.type==="text").map(b=>b.text).join("\n")||"";
+        const clean=txt.replace(/```json|```/g,"").trim();
+        const m=clean.match(/\{[\s\S]*"suggestions"[\s\S]*\}/);
+        if(!m)throw new Error("Keine Preisdaten erhalten");
+        const parsed=JSON.parse(m[0]);
+        setPSugg(parsed.suggestions||{});
+        setComps(parsed);
+        setLastUpd(new Date());
+        show("Preisvorschlaege aktualisiert");
+      }catch(e){setPErr(e.message);show(e.message,"error")}
+      finally{setPLoad(false)}
+    };
+
+    const getP=(tid,d)=>{const a=pSugg[String(tid)];return a?.find(e=>e.date===toDS(d))?.price||null};
+    const getReason=(tid,d)=>{const a=pSugg[String(tid)];return a?.find(e=>e.date===toDS(d))?.reason||""};
+
+    const startEdit=(tid,field,val)=>{setEditCell(tid+"_"+field);setEditVal(String(val))};
+    const saveEdit=async(tid,field)=>{
+      const v=parseFloat(editVal)||0;
+      if(field==="min_price"){setMinPrices(p=>({...p,[tid]:v}))}
+      else if(field==="base_price"){
+        try{await api.patch("unit_types",tid,{base_price:v});
+          setUts(p=>p.map(u=>u.id==tid?{...u,base_price:v}:u));
+          show("Basispreis gespeichert");
+        }catch(e){show(e.message,"error")}
+      }
+      setEditCell(null);
+    };
+
+    const PBadge=({price,base,min})=>{
+      if(pLoad)return<div style={{width:28,height:14,background:"#E2E8F0",borderRadius:4,margin:"0 auto"}}></div>;
+      if(!price)return<span style={{color:"#CBD5E1",fontSize:10}}>-</span>;
+      const cl=Math.max(price,min||0);
+      const diff=cl-base;const pct=Math.round((diff/base)*100);
+      const c=diff>2?"#DC2626":diff<-2?"#059669":"#6B7280";
+      const bg=diff>2?"#FEF2F2":diff<-2?"#ECFDF5":"#F9FAFB";
+      return<div style={{background:bg,borderRadius:6,padding:"2px 4px",textAlign:"center"}}>
+        <div style={{fontSize:12,fontWeight:800,color:c,lineHeight:1.1}}>{cl}&#8364;</div>
+        {diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>2?"&#9650;":"&#9660;"}{pct>0?"+":""}{pct}%</div>}
+        {price<(min||0)&&<div style={{fontSize:7,color:"#F59E0B",fontWeight:700}}>MIN</div>}
+      </div>;
+    };
+
+    return<div>
+      {/* Controls */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))}><I n="cL" s={16}/></Btn>
+          <Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn>
+          <Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))}><I n="cR" s={16}/></Btn>
+          <span style={{fontSize:14,fontWeight:600}}>{fd(ws)} - {fd(addD(ws,13))}</span>
+        </div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <Btn v="ghost" sz="sm" onClick={()=>setShowCfg(!showCfg)} style={{background:showCfg?"#EFF6FF":"transparent"}}><I n="settings" s={14}/> Preise konfigurieren</Btn>
+          <Btn sz="sm" onClick={fetchPrices} disabled={pLoad} style={{background:pLoad?"#94A3B8":"#1E40AF"}}><I n="dollar" s={14} c="#fff"/> {pLoad?"Lade...":"Preise abrufen"}</Btn>
+          <label style={{fontSize:11,color:"#6B7280",display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
+            <input type="checkbox" checked={autoP} onChange={e=>setAutoP(e.target.checked)} style={{width:14,height:14}}/>
+            Auto (30m)
+          </label>
+        </div>
+      </div>
+
+      {/* Config Panel */}
+      {showCfg&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",padding:16,marginBottom:16}}>
+        <div style={{fontSize:14,fontWeight:800,marginBottom:12,color:"#1E40AF"}}>Preiskonfiguration pro Zimmerkategorie</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat("+Math.min(uts.length,4)+", 1fr)",gap:12}}>
+          {uts.map(ut=><div key={ut.id} style={{background:"#F9FAFB",borderRadius:10,padding:12,border:"2px solid "+(ut.color||"#ddd")+"30"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+              <CD color={ut.color||"#999"} size={12}/>
+              <span style={{fontWeight:700,fontSize:13}}>{ut.name}</span>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:11,color:"#6B7280"}}>Basispreis</span>
+                {editCell===ut.id+"_base_price"
+                  ?<input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={()=>saveEdit(ut.id,"base_price")} onKeyDown={e=>{if(e.key==="Enter")saveEdit(ut.id,"base_price");if(e.key==="Escape")setEditCell(null)}} autoFocus style={{width:60,padding:"2px 6px",borderRadius:4,border:"1px solid #3B82F6",fontSize:12,fontWeight:700,textAlign:"center"}}/>
+                  :<span onClick={()=>startEdit(ut.id,"base_price",ut.base_price)} style={{cursor:"pointer",borderBottom:"1px dashed #9CA3AF",fontSize:12,fontWeight:700}}>{ut.base_price}&#8364;</span>
+                }
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:11,color:"#6B7280"}}>Mindestpreis</span>
+                {editCell===ut.id+"_min_price"
+                  ?<input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={()=>saveEdit(ut.id,"min_price")} onKeyDown={e=>{if(e.key==="Enter")saveEdit(ut.id,"min_price");if(e.key==="Escape")setEditCell(null)}} autoFocus style={{width:60,padding:"2px 6px",borderRadius:4,border:"1px solid #3B82F6",fontSize:12,fontWeight:700,textAlign:"center"}}/>
+                  :<span onClick={()=>startEdit(ut.id,"min_price",minPrices[ut.id]||0)} style={{cursor:"pointer",borderBottom:"1px dashed #9CA3AF",fontSize:12,fontWeight:700,color:"#DC2626"}}>{minPrices[ut.id]||0}&#8364;</span>
+                }
+              </div>
+              <div style={{borderTop:"1px solid #E5E7EB",paddingTop:6,display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:10,color:"#9CA3AF"}}>Spielraum</span>
+                <span style={{fontSize:11,fontWeight:700,color:"#059669"}}>{ut.base_price-(minPrices[ut.id]||0)}&#8364;</span>
+              </div>
+            </div>
+          </div>)}
+        </div>
+        <div style={{fontSize:11,color:"#9CA3AF",marginTop:8}}>Klick auf einen Preis um ihn zu aendern. Basispreis wird in Supabase gespeichert. Mindestpreis wird nie unterschritten.</div>
+      </div>}
+
+      {/* Status Bar */}
+      {(lastUpd||pErr)&&<div style={{background:pErr?"#FEF2F2":"#EFF6FF",borderRadius:8,padding:"6px 12px",marginBottom:12,fontSize:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        {pErr?<span style={{color:"#DC2626"}}>Fehler: {pErr}</span>
+          :<span style={{color:"#1E40AF"}}>Preise aktualisiert: {lastUpd.toLocaleTimeString("de-DE")}{autoP?" | naechstes Update in 30 Min.":""}</span>}
+        {comps&&<button onClick={()=>setShowComp(!showComp)} style={{background:"none",border:"none",color:"#1E40AF",cursor:"pointer",fontSize:11,fontWeight:600,textDecoration:"underline"}}>{showComp?"Ausblenden":(comps.competitors?.length||0)+" Konkurrenten"}</button>}
+      </div>}
+
+      {/* Competitors */}
+      {showComp&&comps&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",padding:12,marginBottom:16}}>
+        {comps.marketSummary&&<div style={{fontSize:12,color:"#475569",marginBottom:8,padding:"8px 10px",background:"#FFFBEB",borderRadius:8,borderLeft:"3px solid #F59E0B"}}>{comps.marketSummary}</div>}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {comps.competitors?.map((c,i)=><div key={i} style={{background:"#F9FAFB",border:"1px solid #E5E7EB",borderRadius:8,padding:"8px 12px",fontSize:12}}>
+            <div style={{fontWeight:700}}>{c.name}</div>
+            <div style={{color:"#6B7280",fontSize:11}}>{"★".repeat(c.stars||0)} | {c.rating}/10 | <strong>{c.priceRange}</strong></div>
+          </div>)}
+        </div>
+      </div>}
+
+      {/* Grid */}
+      <div style={{overflowX:"auto",borderRadius:12,border:"1px solid #E5E7EB"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
+          <thead><tr style={{background:"#F9FAFB"}}>
+            <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:130}}>Kategorie / Zimmer</th>
+            {days.map((d,i)=>{const isT=toDS(d)===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;const o=totOcc(d);return<th key={i} style={{padding:"6px 4px",textAlign:"center",fontWeight:isT?800:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:54}}>
+              <div style={{fontSize:10,color:isT?"#2563EB":"#6B7280"}}>{["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()]}</div>
+              <div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate()}</div>
+              <div style={{fontSize:9,fontWeight:700,color:o.pct>80?"#DC2626":o.pct>50?"#D97706":"#059669"}}>{o.pct}%</div>
+            </th>})}
+          </tr></thead>
+          <tbody>
+            {uts.map(ut=>{
+              const tR=aRms.filter(r=>r.unit_type_id==ut.id);
+              const rendered=new Set();
+              return<React.Fragment key={ut.id}>
+                {/* Category Header Row */}
+                <tr style={{background:(ut.color||"#6366F1")+"15"}}>
+                  <td style={{padding:"6px 12px",fontWeight:800,borderBottom:"1px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"15",zIndex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <CD color={ut.color||"#999"} size={12}/>
+                      <span>{ut.short_name||ut.name}</span>
+                      <span style={{fontSize:10,color:"#9CA3AF"}}>({tR.length})</span>
+                    </div>
+                    <div style={{fontSize:9,color:"#6B7280",marginLeft:18}}>Basis: {ut.base_price}&#8364; | Min: {minPrices[ut.id]||"?"}&#8364;</div>
+                  </td>
+                  {days.map((d,i)=>{
+                    const o=getOcc(ut.id,d);
+                    return<td key={i} style={{textAlign:"center",borderBottom:"1px solid #E5E7EB",fontSize:10,fontWeight:700,color:o.pct>80?"#DC2626":o.pct>50?"#D97706":"#059669",background:(ut.color||"#6366F1")+"08"}}>{o.oc}/{o.tot}</td>;
+                  })}
+                </tr>
+
+                {/* Room rows with reservation bars */}
+                {tR.map(room=>{
+                  return<tr key={room.id}>
+                    <td style={{padding:"4px 12px",fontWeight:600,borderBottom:"1px solid #F3F4F6",position:"sticky",left:0,background:"#fff",zIndex:1,fontSize:12}}>
+                      <span style={{marginLeft:18}}>{room.name}</span>
+                    </td>
+                    {days.map((d,di)=>{
+                      const ds=toDS(d);
+                      const isT=ds===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;
+                      const rs=ress.filter(r=>r.room_id===room.id&&ds>=r.check_in&&ds<r.check_out&&!["abgelehnt","checkedout","storniert"].includes(r.status));
+                      const hasR=rs.find(r=>!rendered.has(r.id));
+                      if(hasR){
+                        const vs=ds===hasR.check_in||ds===toDS(Math.max(new Date(ws),new Date(hasR.check_in)));
+                        if(vs){rendered.add(hasR.id);const eI=days.findIndex(dd=>toDS(dd)>=hasR.check_out);const sp=Math.min((eI===-1?14:eI)-di,14-di);
+                          if(sp>0){const sc=SC[hasR.status];const g=gMap[hasR.guest_id];
+                            return<td key={di} colSpan={sp} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}>
+                              <div style={{background:sc.bg,border:"1px solid "+sc.bd,borderRadius:6,padding:"2px 6px",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",fontSize:10,color:sc.tx,fontWeight:600,minHeight:24,display:"flex",alignItems:"center"}}>{g?g.last_name:"..."}</div>
+                            </td>
+                          }
+                        }
+                      }
+                      if(rs.length>0&&!hasR)return null;
+                      return<td key={di} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}></td>;
+                    })}
+                  </tr>
+                })}
+
+                {/* PRICE SUGGESTION ROW */}
+                <tr style={{background:(ut.color||"#6366F1")+"08"}}>
+                  <td style={{padding:"6px 12px",fontWeight:800,fontSize:10,color:ut.color||"#6366F1",borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"10",zIndex:1}}>
+                    <span style={{marginLeft:4}}>&#128176; Preisvorschlag</span>
+                  </td>
+                  {days.map((d,i)=>{
+                    const p=getP(ut.id,d);
+                    const reason=getReason(ut.id,d);
+                    return<td key={i} title={reason} style={{textAlign:"center",borderBottom:"2px solid #E5E7EB",padding:2}}>
+                      <PBadge price={p} base={ut.base_price} min={minPrices[ut.id]}/>
+                    </td>;
+                  })}
+                </tr>
+              </React.Fragment>
+            })}
+
+            {/* Total Row */}
+            <tr style={{background:"#F1F5F9"}}>
+              <td style={{padding:"8px 12px",fontWeight:800,fontSize:11,color:"#475569",position:"sticky",left:0,background:"#F1F5F9",zIndex:1}}>GESAMT</td>
+              {days.map((d,i)=>{
+                const o=totOcc(d);
+                const bg=o.pct>85?"#FEE2E2":o.pct>60?"#FEF3C7":o.pct>30?"#D1FAE5":"#F1F5F9";
+                return<td key={i} style={{textAlign:"center",padding:"6px 0",background:bg}}>
+                  <div style={{fontSize:13,fontWeight:800,color:o.pct>85?"#DC2626":o.pct>60?"#D97706":"#059669"}}>{o.pct}%</div>
+                  <div style={{fontSize:9,color:"#6B7280"}}>{o.oc}/{o.tot}</div>
+                </td>;
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div style={{display:"flex",gap:12,marginTop:12,flexWrap:"wrap",alignItems:"center",fontSize:11,color:"#6B7280"}}>
+        <span style={{fontWeight:700}}>LEGENDE:</span>
+        {Object.entries(SC).filter(([k])=>!["checkedout","abgelehnt","storniert"].includes(k)).map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,borderRadius:3,background:v.bd}}/>{v.l}</span>)}
+        <span>|</span>
+        <span style={{color:"#DC2626",fontWeight:700}}>&#9650; erhoehen</span>
+        <span style={{color:"#059669",fontWeight:700}}>&#9660; senken</span>
+        <span style={{color:"#F59E0B",fontWeight:700}}>MIN = Mindestpreis</span>
+      </div>
+    </div>;
+  };
 
   if(ld)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><I n="clock" s={32} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/></div>;
 
-  const nav=[{id:"dashboard",l:"Dashboard",ic:"chart"},{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"guests",l:"Gäste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
+  const nav=[{id:"dashboard",l:"Dashboard",ic:"chart"},{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"pricing",l:"Preissteuerung",ic:"dollar"},{id:"guests",l:"Gäste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
 
   return<div style={{minHeight:"100vh"}}>
     <div style={{background:"#fff",borderBottom:"1px solid #E5E7EB",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
@@ -763,8 +1040,8 @@ function MainApp({sb,token,onLogout}){
     <div style={{padding:20,maxWidth:1200,margin:"0 auto"}}>
       {view==="dashboard"&&<Dashboard/>}
       {view==="plan"&&<PlanView/>}
+      {view==="pricing"&&<PricingView/>}
       {view==="guests"&&<GuestsView/>}
-      {view==="settings"&&<SettingsView/>}
     </div>
     {toast&&<div style={{position:"fixed",bottom:24,right:24,background:toast.t==="success"?"#10B981":"#EF4444",color:"#fff",padding:"12px 20px",borderRadius:12,fontWeight:600,fontSize:14,boxShadow:"0 10px 25px rgba(0,0,0,.15)",zIndex:2000,animation:"slideIn .3s ease"}}>{toast.m}</div>}
   </div>;
