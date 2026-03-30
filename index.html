@@ -22,8 +22,6 @@
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useMemo,useEffect,useCallback}=React;
-
-// ─── SVG ICONS ───
 const P=({d,s=18,c="currentColor",st={}})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,...st}}>{Array.isArray(d)?d.map((p,i)=><path key={i} d={p}/>):<path d={d}/>}</svg>;
 const IC={
   home:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",
@@ -60,42 +58,38 @@ const IC={
   clock:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 6v6l4 2",
 };
 const I=({n,s,c,st})=><P d={IC[n]||""} s={s} c={c} st={st}/>;
-
-// ─── CONSTANTS ───
-const AMENITIES=["WLAN","TV","Dusche","Badewanne","Balkon","Terrasse","Minibar","Safe","Klimaanlage","Kinderbett","Küche","Whirlpool","Kamin","Parkplatz","Kaffeemaschine","Schreibtisch"];
+const AMENITIES=["WLAN","TV","Dusche","Badewanne","Balkon","Terrasse","Minibar","Safe","Klimaanlage","Kinderbett","Kuche","Whirlpool","Kamin","Parkplatz","Kaffeemaschine","Schreibtisch"];
 const TCOLORS=["#6366F1","#3B82F6","#8B5CF6","#EC4899","#F59E0B","#10B981","#EF4444","#06B6D4","#84CC16","#F97316"];
 const SC={angebot:{bg:"#FEF3C7",bd:"#F59E0B",tx:"#92400E",l:"Angebot"},reservierung:{bg:"#DBEAFE",bd:"#3B82F6",tx:"#1E40AF",l:"Reservierung"},checkedin:{bg:"#D1FAE5",bd:"#10B981",tx:"#065F46",l:"Eingecheckt"},checkedout:{bg:"#E5E7EB",bd:"#6B7280",tx:"#374151",l:"Ausgecheckt"},abgelehnt:{bg:"#FEE2E2",bd:"#EF4444",tx:"#991B1B",l:"Abgelehnt"},storniert:{bg:"#FEE2E2",bd:"#EF4444",tx:"#991B1B",l:"Storniert"}};
 const SOURCES={email:"E-Mail",telefon:"Telefon",walkin:"Walk-in",booking:"Booking.com",hrs:"HRS",expedia:"Expedia",website:"Website",direkt:"Direkt",sonstige:"Sonstige"};
-const PMETHODS={bar:"Bar",ec:"EC-Karte",mastercard:"Mastercard",visa:"Visa",amex:"American Express",sonstige_kk:"Sonst. Kreditkarte",rechnung:"Auf Rechnung",ueberweisung:"Überweisung",paypal:"PayPal",booking_online:"Booking Online Zahlung"};
+const PMETHODS={bar:"Bar",ec:"EC-Karte",mastercard:"Mastercard",visa:"Visa",amex:"American Express",sonstige_kk:"Sonst. Kreditkarte",rechnung:"Auf Rechnung",ueberweisung:"Ueberweisung",paypal:"PayPal",booking_online:"Booking Online Zahlung"};
 const PTYPES={anzahlung:"Anzahlung",zahlung:"Zahlung",restzahlung:"Restzahlung",erstattung:"Erstattung"};
 const SALUTATIONS=["","Herr","Frau","Firma","Familie","Dr.","Prof."];
-
-const fd=d=>{const t=new Date(d);return`${t.getDate().toString().padStart(2,"0")}.${(t.getMonth()+1).toString().padStart(2,"0")}.${t.getFullYear()}`};
+const MONATE=["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const fd=d=>{const t=new Date(d);return t.getDate().toString().padStart(2,"0")+"."+(t.getMonth()+1).toString().padStart(2,"0")+"."+t.getFullYear()};
 const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
-const toDS=d=>{const t=new Date(d);return`${t.getFullYear()}-${(t.getMonth()+1).toString().padStart(2,"0")}-${t.getDate().toString().padStart(2,"0")}`};
+const toDS=d=>{const t=new Date(d);return t.getFullYear()+"-"+(t.getMonth()+1).toString().padStart(2,"0")+"-"+t.getDate().toString().padStart(2,"0")};
 const dBet=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
-const gP=(r,uts)=>r.price_override??uts.find(u=>u.id===r.unit_type_id)?.base_price??0;
+const gP=(r,uts)=>r.price_override!=null?r.price_override:(uts.find(u=>u.id===r.unit_type_id)||{}).base_price||0;
 const gUT=(r,uts)=>uts.find(u=>u.id===r.unit_type_id);
 const fmt=n=>parseFloat(n||0).toFixed(2);
 
-// ─── API ───
 function useAPI(url,key,token){
   const h=useCallback(()=>{
     const hd={"Content-Type":"application/json",Prefer:"return=representation"};
-    if(key.startsWith("sb_")){hd.apikey=key;if(token)hd.Authorization=`Bearer ${token}`}
-    else{hd.apikey=key;hd.Authorization=`Bearer ${token||key}`}
+    if(key.startsWith("sb_")){hd.apikey=key;if(token)hd.Authorization="Bearer "+token}
+    else{hd.apikey=key;hd.Authorization="Bearer "+(token||key)}
     return hd;
   },[key,token]);
   return useMemo(()=>({
-    get:async(t,q="")=>{const r=await fetch(`${url}/rest/v1/${t}?${q}`,{headers:h()});if(!r.ok){const b=await r.text();throw new Error(`${r.status} ${b.slice(0,200)}`)}return r.json()},
-    post:async(t,d)=>{const r=await fetch(`${url}/rest/v1/${t}`,{method:"POST",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(`${r.status} ${b.slice(0,200)}`)}return r.json()},
-    patch:async(t,id,d)=>{const r=await fetch(`${url}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(`${r.status} ${b.slice(0,200)}`)}return r.json()},
-    del:async(t,id)=>{const r=await fetch(`${url}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:h()});if(!r.ok){const b=await r.text();throw new Error(`${r.status} ${b.slice(0,200)}`)}},
+    get:async(t,q="")=>{const r=await fetch(url+"/rest/v1/"+t+"?"+q,{headers:h()});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,200))}return r.json()},
+    post:async(t,d)=>{const r=await fetch(url+"/rest/v1/"+t,{method:"POST",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,200))}return r.json()},
+    patch:async(t,id,d)=>{const r=await fetch(url+"/rest/v1/"+t+"?id=eq."+id,{method:"PATCH",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,200))}return r.json()},
+    del:async(t,id)=>{const r=await fetch(url+"/rest/v1/"+t+"?id=eq."+id,{method:"DELETE",headers:h()});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,200))}},
   }),[url,h]);
 }
 
-// ─── UI ───
-const Badge=({s})=>{const c=SC[s];return c?<span style={{background:c.bg,color:c.tx,border:`1px solid ${c.bd}`,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.l}</span>:null};
+const Badge=({s})=>{const c=SC[s];return c?<span style={{background:c.bg,color:c.tx,border:"1px solid "+c.bd,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.l}</span>:null};
 const Btn=({children,onClick,v="primary",sz="md",disabled:di,style:st={}})=>{
   const vs={primary:{background:"#3B82F6",color:"#fff"},success:{background:"#10B981",color:"#fff"},danger:{background:"#EF4444",color:"#fff"},warning:{background:"#F59E0B",color:"#fff"},ghost:{background:"transparent",color:"#6B7280",border:"1px solid #E5E7EB"}};
   const ss={sm:{padding:"5px 10px",fontSize:12},md:{padding:"8px 16px",fontSize:13},lg:{padding:"10px 20px",fontSize:14}};
@@ -108,386 +102,125 @@ const CD=({color:c,size:s=12})=><span style={{width:s,height:s,borderRadius:s,ba
 const Tab=({tabs,active,onChange})=><div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"2px solid #E5E7EB",paddingBottom:0}}>{tabs.map(t=><button key={t.id} onClick={()=>onChange(t.id)} style={{padding:"10px 16px",fontSize:13,fontWeight:active===t.id?700:500,color:active===t.id?"#2563EB":"#6B7280",background:"none",border:"none",borderBottom:active===t.id?"2px solid #2563EB":"2px solid transparent",cursor:"pointer",marginBottom:-2,display:"flex",alignItems:"center",gap:6}}>{t.icon}{t.label}</button>)}</div>;
 const Card=({title,children,style:st={}})=><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"hidden",...st}}>{title&&<div style={{padding:"12px 16px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:14}}>{title}</div>}<div style={{padding:16}}>{children}</div></div>;
 
-// ─── CONFIG SCREEN ───
-const ConfigScreen=({onConnect})=>{
-  const[url,setUrl]=useState(localStorage.getItem("hm_url")||"");
-  const[key,setKey]=useState(localStorage.getItem("hm_key")||"");
-  const[err,setErr]=useState("");const[ld,setLd]=useState(false);
-  const go=async()=>{
-    if(!url||!key){setErr("Bitte beide Felder ausfüllen");return}
-    const cu=url.trim().replace(/\/+$/,"");
-    if(!cu.startsWith("https://")){setErr("URL muss mit https:// beginnen");return}
-    setLd(true);setErr("");
-    try{
-      const k=key.trim(),hd={apikey:k};if(!k.startsWith("sb_"))hd.Authorization=`Bearer ${k}`;
-      const r=await fetch(`${cu}/rest/v1/hotel_info?select=id&limit=1`,{headers:hd});
-      if(!r.ok)throw new Error(`Status ${r.status}`);
-      localStorage.setItem("hm_url",cu);localStorage.setItem("hm_key",k);onConnect(cu,k);
-    }catch(e){setErr("Fehler: "+e.message)}setLd(false);
-  };
-  return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"#fff",borderRadius:20,padding:40,maxWidth:440,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,.1)"}}>
-    <div style={{textAlign:"center",marginBottom:32}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:16,width:56,height:56,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:16}}><I n="home" s={28} c="#fff"/></div><h1 style={{fontSize:22,fontWeight:800,marginBottom:4}}>HotelManager</h1><p style={{color:"#6B7280",fontSize:14}}>Mit Supabase verbinden</p></div>
-    <Inp label="Supabase Project URL" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://xxxxx.supabase.co"/>
-    <Inp label="API Key" value={key} onChange={e=>setKey(e.target.value)} placeholder="sb_publishable_... oder eyJ..." type="password"/>
-    {err&&<div style={{background:"#FEE2E2",color:"#DC2626",padding:"10px 14px",borderRadius:10,fontSize:13,marginBottom:16}}>{err}</div>}
-    <button onClick={go} disabled={ld} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:"pointer",opacity:ld?.7:1}}>{ld?"Verbinde...":"Verbinden"}</button>
-  </div></div>;
-};
-
-// ─── AUTH ───
 const AuthScreen=({sb,onAuth,onBack})=>{
   const[em,setEm]=useState("");const[pw,setPw]=useState("");const[reg,setReg]=useState(false);
   const[err,setErr]=useState("");const[ld,setLd]=useState(false);const[sp,setSp]=useState(false);
   const go=async()=>{
-    if(!em||!pw){setErr("Bitte ausfüllen");return}if(pw.length<6){setErr("Mind. 6 Zeichen");return}
+    if(!em||!pw){setErr("Bitte ausfuellen");return}if(pw.length<6){setErr("Mind. 6 Zeichen");return}
     setLd(true);setErr("");
     try{
       const ep=reg?"/auth/v1/signup":"/auth/v1/token?grant_type=password";
       const hd={"Content-Type":"application/json",apikey:sb.key};
-      const r=await fetch(`${sb.url}${ep}`,{method:"POST",headers:hd,body:JSON.stringify({email:em,password:pw})});
+      const r=await fetch(sb.url+ep,{method:"POST",headers:hd,body:JSON.stringify({email:em,password:pw})});
       const d=await r.json();if(d.error||d.msg)throw new Error(d.error_description||d.error||d.msg);
-      if(reg&&!d.access_token){setErr("Registrierung erfolgreich! Bitte E-Mail bestätigen.");setReg(false);setLd(false);return}
+      if(reg&&!d.access_token){setErr("Registrierung erfolgreich! Bitte E-Mail bestaetigen.");setReg(false);setLd(false);return}
       onAuth(d.access_token,d.user);
     }catch(e){setErr(e.message||"Fehler")}setLd(false);
   };
   return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"#fff",borderRadius:20,padding:40,maxWidth:400,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,.1)"}}>
     <div style={{textAlign:"center",marginBottom:32}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:16,width:56,height:56,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:16}}><I n="home" s={28} c="#fff"/></div><h1 style={{fontSize:22,fontWeight:800,marginBottom:4}}>HotelManager</h1><p style={{color:"#6B7280",fontSize:14}}>{reg?"Registrieren":"Anmelden"}</p></div>
     <Inp label="E-Mail" value={em} onChange={e=>setEm(e.target.value)} type="email"/>
-    <div style={{marginBottom:20}}><label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>Passwort</label><div style={{position:"relative"}}><input value={pw} onChange={e=>setPw(e.target.value)} type={sp?"text":"password"} placeholder="••••••••" style={{width:"100%",padding:"10px 40px 10px 14px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}} onKeyDown={e=>e.key==="Enter"&&go()}/><button onClick={()=>setSp(!sp)} style={{position:"absolute",right:10,top:10,background:"none",border:"none",cursor:"pointer",color:"#9CA3AF"}}><I n={sp?"eyeOff":"eye"} s={18}/></button></div></div>
+    <div style={{marginBottom:20}}><label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>Passwort</label><div style={{position:"relative"}}><input value={pw} onChange={e=>setPw(e.target.value)} type={sp?"text":"password"} placeholder="--------" style={{width:"100%",padding:"10px 40px 10px 14px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}} onKeyDown={e=>e.key==="Enter"&&go()}/><button onClick={()=>setSp(!sp)} style={{position:"absolute",right:10,top:10,background:"none",border:"none",cursor:"pointer",color:"#9CA3AF"}}><I n={sp?"eyeOff":"eye"} s={18}/></button></div></div>
     {err&&<div style={{background:err.includes("erfolgreich")?"#D1FAE5":"#FEE2E2",color:err.includes("erfolgreich")?"#059669":"#DC2626",padding:"10px 14px",borderRadius:10,fontSize:13,marginBottom:16}}>{err}</div>}
     <button onClick={go} disabled={ld} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:12}}>{ld?"...":reg?"Registrieren":"Anmelden"}</button>
-    <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><button onClick={()=>{setReg(!reg);setErr("")}} style={{background:"none",border:"none",color:"#3B82F6",fontWeight:600,cursor:"pointer"}}>{reg?"Login":"Registrieren"}</button><button onClick={onBack} style={{background:"none",border:"none",color:"#9CA3AF",cursor:"pointer"}}>Andere DB</button></div>
+    <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><button onClick={()=>{setReg(!reg);setErr("")}} style={{background:"none",border:"none",color:"#3B82F6",fontWeight:600,cursor:"pointer"}}>{reg?"Login":"Registrieren"}</button></div>
   </div></div>;
 };
 
-// ─── RESERVATION DETAIL MODAL (PMS Style) ───
 const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,hotelInfo:hi,onClose,onRefresh,showToast})=>{
-  const[tab,setTab]=useState("res");
-  const[gf,setGf]=useState(guest||{});
-  const[rf,setRf]=useState(res);
-  const[items,setItems]=useState([]);
-  const[payments,setPayments]=useState([]);
-  const[saving,setSaving]=useState(false);
-  const[addProduct,setAddProduct]=useState(false);
-  const[addPayment,setAddPayment]=useState(false);
-
-  const loadItems=useCallback(async()=>{
-    try{
-      const[it,py]=await Promise.all([
-        api.get("reservation_items",`reservation_id=eq.${res.id}&order=created_at`),
-        api.get("payments",`reservation_id=eq.${res.id}&order=created_at.desc`)
-      ]);setItems(it);setPayments(py);
-    }catch(e){showToast(e.message,"error")}
-  },[res.id,api]);
+  const[tab,setTab]=useState("res");const[gf,setGf]=useState(guest||{});const[rf,setRf]=useState(res);
+  const[items,setItems]=useState([]);const[payments,setPayments]=useState([]);const[saving,setSaving]=useState(false);
+  const[addProduct,setAddProduct]=useState(false);const[addPayment,setAddPayment]=useState(false);
+  const loadItems=useCallback(async()=>{try{const[it,py]=await Promise.all([api.get("reservation_items","reservation_id=eq."+res.id+"&order=created_at"),api.get("payments","reservation_id=eq."+res.id+"&order=created_at.desc")]);setItems(it);setPayments(py)}catch(e){showToast(e.message,"error")}},[res.id,api]);
   useEffect(()=>{loadItems()},[]);
-
-  const nights=dBet(rf.check_in,rf.check_out);
-  const roomPrice=gP(room,unitTypes);
-  const roomTotal=nights*roomPrice;
-  const calcTax=(total,taxType,taxRate,s1p,s1r,s2p,s2r)=>{
-    if(taxType==="gemischt"&&s1p&&s1r!=null&&s2p&&s2r!=null){
-      const g1=total*(s1p/100),g2=total*(s2p/100);
-      const n1=Math.round(g1/(1+s1r/100)*100)/100,n2=Math.round(g2/(1+s2r/100)*100)/100;
-      return{net:n1+n2,tax:total-(n1+n2),gross:total,detail:`${s1p}%×${s1r}% + ${s2p}%×${s2r}%`};
-    }
-    const r=taxRate||7;const net=Math.round(total/(1+r/100)*100)/100;
-    return{net,tax:total-net,gross:total,detail:`${r}%`};
-  };
-
+  const nights=dBet(rf.check_in,rf.check_out);const roomPrice=gP(room,unitTypes);const roomTotal=nights*roomPrice;
+  const calcTax=(total,taxType,taxRate,s1p,s1r,s2p,s2r)=>{if(taxType==="gemischt"&&s1p&&s1r!=null&&s2p&&s2r!=null){const g1=total*(s1p/100),g2=total*(s2p/100);const n1=Math.round(g1/(1+s1r/100)*100)/100,n2=Math.round(g2/(1+s2r/100)*100)/100;return{net:n1+n2,tax:total-(n1+n2),gross:total,detail:s1p+"%x"+s1r+"% + "+s2p+"%x"+s2r+"%"}}const r=taxRate||7;const net=Math.round(total/(1+r/100)*100)/100;return{net,tax:total-net,gross:total,detail:r+"%"}};
   const roomTaxInfo=calcTax(roomTotal,"einfach",7);
-  const itemsTaxDetails=items.filter(i=>i.item_type==="product").map(it=>{
-    const prod=allProducts.find(p=>p.id===it.product_id);
-    return{...it,taxInfo:calcTax(parseFloat(it.total_price||0),prod?.tax_type||it.tax_type||"einfach",prod?.tax_rate||it.tax_rate||7,prod?.tax_split_1_pct||it.tax_split_1_pct,prod?.tax_split_1_rate||it.tax_split_1_rate,prod?.tax_split_2_pct||it.tax_split_2_pct,prod?.tax_split_2_rate||it.tax_split_2_rate)};
-  });
-  const totalNet=roomTaxInfo.net+itemsTaxDetails.reduce((s,i)=>s+i.taxInfo.net,0);
-  const totalTax=roomTaxInfo.tax+itemsTaxDetails.reduce((s,i)=>s+i.taxInfo.tax,0);
-  const itemsTotal=items.filter(i=>i.item_type==="product").reduce((s,i)=>s+parseFloat(i.total_price||0),0);
-  const grandTotal=roomTotal+itemsTotal;
-  const totalPaid=payments.filter(p=>p.status==="eingegangen").reduce((s,p)=>s+parseFloat(p.amount||0),0);
-  const balance=grandTotal-totalPaid;
-
-  const saveGuest=async()=>{
-    setSaving(true);
-    try{await api.patch("guests",guest.id,gf);showToast("Gast gespeichert")}catch(e){showToast(e.message,"error")}
-    setSaving(false);
-  };
-  const saveRes=async()=>{
-    setSaving(true);
-    try{await api.patch("reservations",res.id,{status:rf.status,source:rf.source,check_in:rf.check_in,check_out:rf.check_out,adults:rf.adults,children:rf.children,notes:rf.notes,internal_notes:rf.internal_notes,deposit_required:rf.deposit_required||0,deposit_due:rf.deposit_due,fixed:rf.fixed,total_price:grandTotal});await onRefresh();showToast("Reservierung gespeichert")}catch(e){showToast(e.message,"error")}
-    setSaving(false);
-  };
-  const addItem=async(prod)=>{
-    try{
-      let qty=1,up=parseFloat(prod.price);
-      if(prod.unit==="pro Nacht")qty=nights;
-      if(prod.unit==="pro Person/Nacht")qty=nights*(rf.adults||1);
-      if(prod.unit==="pro Person")qty=rf.adults||1;
-      const tp=qty*up;
-      await api.post("reservation_items",{reservation_id:res.id,item_type:"product",product_id:prod.id,description:prod.name,quantity:qty,unit_price:up,total_price:tp});
-      await loadItems();setAddProduct(false);showToast("Produkt hinzugefügt");
-    }catch(e){showToast(e.message,"error")}
-  };
+  const itemsTaxDetails=items.filter(i=>i.item_type==="product").map(it=>{const prod=allProducts.find(p=>p.id===it.product_id);return{...it,taxInfo:calcTax(parseFloat(it.total_price||0),prod?.tax_type||it.tax_type||"einfach",prod?.tax_rate||it.tax_rate||7,prod?.tax_split_1_pct||it.tax_split_1_pct,prod?.tax_split_1_rate||it.tax_split_1_rate,prod?.tax_split_2_pct||it.tax_split_2_pct,prod?.tax_split_2_rate||it.tax_split_2_rate)}});
+  const totalNet=roomTaxInfo.net+itemsTaxDetails.reduce((s,i)=>s+i.taxInfo.net,0);const totalTax=roomTaxInfo.tax+itemsTaxDetails.reduce((s,i)=>s+i.taxInfo.tax,0);
+  const itemsTotal=items.filter(i=>i.item_type==="product").reduce((s,i)=>s+parseFloat(i.total_price||0),0);const grandTotal=roomTotal+itemsTotal;
+  const totalPaid=payments.filter(p=>p.status==="eingegangen").reduce((s,p)=>s+parseFloat(p.amount||0),0);const balance=grandTotal-totalPaid;
+  const saveGuest=async()=>{setSaving(true);try{await api.patch("guests",guest.id,gf);showToast("Gast gespeichert")}catch(e){showToast(e.message,"error")}setSaving(false)};
+  const saveRes=async()=>{setSaving(true);try{await api.patch("reservations",res.id,{status:rf.status,source:rf.source,check_in:rf.check_in,check_out:rf.check_out,adults:rf.adults,children:rf.children,notes:rf.notes,internal_notes:rf.internal_notes,deposit_required:rf.deposit_required||0,deposit_due:rf.deposit_due,fixed:rf.fixed,total_price:grandTotal});await onRefresh();showToast("Reservierung gespeichert")}catch(e){showToast(e.message,"error")}setSaving(false)};
+  const addItem=async(prod)=>{try{let qty=1,up=parseFloat(prod.price);if(prod.unit==="pro Nacht")qty=nights;if(prod.unit==="pro Person/Nacht")qty=nights*(rf.adults||1);if(prod.unit==="pro Person")qty=rf.adults||1;const tp=qty*up;await api.post("reservation_items",{reservation_id:res.id,item_type:"product",product_id:prod.id,description:prod.name,quantity:qty,unit_price:up,total_price:tp});await loadItems();setAddProduct(false);showToast("Produkt hinzugefuegt")}catch(e){showToast(e.message,"error")}};
   const removeItem=async(id)=>{try{await api.del("reservation_items",id);await loadItems();showToast("Entfernt")}catch(e){showToast(e.message,"error")}};
-  const addPay=async(pay)=>{
-    try{await api.post("payments",{reservation_id:res.id,guest_id:guest.id,...pay});await loadItems();showToast("Zahlung erfasst")}catch(e){showToast(e.message,"error")}
-  };
-  const updateStatus=async(s)=>{
-    try{
-      const x={status:s};
-      if(s==="checkedin")x.checked_in_at=new Date().toISOString();
-      if(s==="checkedout")x.checked_out_at=new Date().toISOString();
-      await api.patch("reservations",res.id,x);setRf(p=>({...p,status:s}));await onRefresh();showToast("Status: "+SC[s]?.l);
-    }catch(e){showToast(e.message,"error")}
-  };
+  const addPay=async(pay)=>{try{await api.post("payments",{reservation_id:res.id,guest_id:guest.id,...pay});await loadItems();showToast("Zahlung erfasst")}catch(e){showToast(e.message,"error")}};
+  const updateStatus=async(s)=>{try{const x={status:s};if(s==="checkedin")x.checked_in_at=new Date().toISOString();if(s==="checkedout")x.checked_out_at=new Date().toISOString();await api.patch("reservations",res.id,x);setRf(p=>({...p,status:s}));await onRefresh();showToast("Status: "+(SC[s]||{}).l)}catch(e){showToast(e.message,"error")}};
+  const u=(k,v)=>setRf(p=>({...p,[k]:v}));const ug=(k,v)=>setGf(p=>({...p,[k]:v}));
+  const tabs=[{id:"res",label:"Reservierung",icon:<I n="file" s={15}/>},{id:"guest",label:"Gast",icon:<I n="user" s={15}/>},{id:"payment",label:"Zahlung",icon:<I n="credit" s={15}/>},{id:"room",label:"Zimmer",icon:<I n="bed" s={15}/>}];
+  const sendEmail=(type)=>{const g=guest||{};const baseUrl=window.location.origin;let subj="",html="";const hdr="<!DOCTYPE html><html><head><meta charset=utf-8></head><body style='margin:0;padding:0;background:#F3F4F6;font-family:sans-serif'><div style='max-width:600px;margin:0 auto;padding:24px'><div style='background:#fff;border-radius:16px;overflow:hidden'><div style='background:linear-gradient(135deg,#3B82F6,#1D4ED8);padding:32px;text-align:center'><h1 style='color:#fff;margin:0'>"+(hi?.name||"Hotel")+"</h1></div><div style='padding:32px'>";const ftr="<p>Mit freundlichen Gruessen,<br><strong>"+(hi?.name||"")+"</strong></p></div></div></div></body></html>";const info="<div style='background:#F9FAFB;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #E5E7EB'><p><strong>Zimmer:</strong> "+room.name+" - "+(ut?.name||"")+"</p><p><strong>Zeitraum:</strong> "+fd(rf.check_in)+" - "+fd(rf.check_out)+" ("+nights+" Naechte)</p><p><strong>Personen:</strong> "+rf.adults+" Erw."+(rf.children>0?", "+rf.children+" Kinder":"")+"</p><p style='font-size:20px;font-weight:800;color:#1E40AF'>Gesamt: EUR "+fmt(grandTotal)+"</p></div>";
+  if(type==="angebot"){subj="Angebot - "+(ut?.name||"")+" Zi. "+room.name+" | "+(hi?.name||"Hotel");html=hdr+"<h2>Ihr Angebot</h2><p>"+(g.salutation||"Sehr geehrte/r")+" "+g.last_name+",</p><p>vielen Dank fuer Ihre Anfrage. Hier Ihr Angebot:</p>"+info+"<div style='margin:28px 0;text-align:center'><a href='"+baseUrl+"/api/offer-response?token="+res.offer_token+"&action=accept' style='display:inline-block;background:#10B981;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:16px;margin:8px'>Angebot annehmen</a> <a href='"+baseUrl+"/api/offer-response?token="+res.offer_token+"&action=decline' style='display:inline-block;background:#EF4444;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:16px;margin:8px'>Ablehnen</a></div>"+ftr}
+  if(type==="bestaetigung"){subj="Reservierungsbestaetigung | "+(hi?.name||"Hotel");html=hdr+"<div style='background:#D1FAE5;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px'><p style='color:#065F46;font-weight:700;margin:0'>Reservierung bestaetigt</p></div><p>"+(g.salutation||"Sehr geehrte/r")+" "+g.last_name+",</p><p>Ihre Reservierung ist bestaetigt.</p>"+info+"<p>Wir freuen uns auf Sie!</p>"+ftr}
+  if(type==="storno"){subj="Stornierungsbestaetigung | "+(hi?.name||"Hotel");html=hdr+"<div style='background:#FEE2E2;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px'><p style='color:#991B1B;font-weight:700;margin:0'>Stornierung</p></div><p>"+(g.salutation||"Sehr geehrte/r")+" "+g.last_name+",</p><p>hiermit bestaetigen wir die Stornierung Ihrer Reservierung fuer Zimmer "+room.name+" ("+fd(rf.check_in)+" - "+fd(rf.check_out)+").</p>"+ftr}
+  fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:g.email,subject:subj,html:html,emailType:type})}).then(r=>r.json()).then(d=>{if(d.success){showToast(type+" an "+g.email+" gesendet!");if(type==="angebot")api.patch("reservations",res.id,{offer_sent_at:new Date().toISOString()});if(type==="bestaetigung")api.patch("reservations",res.id,{confirmation_sent_at:new Date().toISOString()})}else showToast("Fehler: "+(d.error||d.details),"error")}).catch(e=>showToast("Fehler: "+e.message,"error"))};
 
-  const u=(k,v)=>setRf(p=>({...p,[k]:v}));
-  const ug=(k,v)=>setGf(p=>({...p,[k]:v}));
-
-  const tabs=[
-    {id:"res",label:"Reservierung",icon:<I n="file" s={15}/>},
-    {id:"guest",label:"Gast",icon:<I n="user" s={15}/>},
-    {id:"payment",label:"Zahlung",icon:<I n="credit" s={15}/>},
-    {id:"room",label:"Zimmer",icon:<I n="bed" s={15}/>},
-  ];
-
-  return<Modal title={`RESERVIERUNG / ${res.reservation_number||"Neu"}`} onClose={onClose} width={780}>
+  return<Modal title={"RESERVIERUNG / "+(res.reservation_number||"Neu")} onClose={onClose} width={780}>
     <div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
-      <Badge s={rf.status}/>
-      <span style={{fontSize:12,color:"#6B7280"}}>{SOURCES[rf.source]||rf.source}</span>
-      <span style={{fontSize:12,color:"#9CA3AF"}}>Erstellt {fd(res.created_at)}</span>
+      <Badge s={rf.status}/><span style={{fontSize:12,color:"#6B7280"}}>{SOURCES[rf.source]||rf.source}</span><span style={{fontSize:12,color:"#9CA3AF"}}>Erstellt {fd(res.created_at)}</span>
       <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-        {rf.status==="angebot"&&<><Btn v="success" sz="sm" onClick={()=>updateStatus("reservierung")}><I n="check" s={14}/> → Reservierung</Btn><Btn v="danger" sz="sm" onClick={()=>updateStatus("abgelehnt")}><I n="xc" s={14}/> Ablehnen</Btn></>}
+        {rf.status==="angebot"&&<><Btn v="success" sz="sm" onClick={()=>updateStatus("reservierung")}><I n="check" s={14}/> Reservierung</Btn><Btn v="danger" sz="sm" onClick={()=>updateStatus("abgelehnt")}><I n="xc" s={14}/> Ablehnen</Btn></>}
         {rf.status==="reservierung"&&<Btn v="success" sz="sm" onClick={()=>updateStatus("checkedin")}><I n="check" s={14}/> Check-in</Btn>}
         {rf.status==="checkedin"&&<Btn v="warning" sz="sm" onClick={()=>updateStatus("checkedout")}><I n="xc" s={14}/> Check-out</Btn>}
         <Btn v="danger" sz="sm" onClick={()=>updateStatus("storniert")}><I n="trash" s={14}/> Stornieren</Btn>
       </div>
     </div>
-
-    <div style={{display:"flex",gap:8,marginBottom:16,padding:"12px 16px",background:"#F9FAFB",borderRadius:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:12,fontWeight:600}}><I n="mail" s={14} st={{verticalAlign:-3,marginRight:4}}/> E-Mail:</span><Btn v="primary" sz="sm" onClick={()=>{const g=guest||{};const subj="Angebot – "+((ut||{}).name||"")+" Zi. "+(room||{}).name+" | "+(hi?.name||"Hotel");const baseUrl=window.location.origin;const html="<!DOCTYPE html><html><head><meta charset=utf-8></head><body style='margin:0;padding:0;background:#F3F4F6;font-family:sans-serif'><div style='max-width:600px;margin:0 auto;padding:24px'><div style='background:#fff;border-radius:16px;overflow:hidden'><div style='background:linear-gradient(135deg,#3B82F6,#1D4ED8);padding:32px;text-align:center'><h1 style='color:#fff;margin:0'>"+(hi?.name||"Hotel")+"</h1></div><div style='padding:32px'><h2>Ihr Angebot</h2><p>"+(g.salutation||"Sehr geehrte/r")+" "+g.last_name+",</p><p>vielen Dank für Ihre Anfrage. Hier Ihr Angebot:</p><div style='background:#F9FAFB;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #E5E7EB'><p><strong>Zimmer:</strong> "+room.name+" – "+(ut?.name||"")+"</p><p><strong>Zeitraum:</strong> "+fd(rf.check_in)+" – "+fd(rf.check_out)+" ("+nights+" Nächte)</p><p><strong>Personen:</strong> "+rf.adults+" Erw."+(rf.children>0?", "+rf.children+" Kinder":"")+"</p><p style='font-size:20px;font-weight:800;color:#1E40AF'>Gesamt: € "+fmt(grandTotal)+"</p></div><div style='margin:28px 0;text-align:center'><a href='"+baseUrl+"/api/offer-response?token="+res.offer_token+"&action=accept' style='display:inline-block;background:#10B981;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:16px;margin:8px'>✓ Angebot annehmen</a> <a href='"+baseUrl+"/api/offer-response?token="+res.offer_token+"&action=decline' style='display:inline-block;background:#EF4444;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:16px;margin:8px'>✗ Ablehnen</a></div><p>Mit freundlichen Grüßen,<br><strong>"+(hi?.name||"")+"</strong></p></div></div></div></body></html>";fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:g.email,subject:subj,html:html,emailType:"angebot"})}).then(r=>r.json()).then(d=>{if(d.success){showToast("Angebot an "+g.email+" gesendet!");api.patch("reservations",res.id,{offer_sent_at:new Date().toISOString()})}else showToast("Fehler: "+(d.error||d.details),"error")}).catch(e=>showToast("Fehler: "+e.message,"error"))}}><I n="send" s={13}/> Angebot</Btn><Btn v="success" sz="sm" onClick={()=>{const g=guest||{};const subj="Reservierungsbestätigung | "+(hi?.name||"Hotel");const html="<!DOCTYPE html><html><head><meta charset=utf-8></head><body style='margin:0;padding:0;background:#F3F4F6;font-family:sans-serif'><div style='max-width:600px;margin:0 auto;padding:24px'><div style='background:#fff;border-radius:16px;overflow:hidden'><div style='background:linear-gradient(135deg,#3B82F6,#1D4ED8);padding:32px;text-align:center'><h1 style='color:#fff;margin:0'>"+(hi?.name||"Hotel")+"</h1></div><div style='padding:32px'><div style='background:#D1FAE5;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px'><p style='color:#065F46;font-weight:700;margin:0'>✓ Reservierung bestätigt</p></div><p>"+(g.salutation||"Sehr geehrte/r")+" "+g.last_name+",</p><p>Ihre Reservierung ist bestätigt.</p><div style='background:#F9FAFB;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #E5E7EB'><p><strong>Zimmer:</strong> "+room.name+" – "+(ut?.name||"")+"</p><p><strong>Anreise:</strong> "+fd(rf.check_in)+" (ab 15:00)</p><p><strong>Abreise:</strong> "+fd(rf.check_out)+" (bis 11:00)</p><p><strong>Nächte:</strong> "+nights+"</p><p style='font-size:20px;font-weight:800;color:#1E40AF'>Gesamt: € "+fmt(grandTotal)+"</p></div><p>Wir freuen uns auf Sie!<br><strong>"+(hi?.name||"")+"</strong></p></div></div></div></body></html>";fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:g.email,subject:subj,html:html,emailType:"bestaetigung"})}).then(r=>r.json()).then(d=>{if(d.success){showToast("Bestätigung an "+g.email+" gesendet!");api.patch("reservations",res.id,{confirmation_sent_at:new Date().toISOString()})}else showToast("Fehler: "+(d.error||d.details),"error")}).catch(e=>showToast("Fehler: "+e.message,"error"))}}><I n="check" s={13}/> Bestätigung</Btn><Btn v="danger" sz="sm" onClick={()=>{const g=guest||{};const subj="Stornierungsbestätigung | "+(hi?.name||"Hotel");const html="<!DOCTYPE html><html><head><meta charset=utf-8></head><body style='margin:0;padding:0;background:#F3F4F6;font-family:sans-serif'><div style='max-width:600px;margin:0 auto;padding:24px'><div style='background:#fff;border-radius:16px;overflow:hidden'><div style='background:linear-gradient(135deg,#3B82F6,#1D4ED8);padding:32px;text-align:center'><h1 style='color:#fff;margin:0'>"+(hi?.name||"Hotel")+"</h1></div><div style='padding:32px'><div style='background:#FEE2E2;border-radius:10px;padding:16px;text-align:center;margin-bottom:20px'><p style='color:#991B1B;font-weight:700;margin:0'>✗ Stornierung</p></div><p>"+(g.salutation||"Sehr geehrte/r")+" "+g.last_name+",</p><p>hiermit bestätigen wir die Stornierung Ihrer Reservierung für Zimmer "+room.name+" ("+fd(rf.check_in)+" – "+fd(rf.check_out)+").</p><p>Mit freundlichen Grüßen,<br><strong>"+(hi?.name||"")+"</strong></p></div></div></div></body></html>";fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:g.email,subject:subj,html:html,emailType:"storno"})}).then(r=>r.json()).then(d=>{if(d.success)showToast("Storno an "+g.email+" gesendet!");else showToast("Fehler: "+(d.error||d.details),"error")}).catch(e=>showToast("Fehler: "+e.message,"error"))}}><I n="xc" s={13}/> Storno</Btn>{res.offer_sent_at&&<span style={{fontSize:11,color:"#6B7280"}}>Angebot: {fd(res.offer_sent_at)}</span>}{res.confirmation_sent_at&&<span style={{fontSize:11,color:"#6B7280"}}>Bestätigung: {fd(res.confirmation_sent_at)}</span>}</div>
-
+    <div style={{display:"flex",gap:8,marginBottom:16,padding:"12px 16px",background:"#F9FAFB",borderRadius:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:12,fontWeight:600}}><I n="mail" s={14} st={{verticalAlign:-3,marginRight:4}}/> E-Mail:</span><Btn v="primary" sz="sm" onClick={()=>sendEmail("angebot")}><I n="send" s={13}/> Angebot</Btn><Btn v="success" sz="sm" onClick={()=>sendEmail("bestaetigung")}><I n="check" s={13}/> Bestaetigung</Btn><Btn v="danger" sz="sm" onClick={()=>sendEmail("storno")}><I n="xc" s={13}/> Storno</Btn>{res.offer_sent_at&&<span style={{fontSize:11,color:"#6B7280"}}>Angebot: {fd(res.offer_sent_at)}</span>}{res.confirmation_sent_at&&<span style={{fontSize:11,color:"#6B7280"}}>Bestaetigung: {fd(res.confirmation_sent_at)}</span>}</div>
     <Tab tabs={tabs} active={tab} onChange={setTab}/>
-
     {tab==="res"&&<div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}>
-        <Sel label="Status" value={rf.status} onChange={e=>u("status",e.target.value)}>{Object.entries(SC).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</Sel>
-        <Sel label="Quelle" value={rf.source||"direkt"} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel>
-        <div><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginTop:24}}><input type="checkbox" checked={rf.fixed||false} onChange={()=>u("fixed",!rf.fixed)} style={{width:18,height:18}}/><span style={{fontSize:13,fontWeight:600}}>Fixiert</span></label></div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:20}}>
-        <Inp label="Anreise" type="date" value={rf.check_in} onChange={e=>u("check_in",e.target.value)}/>
-        <Inp label="Abreise" type="date" value={rf.check_out} onChange={e=>u("check_out",e.target.value)}/>
-        <Inp label="Erwachsene" type="number" min={1} value={rf.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/>
-        <Inp label="Kinder" type="number" min={0} value={rf.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/>
-      </div>
-
-      <Card title={<div style={{display:"flex",justifyContent:"space-between"}}><span>Warenkorb</span><span style={{fontWeight:400,fontSize:12,color:"#6B7280"}}>Zimmer: {room.name}, Erw.: {rf.adults}, Kinder: {rf.children||0}</span></div>} style={{marginBottom:16}}>
-        <table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}>
-          <thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"8px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280"}}>Anz.</th><th style={{padding:"8px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280"}}>Produkt</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600,fontSize:11,color:"#6B7280"}}>Preis</th><th style={{padding:"8px 12px",width:60}}></th></tr></thead>
-          <tbody>
-            <tr style={{borderBottom:"1px solid #F3F4F6"}}>
-              <td style={{padding:"10px 12px"}}>1</td>
-              <td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{room.name}, {ut?.name}</div><div style={{fontSize:11,color:"#6B7280"}}>{fd(rf.check_in)} - {fd(rf.check_out)} | {nights} Nächte</div></td>
-              <td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>€ {fmt(roomTotal)}</td>
-              <td></td>
-            </tr>
-            {items.filter(i=>i.item_type==="product").map(it=><tr key={it.id} style={{borderBottom:"1px solid #F3F4F6"}}>
-              <td style={{padding:"10px 12px"}}>{it.quantity}</td>
-              <td style={{padding:"10px 12px"}}>{it.description}</td>
-              <td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>€ {fmt(it.total_price)}</td>
-              <td style={{padding:"10px 12px"}}><div style={{display:"flex",gap:4}}><button onClick={()=>removeItem(it.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></div></td>
-            </tr>)}
-            <tr style={{background:"#F0FDF4"}}><td></td><td style={{padding:"10px 12px",fontWeight:700}}>GESAMT</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:16,color:"#059669"}}>€ {fmt(grandTotal)}</td><td></td></tr>
-            <tr style={{background:"#F9FAFB"}}><td></td><td style={{padding:"6px 12px",fontSize:11,color:"#6B7280"}}>davon Netto</td><td style={{padding:"6px 12px",textAlign:"right",fontSize:11,color:"#6B7280"}}>€ {fmt(totalNet)}</td><td></td></tr>
-            <tr style={{background:"#F9FAFB"}}><td></td><td style={{padding:"6px 12px",fontSize:11,color:"#6B7280"}}>davon MwSt. (Übern. 7%{itemsTaxDetails.some(i=>i.taxInfo.detail.includes("×"))?" / Verpfl. gem.":""})</td><td style={{padding:"6px 12px",textAlign:"right",fontSize:11,color:"#6B7280"}}>€ {fmt(totalTax)}</td><td></td></tr>
-          </tbody>
-        </table>
-        <div style={{display:"flex",gap:8,marginTop:12}}>
-          <Btn v="ghost" sz="sm" onClick={()=>setAddProduct(true)}><I n="plus" s={14}/> Produkt hinzufügen</Btn>
-        </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}><Sel label="Status" value={rf.status} onChange={e=>u("status",e.target.value)}>{Object.entries(SC).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</Sel><Sel label="Quelle" value={rf.source||"direkt"} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel><div><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginTop:24}}><input type="checkbox" checked={rf.fixed||false} onChange={()=>u("fixed",!rf.fixed)} style={{width:18,height:18}}/><span style={{fontSize:13,fontWeight:600}}>Fixiert</span></label></div></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:20}}><Inp label="Anreise" type="date" value={rf.check_in} onChange={e=>u("check_in",e.target.value)}/><Inp label="Abreise" type="date" value={rf.check_out} onChange={e=>u("check_out",e.target.value)}/><Inp label="Erwachsene" type="number" min={1} value={rf.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/><Inp label="Kinder" type="number" min={0} value={rf.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/></div>
+      <Card title={<div style={{display:"flex",justifyContent:"space-between"}}><span>Warenkorb</span><span style={{fontWeight:400,fontSize:12,color:"#6B7280"}}>Zi: {room.name}, Erw: {rf.adults}, Ki: {rf.children||0}</span></div>} style={{marginBottom:16}}>
+        <table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}><thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"8px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280"}}>Anz.</th><th style={{padding:"8px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280"}}>Produkt</th><th style={{padding:"8px 12px",textAlign:"right",fontWeight:600,fontSize:11,color:"#6B7280"}}>Preis</th><th style={{padding:"8px 12px",width:60}}></th></tr></thead><tbody>
+          <tr style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"10px 12px"}}>1</td><td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{room.name}, {ut?.name}</div><div style={{fontSize:11,color:"#6B7280"}}>{fd(rf.check_in)} - {fd(rf.check_out)} | {nights} Naechte</div></td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>EUR {fmt(roomTotal)}</td><td></td></tr>
+          {items.filter(i=>i.item_type==="product").map(it=><tr key={it.id} style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"10px 12px"}}>{it.quantity}</td><td style={{padding:"10px 12px"}}>{it.description}</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>EUR {fmt(it.total_price)}</td><td style={{padding:"10px 12px"}}><button onClick={()=>removeItem(it.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></td></tr>)}
+          <tr style={{background:"#F0FDF4"}}><td></td><td style={{padding:"10px 12px",fontWeight:700}}>GESAMT</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:16,color:"#059669"}}>EUR {fmt(grandTotal)}</td><td></td></tr>
+          <tr style={{background:"#F9FAFB"}}><td></td><td style={{padding:"6px 12px",fontSize:11,color:"#6B7280"}}>Netto</td><td style={{padding:"6px 12px",textAlign:"right",fontSize:11,color:"#6B7280"}}>EUR {fmt(totalNet)}</td><td></td></tr>
+          <tr style={{background:"#F9FAFB"}}><td></td><td style={{padding:"6px 12px",fontSize:11,color:"#6B7280"}}>MwSt.</td><td style={{padding:"6px 12px",textAlign:"right",fontSize:11,color:"#6B7280"}}>EUR {fmt(totalTax)}</td><td></td></tr>
+        </tbody></table>
+        <div style={{display:"flex",gap:8,marginTop:12}}><Btn v="ghost" sz="sm" onClick={()=>setAddProduct(true)}><I n="plus" s={14}/> Produkt</Btn></div>
       </Card>
-
-      <Inp label="Anmerkungen (für Gast sichtbar)" value={rf.notes||""} onChange={e=>u("notes",e.target.value)} textarea/>
-      <Inp label="Interne Notizen" value={rf.internal_notes||""} onChange={e=>u("internal_notes",e.target.value)} textarea/>
+      <Inp label="Anmerkungen (Gast sichtbar)" value={rf.notes||""} onChange={e=>u("notes",e.target.value)} textarea/><Inp label="Interne Notizen" value={rf.internal_notes||""} onChange={e=>u("internal_notes",e.target.value)} textarea/>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn disabled={saving} onClick={saveRes}><I n="save" s={14}/> {saving?"...":"Speichern"}</Btn></div>
-
-      {addProduct&&<Modal title="Produkt hinzufügen" onClose={()=>setAddProduct(false)} width={480}>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {allProducts.filter(p=>p.active).map(p=><div key={p.id} onClick={()=>addItem(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderRadius:8,border:"1px solid #E5E7EB",cursor:"pointer",transition:"background .1s"}} onMouseOver={e=>e.currentTarget.style.background="#F9FAFB"} onMouseOut={e=>e.currentTarget.style.background="#fff"}>
-            <div><div style={{fontWeight:600,fontSize:14}}>{p.name}</div><div style={{fontSize:12,color:"#6B7280"}}>{p.description} · {p.unit}</div></div>
-            <div style={{fontWeight:700,color:"#3B82F6"}}>{parseFloat(p.price)>0?`€ ${fmt(p.price)}`:"Gratis"}</div>
-          </div>)}
-        </div>
-      </Modal>}
+      {addProduct&&<Modal title="Produkt hinzufuegen" onClose={()=>setAddProduct(false)} width={480}><div style={{display:"flex",flexDirection:"column",gap:8}}>{allProducts.filter(p=>p.active).map(p=><div key={p.id} onClick={()=>addItem(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderRadius:8,border:"1px solid #E5E7EB",cursor:"pointer"}} onMouseOver={e=>e.currentTarget.style.background="#F9FAFB"} onMouseOut={e=>e.currentTarget.style.background="#fff"}><div><div style={{fontWeight:600}}>{p.name}</div><div style={{fontSize:12,color:"#6B7280"}}>{p.description} - {p.unit}</div></div><div style={{fontWeight:700,color:"#3B82F6"}}>{parseFloat(p.price)>0?"EUR "+fmt(p.price):"Gratis"}</div></div>)}</div></Modal>}
     </div>}
-
     {tab==="guest"&&<div>
-      <div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}>
-        <Sel label="Anrede" value={gf.salutation||""} onChange={e=>ug("salutation",e.target.value)}>{SALUTATIONS.map(s=><option key={s} value={s}>{s||"–"}</option>)}</Sel>
-        <Inp label="Vorname *" value={gf.first_name||""} onChange={e=>ug("first_name",e.target.value)}/>
-        <Inp label="Nachname *" value={gf.last_name||""} onChange={e=>ug("last_name",e.target.value)}/>
-      </div>
+      <div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}><Sel label="Anrede" value={gf.salutation||""} onChange={e=>ug("salutation",e.target.value)}>{SALUTATIONS.map(s=><option key={s} value={s}>{s||"-"}</option>)}</Sel><Inp label="Vorname *" value={gf.first_name||""} onChange={e=>ug("first_name",e.target.value)}/><Inp label="Nachname *" value={gf.last_name||""} onChange={e=>ug("last_name",e.target.value)}/></div>
       <Inp label="Firma" value={gf.company||""} onChange={e=>ug("company",e.target.value)}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        <Inp label="E-Mail *" type="email" value={gf.email||""} onChange={e=>ug("email",e.target.value)}/>
-        <Inp label="Telefon" value={gf.phone||""} onChange={e=>ug("phone",e.target.value)}/>
-      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="E-Mail *" type="email" value={gf.email||""} onChange={e=>ug("email",e.target.value)}/><Inp label="Telefon" value={gf.phone||""} onChange={e=>ug("phone",e.target.value)}/></div>
       <Inp label="Adresse" value={gf.address||""} onChange={e=>ug("address",e.target.value)}/>
-      <div style={{display:"grid",gridTemplateColumns:"120px 1fr 120px",gap:12}}>
-        <Inp label="PLZ" value={gf.zip||""} onChange={e=>ug("zip",e.target.value)}/>
-        <Inp label="Ort" value={gf.city||""} onChange={e=>ug("city",e.target.value)}/>
-        <Inp label="Land" value={gf.country||"DE"} onChange={e=>ug("country",e.target.value)}/>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
-        <Inp label="Geburtsdatum" type="date" value={gf.date_of_birth||""} onChange={e=>ug("date_of_birth",e.target.value)}/>
-        <Sel label="Ausweis-Typ" value={gf.id_type||""} onChange={e=>ug("id_type",e.target.value)}><option value="">–</option><option value="perso">Personalausweis</option><option value="reisepass">Reisepass</option><option value="fuehrerschein">Führerschein</option></Sel>
-        <Inp label="Ausweis-Nr." value={gf.id_number||""} onChange={e=>ug("id_number",e.target.value)}/>
-      </div>
-      <Inp label="Nationalität" value={gf.nationality||""} onChange={e=>ug("nationality",e.target.value)}/>
-      <div style={{display:"flex",gap:16,marginBottom:16}}>
-        <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={gf.vip||false} onChange={()=>ug("vip",!gf.vip)}/><span style={{fontSize:13,fontWeight:600}}>⭐ VIP</span></label>
-        <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={gf.newsletter||false} onChange={()=>ug("newsletter",!gf.newsletter)}/><span style={{fontSize:13}}>Newsletter</span></label>
-      </div>
+      <div style={{display:"grid",gridTemplateColumns:"120px 1fr 120px",gap:12}}><Inp label="PLZ" value={gf.zip||""} onChange={e=>ug("zip",e.target.value)}/><Inp label="Ort" value={gf.city||""} onChange={e=>ug("city",e.target.value)}/><Inp label="Land" value={gf.country||"DE"} onChange={e=>ug("country",e.target.value)}/></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}><Inp label="Geburtsdatum" type="date" value={gf.date_of_birth||""} onChange={e=>ug("date_of_birth",e.target.value)}/><Sel label="Ausweis-Typ" value={gf.id_type||""} onChange={e=>ug("id_type",e.target.value)}><option value="">-</option><option value="perso">Personalausweis</option><option value="reisepass">Reisepass</option><option value="fuehrerschein">Fuehrerschein</option></Sel><Inp label="Ausweis-Nr." value={gf.id_number||""} onChange={e=>ug("id_number",e.target.value)}/></div>
+      <Inp label="Nationalitaet" value={gf.nationality||""} onChange={e=>ug("nationality",e.target.value)}/>
+      <div style={{display:"flex",gap:16,marginBottom:16}}><label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={gf.vip||false} onChange={()=>ug("vip",!gf.vip)}/><span style={{fontSize:13,fontWeight:600}}>VIP</span></label><label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={gf.newsletter||false} onChange={()=>ug("newsletter",!gf.newsletter)}/><span style={{fontSize:13}}>Newsletter</span></label></div>
       <Inp label="Notizen zum Gast" value={gf.notes||""} onChange={e=>ug("notes",e.target.value)} textarea/>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn disabled={saving} onClick={saveGuest}><I n="save" s={14}/> {saving?"...":"Gast speichern"}</Btn></div>
     </div>}
-
     {tab==="payment"&&<div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}>
-        <Card><div style={{fontSize:12,color:"#6B7280"}}>Gesamtbetrag</div><div style={{fontSize:20,fontWeight:800}}>€ {fmt(grandTotal)}</div></Card>
-        <Card><div style={{fontSize:12,color:"#6B7280"}}>Bezahlt</div><div style={{fontSize:20,fontWeight:800,color:"#059669"}}>€ {fmt(totalPaid)}</div></Card>
-        <Card><div style={{fontSize:12,color:"#6B7280"}}>Offen</div><div style={{fontSize:20,fontWeight:800,color:balance>0?"#DC2626":"#059669"}}>€ {fmt(balance)}</div></Card>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-        <Inp label="Geforderte Anzahlung (€)" type="number" value={rf.deposit_required||0} onChange={e=>u("deposit_required",parseFloat(e.target.value)||0)}/>
-        <Inp label="Fälligkeitsdatum" type="date" value={rf.deposit_due||""} onChange={e=>u("deposit_due",e.target.value)}/>
-      </div>
-
-      <Card title="Zahlungen" style={{marginBottom:16}}>
-        {payments.length===0?<div style={{color:"#9CA3AF",fontSize:13,padding:8}}>Noch keine Zahlungen.</div>:
-        <table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}>
-          <thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"8px",textAlign:"left",fontSize:11,color:"#6B7280"}}>Datum</th><th style={{padding:"8px",textAlign:"left",fontSize:11,color:"#6B7280"}}>Typ</th><th style={{padding:"8px",textAlign:"left",fontSize:11,color:"#6B7280"}}>Methode</th><th style={{padding:"8px",textAlign:"right",fontSize:11,color:"#6B7280"}}>Betrag</th><th style={{padding:"8px",textAlign:"left",fontSize:11,color:"#6B7280"}}>Status</th></tr></thead>
-          <tbody>{payments.map(p=><tr key={p.id} style={{borderBottom:"1px solid #F3F4F6"}}>
-            <td style={{padding:"8px"}}>{fd(p.paid_at||p.created_at)}</td>
-            <td style={{padding:"8px"}}>{PTYPES[p.payment_type]||p.payment_type}</td>
-            <td style={{padding:"8px"}}>{PMETHODS[p.payment_method]||p.payment_method}</td>
-            <td style={{padding:"8px",textAlign:"right",fontWeight:600}}>€ {fmt(p.amount)}</td>
-            <td style={{padding:"8px"}}><span style={{fontSize:11,fontWeight:600,color:p.status==="eingegangen"?"#059669":"#F59E0B"}}>{p.status==="eingegangen"?"✓ Eingegangen":"⏳ Ausstehend"}</span></td>
-          </tr>)}</tbody>
-        </table>}
-        <div style={{marginTop:12}}><Btn v="ghost" sz="sm" onClick={()=>setAddPayment(true)}><I n="plus" s={14}/> Zahlung erfassen</Btn></div>
-      </Card>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}><Card><div style={{fontSize:12,color:"#6B7280"}}>Gesamt</div><div style={{fontSize:20,fontWeight:800}}>EUR {fmt(grandTotal)}</div></Card><Card><div style={{fontSize:12,color:"#6B7280"}}>Bezahlt</div><div style={{fontSize:20,fontWeight:800,color:"#059669"}}>EUR {fmt(totalPaid)}</div></Card><Card><div style={{fontSize:12,color:"#6B7280"}}>Offen</div><div style={{fontSize:20,fontWeight:800,color:balance>0?"#DC2626":"#059669"}}>EUR {fmt(balance)}</div></Card></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}><Inp label="Anzahlung (EUR)" type="number" value={rf.deposit_required||0} onChange={e=>u("deposit_required",parseFloat(e.target.value)||0)}/><Inp label="Faellig" type="date" value={rf.deposit_due||""} onChange={e=>u("deposit_due",e.target.value)}/></div>
+      <Card title="Zahlungen" style={{marginBottom:16}}>{payments.length===0?<div style={{color:"#9CA3AF",fontSize:13,padding:8}}>Keine Zahlungen.</div>:<table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}><thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"8px",textAlign:"left",fontSize:11,color:"#6B7280"}}>Datum</th><th style={{padding:"8px",textAlign:"left",fontSize:11,color:"#6B7280"}}>Typ</th><th style={{padding:"8px",textAlign:"left",fontSize:11,color:"#6B7280"}}>Methode</th><th style={{padding:"8px",textAlign:"right",fontSize:11,color:"#6B7280"}}>Betrag</th><th style={{padding:"8px",fontSize:11,color:"#6B7280"}}>Status</th></tr></thead><tbody>{payments.map(p=><tr key={p.id} style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"8px"}}>{fd(p.paid_at||p.created_at)}</td><td style={{padding:"8px"}}>{PTYPES[p.payment_type]||p.payment_type}</td><td style={{padding:"8px"}}>{PMETHODS[p.payment_method]||p.payment_method}</td><td style={{padding:"8px",textAlign:"right",fontWeight:600}}>EUR {fmt(p.amount)}</td><td style={{padding:"8px"}}><span style={{fontSize:11,fontWeight:600,color:p.status==="eingegangen"?"#059669":"#F59E0B"}}>{p.status==="eingegangen"?"Eingegangen":"Ausstehend"}</span></td></tr>)}</tbody></table>}
+        <div style={{marginTop:12}}><Btn v="ghost" sz="sm" onClick={()=>setAddPayment(true)}><I n="plus" s={14}/> Zahlung erfassen</Btn></div></Card>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn disabled={saving} onClick={saveRes}><I n="save" s={14}/> Speichern</Btn></div>
-
       {addPayment&&<PaymentForm onClose={()=>setAddPayment(false)} onSave={async(d)=>{await addPay(d);setAddPayment(false)}} balance={balance}/>}
     </div>}
-
-    {tab==="room"&&<div>
-      <Card title="Zimmerzuweisung" style={{marginBottom:16}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,padding:8}}>
-          <CD color={ut?.color||"#999"} size={20}/>
-          <div><div style={{fontWeight:700,fontSize:18}}>Zimmer {room.name}</div><div style={{fontSize:13,color:"#6B7280"}}>{ut?.name} · {room.floor}. OG · max. {ut?.capacity} Personen</div><div style={{fontSize:13,color:"#3B82F6",fontWeight:600}}>€ {fmt(roomPrice)} / Nacht × {nights} Nächte = € {fmt(roomTotal)}</div></div>
-        </div>
-        {ut?.amenities?.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>{ut.amenities.map(a=><span key={a} style={{background:"#EFF6FF",color:"#2563EB",padding:"2px 10px",borderRadius:12,fontSize:11}}>{a}</span>)}</div>}
-      </Card>
-    </div>}
+    {tab==="room"&&<div><Card title="Zimmerzuweisung"><div style={{display:"flex",alignItems:"center",gap:12,padding:8}}><CD color={ut?.color||"#999"} size={20}/><div><div style={{fontWeight:700,fontSize:18}}>Zimmer {room.name}</div><div style={{fontSize:13,color:"#6B7280"}}>{ut?.name} - {room.floor}. OG - max. {ut?.capacity} Pers.</div><div style={{fontSize:13,color:"#3B82F6",fontWeight:600}}>EUR {fmt(roomPrice)} / Nacht x {nights} = EUR {fmt(roomTotal)}</div></div></div>{ut?.amenities?.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>{ut.amenities.map(a=><span key={a} style={{background:"#EFF6FF",color:"#2563EB",padding:"2px 10px",borderRadius:12,fontSize:11}}>{a}</span>)}</div>}</Card></div>}
   </Modal>;
 };
 
-// ─── PAYMENT FORM ───
-const PaymentForm=({onClose,onSave,balance})=>{
-  const[fm,setFm]=useState({amount:balance>0?balance:0,payment_method:"bar",payment_type:"zahlung",status:"eingegangen",reference:"",notes:""});
-  const[sv,setSv]=useState(false);
-  const u=(k,v)=>setFm(p=>({...p,[k]:v}));
-  return<Modal title="Zahlung erfassen" onClose={onClose} width={440}>
-    <Inp label="Betrag (€) *" type="number" min={0} step={.01} value={fm.amount} onChange={e=>u("amount",parseFloat(e.target.value)||0)}/>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <Sel label="Zahlungsart" value={fm.payment_method} onChange={e=>u("payment_method",e.target.value)}>{Object.entries(PMETHODS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel>
-      <Sel label="Typ" value={fm.payment_type} onChange={e=>u("payment_type",e.target.value)}>{Object.entries(PTYPES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel>
-    </div>
-    <Sel label="Status" value={fm.status} onChange={e=>u("status",e.target.value)}><option value="eingegangen">Eingegangen</option><option value="ausstehend">Ausstehend</option></Sel>
-    <Inp label="Referenz / Beleg-Nr." value={fm.reference} onChange={e=>u("reference",e.target.value)}/>
-    <Inp label="Notiz" value={fm.notes} onChange={e=>u("notes",e.target.value)}/>
-    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.amount||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="check" s={14}/> Erfassen</Btn></div>
-  </Modal>;
-};
+const PaymentForm=({onClose,onSave,balance})=>{const[fm,setFm]=useState({amount:balance>0?balance:0,payment_method:"bar",payment_type:"zahlung",status:"eingegangen",reference:"",notes:""});const[sv,setSv]=useState(false);const u=(k,v)=>setFm(p=>({...p,[k]:v}));return<Modal title="Zahlung erfassen" onClose={onClose} width={440}><Inp label="Betrag (EUR) *" type="number" min={0} step={.01} value={fm.amount} onChange={e=>u("amount",parseFloat(e.target.value)||0)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Sel label="Zahlungsart" value={fm.payment_method} onChange={e=>u("payment_method",e.target.value)}>{Object.entries(PMETHODS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel><Sel label="Typ" value={fm.payment_type} onChange={e=>u("payment_type",e.target.value)}>{Object.entries(PTYPES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel></div><Sel label="Status" value={fm.status} onChange={e=>u("status",e.target.value)}><option value="eingegangen">Eingegangen</option><option value="ausstehend">Ausstehend</option></Sel><Inp label="Referenz" value={fm.reference} onChange={e=>u("reference",e.target.value)}/><Inp label="Notiz" value={fm.notes} onChange={e=>u("notes",e.target.value)}/><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.amount||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="check" s={14}/> Erfassen</Btn></div></Modal>};
 
-// ─── NEW RESERVATION FORM ───
-const NewResForm=({room,ut,unitTypes,api,onClose,onRefresh,showToast})=>{
-  const price=gP(room,unitTypes);
-  const[fm,setFm]=useState({first_name:"",last_name:"",email:"",phone:"",check_in:toDS(new Date()),check_out:toDS(addD(new Date(),1)),adults:1,children:0,notes:"",source:"direkt"});
-  const nights=Math.max(1,dBet(fm.check_in,fm.check_out));
-  const total=nights*price;
-  const u=(k,v)=>setFm(p=>({...p,[k]:v}));
-  const[sv,setSv]=useState(false);
-  const save=async()=>{
-    if(!fm.first_name||!fm.last_name||!fm.email)return;
-    setSv(true);
-    try{
-      const[g]=await api.post("guests",{first_name:fm.first_name,last_name:fm.last_name,email:fm.email,phone:fm.phone||""});
-      await api.post("reservations",{room_id:room.id,guest_id:g.id,check_in:fm.check_in,check_out:fm.check_out,status:"angebot",adults:fm.adults,children:fm.children,total_price:total,notes:fm.notes||"",source:fm.source});
-      await onRefresh();showToast("Angebot erstellt");onClose();
-    }catch(e){showToast(e.message,"error")}
-    setSv(false);
-  };
-  return<Modal title={`Neu – ${ut?.name} ${room.name}`} onClose={onClose} width={520}>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <Inp label="Vorname *" value={fm.first_name} onChange={e=>u("first_name",e.target.value)}/>
-      <Inp label="Nachname *" value={fm.last_name} onChange={e=>u("last_name",e.target.value)}/>
-      <Inp label="E-Mail *" type="email" value={fm.email} onChange={e=>u("email",e.target.value)}/>
-      <Inp label="Telefon" value={fm.phone} onChange={e=>u("phone",e.target.value)}/>
-      <Inp label="Anreise" type="date" value={fm.check_in} onChange={e=>u("check_in",e.target.value)}/>
-      <Inp label="Abreise" type="date" value={fm.check_out} onChange={e=>u("check_out",e.target.value)}/>
-      <Inp label="Erwachsene" type="number" min={1} value={fm.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/>
-      <Inp label="Kinder" type="number" min={0} value={fm.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/>
-      <Sel label="Quelle" value={fm.source} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel>
-    </div>
-    <div style={{background:"#F0F9FF",borderRadius:8,padding:12,margin:"8px 0 16px",display:"flex",justifyContent:"space-between"}}>
-      <span style={{fontSize:13,color:"#1E40AF"}}>{nights} N. × {fmt(price)} €</span>
-      <span style={{fontSize:18,fontWeight:700,color:"#1E40AF"}}>{fmt(total)} €</span>
-    </div>
-    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.first_name||!fm.last_name||!fm.email||sv} onClick={save}>{sv?"...":"Angebot erstellen"}</Btn></div>
-  </Modal>;
-};
+const NewResForm=({room,ut,unitTypes,api,onClose,onRefresh,showToast})=>{const price=gP(room,unitTypes);const[fm,setFm]=useState({first_name:"",last_name:"",email:"",phone:"",check_in:toDS(new Date()),check_out:toDS(addD(new Date(),1)),adults:1,children:0,notes:"",source:"direkt"});const nights=Math.max(1,dBet(fm.check_in,fm.check_out));const total=nights*price;const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);const save=async()=>{if(!fm.first_name||!fm.last_name||!fm.email)return;setSv(true);try{const[g]=await api.post("guests",{first_name:fm.first_name,last_name:fm.last_name,email:fm.email,phone:fm.phone||""});await api.post("reservations",{room_id:room.id,guest_id:g.id,check_in:fm.check_in,check_out:fm.check_out,status:"angebot",adults:fm.adults,children:fm.children,total_price:total,notes:fm.notes||"",source:fm.source});await onRefresh();showToast("Angebot erstellt");onClose()}catch(e){showToast(e.message,"error")}setSv(false)};return<Modal title={"Neu - "+(ut?.name||"")+" "+room.name} onClose={onClose} width={520}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Vorname *" value={fm.first_name} onChange={e=>u("first_name",e.target.value)}/><Inp label="Nachname *" value={fm.last_name} onChange={e=>u("last_name",e.target.value)}/><Inp label="E-Mail *" type="email" value={fm.email} onChange={e=>u("email",e.target.value)}/><Inp label="Telefon" value={fm.phone} onChange={e=>u("phone",e.target.value)}/><Inp label="Anreise" type="date" value={fm.check_in} onChange={e=>u("check_in",e.target.value)}/><Inp label="Abreise" type="date" value={fm.check_out} onChange={e=>u("check_out",e.target.value)}/><Inp label="Erwachsene" type="number" min={1} value={fm.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/><Inp label="Kinder" type="number" min={0} value={fm.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/><Sel label="Quelle" value={fm.source} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel></div><div style={{background:"#F0F9FF",borderRadius:8,padding:12,margin:"8px 0 16px",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:13,color:"#1E40AF"}}>{nights} N. x {fmt(price)} EUR</span><span style={{fontSize:18,fontWeight:700,color:"#1E40AF"}}>{fmt(total)} EUR</span></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.first_name||!fm.last_name||!fm.email||sv} onClick={save}>{sv?"...":"Angebot erstellen"}</Btn></div></Modal>};
 
-// ─── UNIT TYPE / ROOM EDITORS (simplified) ───
-const UTEditor=({ut,usedColors,onSave,onClose})=>{
-  const[fm,setFm]=useState(ut?{...ut}:{name:"",short_name:"",description:"",base_price:100,capacity:2,amenities:["WLAN","TV","Dusche"],color:TCOLORS.find(c=>!usedColors.includes(c))||TCOLORS[0]});
-  const u=(k,v)=>setFm(p=>({...p,[k]:v}));const tA=a=>setFm(p=>({...p,amenities:p.amenities.includes(a)?p.amenities.filter(x=>x!==a):[...p.amenities,a]}));
-  const[sv,setSv]=useState(false);
-  return<Modal title={ut?`"${ut.name}" bearbeiten`:"Neue Einheit"} onClose={onClose} width={540}>
-    <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12}}><Inp label="Name *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Inp label="Kürzel" value={fm.short_name} onChange={e=>u("short_name",e.target.value)}/></div>
-    <Inp label="Beschreibung" value={fm.description} onChange={e=>u("description",e.target.value)}/>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Preis/N. (€)" type="number" value={fm.base_price} onChange={e=>u("base_price",parseFloat(e.target.value)||0)}/><Inp label="Max. Pers." type="number" min={1} value={fm.capacity} onChange={e=>u("capacity",parseInt(e.target.value)||1)}/></div>
-    <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8}}>Farbe</label><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{TCOLORS.map(c=><button key={c} onClick={()=>u("color",c)} style={{width:32,height:32,borderRadius:8,background:c,border:fm.color===c?"3px solid #111":"2px solid #E5E7EB",cursor:"pointer"}}/>)}</div></div>
-    <div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8}}>Ausstattung</label><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{AMENITIES.map(a=><button key={a} onClick={()=>tA(a)} style={{padding:"4px 12px",borderRadius:20,border:`1px solid ${fm.amenities?.includes(a)?"#3B82F6":"#D1D5DB"}`,background:fm.amenities?.includes(a)?"#EFF6FF":"#fff",color:fm.amenities?.includes(a)?"#2563EB":"#6B7280",fontSize:12,cursor:"pointer"}}>{fm.amenities?.includes(a)?"✓ ":""}{a}</button>)}</div></div>
-    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {ut?"Speichern":"Anlegen"}</Btn></div>
-  </Modal>;
-};
-const RoomEditor=({room,unitTypes,onSave,onClose})=>{
-  const[fm,setFm]=useState(room?{...room}:{name:"",unit_type_id:unitTypes[0]?.id,floor:1,price_override:null,active:true,notes:""});
-  const u=(k,v)=>setFm(p=>({...p,[k]:v}));const ut=unitTypes.find(t=>t.id===fm.unit_type_id);
-  const[ov,setOv]=useState(fm.price_override!=null);const[sv,setSv]=useState(false);
-  return<Modal title={room?`Zimmer ${room.name}`:"Neues Zimmer"} onClose={onClose}>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <Inp label="Nr. *" value={fm.name} onChange={e=>u("name",e.target.value)}/>
-      <Sel label="Einheit *" value={fm.unit_type_id||""} onChange={e=>u("unit_type_id",e.target.value)}>{unitTypes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</Sel>
-      <Inp label="Etage" type="number" value={fm.floor} onChange={e=>u("floor",parseInt(e.target.value)||0)}/>
-      <div><label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:600,marginBottom:4,cursor:"pointer"}}><input type="checkbox" checked={ov} onChange={()=>{setOv(!ov);if(ov)u("price_override",null);else u("price_override",ut?.base_price||0)}}/> Abw. Preis</label>
-      {ov?<input type="number" value={fm.price_override??""} onChange={e=>u("price_override",parseFloat(e.target.value)||0)} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>:<div style={{padding:"8px 12px",background:"#F9FAFB",borderRadius:8,color:"#6B7280"}}>{ut?.base_price??0} € (Std.)</div>}</div>
-    </div>
-    <Inp label="Notizen" value={fm.notes||""} onChange={e=>u("notes",e.target.value)}/>
-    <label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer"}}><input type="checkbox" checked={fm.active} onChange={()=>u("active",!fm.active)} style={{width:18,height:18}}/><span style={{fontSize:13,fontWeight:600}}>Aktiv</span></label>
-    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {room?"Speichern":"Anlegen"}</Btn></div>
-  </Modal>;
-};
+const UTEditor=({ut,usedColors,onSave,onClose})=>{const[fm,setFm]=useState(ut?{...ut}:{name:"",short_name:"",description:"",base_price:100,capacity:2,amenities:["WLAN","TV","Dusche"],color:TCOLORS.find(c=>!usedColors.includes(c))||TCOLORS[0]});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const tA=a=>setFm(p=>({...p,amenities:p.amenities.includes(a)?p.amenities.filter(x=>x!==a):[...p.amenities,a]}));const[sv,setSv]=useState(false);return<Modal title={ut?ut.name+" bearbeiten":"Neue Einheit"} onClose={onClose} width={540}><div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12}}><Inp label="Name *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Inp label="Kuerzel" value={fm.short_name} onChange={e=>u("short_name",e.target.value)}/></div><Inp label="Beschreibung" value={fm.description} onChange={e=>u("description",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Preis/N. (EUR)" type="number" value={fm.base_price} onChange={e=>u("base_price",parseFloat(e.target.value)||0)}/><Inp label="Max. Pers." type="number" min={1} value={fm.capacity} onChange={e=>u("capacity",parseInt(e.target.value)||1)}/></div><div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8}}>Farbe</label><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{TCOLORS.map(c=><button key={c} onClick={()=>u("color",c)} style={{width:32,height:32,borderRadius:8,background:c,border:fm.color===c?"3px solid #111":"2px solid #E5E7EB",cursor:"pointer"}}/>)}</div></div><div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8}}>Ausstattung</label><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{AMENITIES.map(a=><button key={a} onClick={()=>tA(a)} style={{padding:"4px 12px",borderRadius:20,border:"1px solid "+(fm.amenities?.includes(a)?"#3B82F6":"#D1D5DB"),background:fm.amenities?.includes(a)?"#EFF6FF":"#fff",color:fm.amenities?.includes(a)?"#2563EB":"#6B7280",fontSize:12,cursor:"pointer"}}>{fm.amenities?.includes(a)?"+ ":""}{a}</button>)}</div></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {ut?"Speichern":"Anlegen"}</Btn></div></Modal>};
 
-// ─── MAIN APP ───
+const RoomEditor=({room,unitTypes,onSave,onClose})=>{const[fm,setFm]=useState(room?{...room}:{name:"",unit_type_id:unitTypes[0]?.id,floor:1,price_override:null,active:true,notes:""});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const ut=unitTypes.find(t=>t.id===fm.unit_type_id);const[ov,setOv]=useState(fm.price_override!=null);const[sv,setSv]=useState(false);return<Modal title={room?"Zimmer "+room.name:"Neues Zimmer"} onClose={onClose}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Nr. *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Sel label="Einheit *" value={fm.unit_type_id||""} onChange={e=>u("unit_type_id",e.target.value)}>{unitTypes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</Sel><Inp label="Etage" type="number" value={fm.floor} onChange={e=>u("floor",parseInt(e.target.value)||0)}/><div><label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:600,marginBottom:4,cursor:"pointer"}}><input type="checkbox" checked={ov} onChange={()=>{setOv(!ov);if(ov)u("price_override",null);else u("price_override",ut?.base_price||0)}}/> Abw. Preis</label>{ov?<input type="number" value={fm.price_override!=null?fm.price_override:""} onChange={e=>u("price_override",parseFloat(e.target.value)||0)} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box"}}/>:<div style={{padding:"8px 12px",background:"#F9FAFB",borderRadius:8,color:"#6B7280"}}>{ut?.base_price||0} EUR (Std.)</div>}</div></div><Inp label="Notizen" value={fm.notes||""} onChange={e=>u("notes",e.target.value)}/><label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer"}}><input type="checkbox" checked={fm.active} onChange={()=>u("active",!fm.active)} style={{width:18,height:18}}/><span style={{fontSize:13,fontWeight:600}}>Aktiv</span></label><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {room?"Speichern":"Anlegen"}</Btn></div></Modal>};
+
 function App(){
-      const[token,setToken]=useState(null);const[user,setUser]=useState(null);
-      const sb={url:"https://ztdtkncoyrkvdpytwuhy.supabase.co",key:"sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT"};
-      if(!token)return<AuthScreen sb={sb} onAuth={(t,u)=>{setToken(t);setUser(u)}}/>;
-      return<MainApp sb={sb} token={token} user={user} onLogout={()=>{setToken(null);setUser(null)}}/>;
-    }
+  const[token,setToken]=useState(null);const[user,setUser]=useState(null);
+  const sb={url:"https://ztdtkncoyrkvdpytwuhy.supabase.co",key:"sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT"};
+  if(!token)return<AuthScreen sb={sb} onAuth={(t,u)=>{setToken(t);setUser(u)}}/>;
+  return<MainApp sb={sb} token={token} user={user} onLogout={()=>{setToken(null);setUser(null)}}/>;
+}
 
 function MainApp({sb,token,onLogout}){
   const api=useAPI(sb.url,sb.key,token);
@@ -495,553 +228,144 @@ function MainApp({sb,token,onLogout}){
   const[ws,setWs]=useState(new Date(new Date().setHours(0,0,0,0)));
   const[toast,setToast]=useState(null);
   const show=(m,t="success")=>{setToast({m,t});setTimeout(()=>setToast(null),3000)};
-
   const[hi,setHi]=useState(null);const[uts,setUts]=useState([]);const[rms,setRms]=useState([]);
   const[ress,setRess]=useState([]);const[guests,setGuests]=useState([]);const[products,setProducts]=useState([]);
   const[ld,setLd]=useState(true);
 
-  const load=useCallback(async()=>{
-    setLd(true);
-    try{
-      const[h,u,r,rv,g,p]=await Promise.all([
-        api.get("hotel_info","limit=1"),api.get("unit_types","order=sort_order"),api.get("rooms","order=name"),
-        api.get("reservations","order=created_at.desc"),api.get("guests","order=last_name"),api.get("products","order=sort_order")
-      ]);
-      setHi(h[0]||{});setUts(u);setRms(r);setRess(rv);setGuests(g);setProducts(p);
-    }catch(e){show("Ladefehler: "+e.message,"error")}
-    setLd(false);
-  },[api]);
+  const load=useCallback(async()=>{setLd(true);try{const[h,u,r,rv,g,p]=await Promise.all([api.get("hotel_info","limit=1"),api.get("unit_types","order=sort_order"),api.get("rooms","order=name"),api.get("reservations","order=created_at.desc"),api.get("guests","order=last_name"),api.get("products","order=sort_order")]);setHi(h[0]||{});setUts(u);setRms(r);setRess(rv);setGuests(g);setProducts(p)}catch(e){show("Ladefehler: "+e.message,"error")}setLd(false)},[api]);
   useEffect(()=>{load()},[]);
-
-  // CRUD helpers
   const saveUT=async(d,id)=>{try{if(id)await api.patch("unit_types",id,d);else await api.post("unit_types",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
-  const delUT=async id=>{try{await api.del("unit_types",id);await load();show("Gelöscht")}catch(e){show(e.message,"error")}};
+  const delUT=async id=>{try{await api.del("unit_types",id);await load();show("Geloescht")}catch(e){show(e.message,"error")}};
   const saveRoom=async(d,id)=>{try{if(id)await api.patch("rooms",id,d);else await api.post("rooms",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
-  const delRoom=async id=>{try{await api.del("rooms",id);await load();show("Gelöscht")}catch(e){show(e.message,"error")}};
-  const delRes=async id=>{try{await api.del("reservations",id);await load();show("Gelöscht")}catch(e){show(e.message,"error")}};
-
+  const delRoom=async id=>{try{await api.del("rooms",id);await load();show("Geloescht")}catch(e){show(e.message,"error")}};
   const aRms=useMemo(()=>rms.filter(r=>r.active).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})),[rms]);
   const gMap=useMemo(()=>Object.fromEntries(guests.map(g=>[g.id,g])),[guests]);
 
-  // ─── PLAN ───
+  // ─── BELEGUNGSPLAN mit Preisvorschlaegen ───
   const PlanView=()=>{
     const days=Array.from({length:14},(_,i)=>addD(ws,i));
     const[modal,setModal]=useState(null);
+    const[pSugg,setPSugg]=useState({});const[pLoad,setPLoad]=useState(false);const[pErr,setPErr]=useState(null);
+    const[lastUpd,setLastUpd]=useState(null);const[comps,setComps]=useState(null);const[showComp,setShowComp]=useState(false);
+    const[autoP,setAutoP]=useState(false);const[minPrices,setMinPrices]=useState({});
+    const autoRef=React.useRef(null);
+
+    useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]=Math.round((u.base_price||80)*0.65)});setMinPrices(m)},[uts]);
+    useEffect(()=>{if(autoP){autoRef.current=setInterval(()=>fetchPrices(),30*60000);return()=>clearInterval(autoRef.current)}else{if(autoRef.current)clearInterval(autoRef.current)}},[autoP]);
+
+    const getOcc=(tid,date)=>{const ds=toDS(date);const tr=aRms.filter(r=>r.unit_type_id==tid);const oc=tr.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&!["abgelehnt","checkedout","storniert"].includes(rv.status))).length;return{oc,tot:tr.length,pct:tr.length?Math.round(oc/tr.length*100):0}};
+    const totOcc=(date)=>{const ds=toDS(date);const oc=aRms.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&!["abgelehnt","checkedout","storniert"].includes(rv.status))).length;return{oc,tot:aRms.length,pct:aRms.length?Math.round(oc/aRms.length*100):0}};
+
+    const fetchPrices=async()=>{setPLoad(true);setPErr(null);try{const occD={};uts.forEach(ut=>{occD[ut.id]=days.map(d=>{const o=getOcc(ut.id,d);return{date:toDS(d),weekday:["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()],occupied:o.oc,total:o.tot,pct:o.pct}})});const prompt="You are a hotel revenue management AI for \"Hotel Europa Ruesselsheim\" (3-star, rating 7.5/10, near Frankfurt Airport).\n\nSearch Booking.com for current hotel prices near Ruesselsheim, Frankfurt Airport, Kelsterbach, Raunheim for "+toDS(days[0])+" to "+toDS(days[13])+".\n\nOUR ROOM CATEGORIES:\n"+uts.map(ut=>"- ID "+ut.id+" \""+ut.name+"\": Basispreis "+ut.base_price+"EUR, Mindestpreis "+(minPrices[ut.id]||39)+"EUR\n  Belegung: "+JSON.stringify(occD[ut.id])).join("\n")+"\n\nRULES:\n- Never suggest below minimum price\n- High occupancy >80%: price 10-20% above market\n- Low occupancy <50%: price 5-15% below market but above minimum\n- Weekend Fr/Sa premium +10-15%\n\nRespond ONLY valid JSON (no markdown no backticks):\n{\"competitors\":[{\"name\":\"string\",\"stars\":0,\"rating\":0,\"priceRange\":\"string\"}],\"suggestions\":{\""+uts.map(u=>u.id).join("\":[...],\"")+"\":[{\"date\":\"YYYY-MM-DD\",\"price\":0,\"reason\":\"short German reason\"}]},\"marketSummary\":\"2-3 German sentences\"}";const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,tools:[{type:"web_search_20250305",name:"web_search"}],messages:[{role:"user",content:prompt}]})});if(!resp.ok)throw new Error("API "+resp.status);const data=await resp.json();const txt=data.content?.filter(b=>b.type==="text").map(b=>b.text).join("\n")||"";const clean=txt.replace(/```json|```/g,"").trim();const m=clean.match(/\{[\s\S]*"suggestions"[\s\S]*\}/);if(!m)throw new Error("Keine Preisdaten erhalten");const parsed=JSON.parse(m[0]);setPSugg(parsed.suggestions||{});setComps(parsed);setLastUpd(new Date());show("Preisvorschlaege aktualisiert")}catch(e){setPErr(e.message);show(e.message,"error")}finally{setPLoad(false)}};
+    const getP=(tid,d)=>{const a=pSugg[String(tid)];return a?.find(e=>e.date===toDS(d))?.price||null};
+    const getReason=(tid,d)=>{const a=pSugg[String(tid)];return a?.find(e=>e.date===toDS(d))?.reason||""};
+    const PBadge=({price,base,min})=>{if(pLoad)return<div style={{width:28,height:14,background:"#E2E8F0",borderRadius:4,margin:"0 auto"}}></div>;if(!price)return<span style={{color:"#CBD5E1",fontSize:10}}>-</span>;const cl=Math.max(price,min||0);const diff=cl-base;const pct=Math.round((diff/base)*100);const c=diff>2?"#DC2626":diff<-2?"#059669":"#6B7280";const bg=diff>2?"#FEF2F2":diff<-2?"#ECFDF5":"#F9FAFB";return<div style={{background:bg,borderRadius:6,padding:"2px 4px",textAlign:"center"}}><div style={{fontSize:12,fontWeight:800,color:c,lineHeight:1.1}}>{cl}&#8364;</div>{diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>2?"&#9650;":"&#9660;"}{pct>0?"+":""}{pct}%</div>}{price<(min||0)&&<div style={{fontSize:7,color:"#F59E0B",fontWeight:700}}>MIN</div>}</div>};
+
+    const goMonth=(n)=>{const d=new Date(ws);d.setMonth(d.getMonth()+n);d.setDate(1);setWs(d)};
+    const goYear=(n)=>{const d=new Date(ws);d.setFullYear(d.getFullYear()+n);d.setDate(1);setWs(d)};
+
     return<div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+          <Btn v="ghost" sz="sm" onClick={()=>goYear(-1)} title="Jahr zurueck" style={{padding:"5px 6px",fontSize:11}}>&#171;</Btn>
+          <Btn v="ghost" sz="sm" onClick={()=>goMonth(-1)} title="Monat zurueck" style={{padding:"5px 6px",fontSize:11}}>&#8249; Monat</Btn>
           <Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))}><I n="cL" s={16}/></Btn>
           <Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn>
           <Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))}><I n="cR" s={16}/></Btn>
-          <span style={{fontSize:14,fontWeight:600}}>{fd(ws)} – {fd(addD(ws,13))}</span>
+          <Btn v="ghost" sz="sm" onClick={()=>goMonth(1)} title="Monat vor" style={{padding:"5px 6px",fontSize:11}}>Monat &#8250;</Btn>
+          <Btn v="ghost" sz="sm" onClick={()=>goYear(1)} title="Jahr vor" style={{padding:"5px 6px",fontSize:11}}>&#187;</Btn>
+          <span style={{fontSize:14,fontWeight:600,marginLeft:4}}>{MONATE[ws.getMonth()]} {ws.getFullYear()} | {fd(ws)} - {fd(addD(ws,13))}</span>
         </div>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{Object.entries(SC).filter(([k])=>!["checkedout","abgelehnt","storniert"].includes(k)).map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{width:10,height:10,borderRadius:3,background:v.bd}}/>{v.l}</span>)}</div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <Btn sz="sm" onClick={fetchPrices} disabled={pLoad} style={{background:pLoad?"#94A3B8":"#1E40AF"}}><I n="dollar" s={14} c="#fff"/> {pLoad?"Lade...":"Preise abrufen"}</Btn>
+          <label title="Alle 30 Min. automatisch aktualisieren" style={{fontSize:11,color:"#6B7280",display:"flex",alignItems:"center",gap:4,cursor:"pointer",background:autoP?"#EFF6FF":"transparent",padding:"4px 8px",borderRadius:6,border:autoP?"1px solid #BFDBFE":"1px solid transparent"}}><input type="checkbox" checked={autoP} onChange={e=>setAutoP(e.target.checked)} style={{width:14,height:14}}/>Auto (30m)</label>
+        </div>
       </div>
+      {(lastUpd||pErr)&&<div style={{background:pErr?"#FEF2F2":"#EFF6FF",borderRadius:8,padding:"5px 12px",marginBottom:10,fontSize:11,display:"flex",justifyContent:"space-between",alignItems:"center"}}>{pErr?<span style={{color:"#DC2626"}}>Fehler: {pErr}</span>:<span style={{color:"#1E40AF"}}>Preise aktualisiert: {lastUpd.toLocaleTimeString("de-DE")}{autoP?" | Auto aktiv":""}</span>}{comps&&<button onClick={()=>setShowComp(!showComp)} style={{background:"none",border:"none",color:"#1E40AF",cursor:"pointer",fontSize:11,fontWeight:600,textDecoration:"underline"}}>{showComp?"Ausblenden":(comps.competitors?.length||0)+" Konkurrenten"}</button>}</div>}
+      {showComp&&comps&&<div style={{background:"#fff",borderRadius:10,border:"1px solid #E5E7EB",padding:10,marginBottom:12}}>{comps.marketSummary&&<div style={{fontSize:11,color:"#475569",marginBottom:6,padding:"6px 8px",background:"#FFFBEB",borderRadius:6,borderLeft:"3px solid #F59E0B"}}>{comps.marketSummary}</div>}<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{comps.competitors?.map((c,i)=><div key={i} style={{background:"#F9FAFB",border:"1px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:11}}><div style={{fontWeight:700}}>{c.name}</div><div style={{color:"#6B7280"}}>{"*".repeat(c.stars||0)} | {c.rating}/10 | <strong>{c.priceRange}</strong></div></div>)}</div></div>}
+      <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>{Object.entries(SC).filter(([k])=>!["checkedout","abgelehnt","storniert"].includes(k)).map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{width:10,height:10,borderRadius:3,background:v.bd}}/>{v.l}</span>)}{lastUpd&&<><span style={{color:"#CBD5E1"}}>|</span><span style={{fontSize:11,color:"#DC2626",fontWeight:700}}>&#9650; erhoehen</span><span style={{fontSize:11,color:"#059669",fontWeight:700}}>&#9660; senken</span><span style={{fontSize:11,color:"#F59E0B",fontWeight:700}}>MIN</span></>}</div>
+
       <div style={{overflowX:"auto",borderRadius:12,border:"1px solid #E5E7EB"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
-          <thead><tr style={{background:"#F9FAFB"}}>
-            <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:130}}>Zimmer</th>
-            {days.map((d,i)=>{const isT=toDS(d)===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;return<th key={i} style={{padding:"6px 4px",textAlign:"center",fontWeight:isT?800:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:52,color:isT?"#2563EB":"#6B7280"}}><div>{["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()]}</div><div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate()}</div></th>})}
-          </tr></thead>
-          <tbody>{aRms.map(room=>{const ut=gUT(room,uts);const rendered=new Set();return<tr key={room.id}>
-            <td style={{padding:"8px 12px",fontWeight:600,borderBottom:"1px solid #F3F4F6",position:"sticky",left:0,background:"#fff",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:6}}><CD color={ut?.color||"#999"}/><span style={{fontWeight:700}}>{room.name}</span></div><div style={{fontSize:10,color:"#9CA3AF",marginLeft:18}}>{ut?.name} · {gP(room,uts)}€</div></td>
-            {days.map((d,di)=>{
-              const ds=toDS(d);const rs=ress.filter(r=>r.room_id===room.id&&ds>=r.check_in&&ds<r.check_out&&!["abgelehnt","checkedout","storniert"].includes(r.status));
-              const isT=ds===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;const hasR=rs.find(r=>!rendered.has(r.id));
-              if(hasR){const vs=ds===hasR.check_in||ds===toDS(Math.max(new Date(ws),new Date(hasR.check_in)));
-                if(vs){rendered.add(hasR.id);const eI=days.findIndex(dd=>toDS(dd)>=hasR.check_out);const sp=Math.min((eI===-1?14:eI)-di,14-di);
-                  if(sp>0){const sc=SC[hasR.status];const g=gMap[hasR.guest_id];return<td key={di} colSpan={sp} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}><div onClick={()=>setModal({type:"detail",res:hasR,room})} style={{background:sc.bg,border:`1px solid ${sc.bd}`,borderRadius:6,padding:"4px 8px",cursor:"pointer",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",fontSize:11,color:sc.tx,fontWeight:600,minHeight:28,display:"flex",alignItems:"center"}}>{g?`${g.first_name} ${g.last_name.charAt(0)}.`:"..."}</div></td>}
-                }}
-              if(rs.length>0&&!hasR)return null;
-              return<td key={di} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff",cursor:"pointer"}} onClick={()=>setModal({type:"new",room})}><div style={{height:28,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",opacity:.3}}><I n="plus" s={12} c="#9CA3AF"/></div></td>;
-            })}
-          </tr>})}</tbody>
-        </table>
+          <thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:130}}>Zimmer</th>{days.map((d,i)=>{const isT=toDS(d)===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;return<th key={i} style={{padding:"6px 4px",textAlign:"center",fontWeight:isT?800:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:52,color:isT?"#2563EB":"#6B7280"}}><div>{["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()]}</div><div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate()}</div></th>})}</tr></thead>
+          <tbody>
+          {uts.map(ut=>{const tR=aRms.filter(r=>r.unit_type_id==ut.id).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));if(tR.length===0)return null;
+          return<React.Fragment key={ut.id}>
+            <tr style={{background:(ut.color||"#6366F1")+"18"}}><td style={{padding:"6px 12px",fontWeight:800,borderBottom:"1px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"18",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:6}}><CD color={ut.color||"#999"} size={14}/><span style={{fontSize:13}}>{ut.name}</span><span style={{fontSize:10,color:"#9CA3AF",fontWeight:500}}>({tR.length})</span></div><div style={{fontSize:9,color:"#6B7280",marginLeft:20}}>Basis: {ut.base_price}&#8364; | Min: {minPrices[ut.id]||"?"}&#8364;</div></td>{days.map((d,i)=>{const o=getOcc(ut.id,d);return<td key={i} style={{textAlign:"center",borderBottom:"1px solid #E5E7EB",fontSize:10,fontWeight:700,color:o.pct>80?"#DC2626":o.pct>50?"#D97706":"#059669",background:(ut.color||"#6366F1")+"0A"}}>{o.oc}/{o.tot}</td>})}</tr>
+            {tR.map(room=>{const rendered=new Set();return<tr key={room.id}><td style={{padding:"8px 12px",fontWeight:600,borderBottom:"1px solid #F3F4F6",position:"sticky",left:0,background:"#fff",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:6,marginLeft:12}}><CD color={ut.color||"#999"} size={8}/><span style={{fontWeight:700}}>{room.name}</span></div><div style={{fontSize:10,color:"#9CA3AF",marginLeft:26}}>{gP(room,uts)}&#8364;/N.</div></td>{days.map((d,di)=>{const ds=toDS(d);const isT=ds===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;const rs=ress.filter(r=>r.room_id===room.id&&ds>=r.check_in&&ds<r.check_out&&!["abgelehnt","checkedout","storniert"].includes(r.status));const hasR=rs.find(r=>!rendered.has(r.id));if(hasR){const vs=ds===hasR.check_in||ds===toDS(Math.max(new Date(ws),new Date(hasR.check_in)));if(vs){rendered.add(hasR.id);const eI=days.findIndex(dd=>toDS(dd)>=hasR.check_out);const sp=Math.min((eI===-1?14:eI)-di,14-di);if(sp>0){const sc=SC[hasR.status];const g=gMap[hasR.guest_id];return<td key={di} colSpan={sp} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}><div onClick={()=>setModal({type:"detail",res:hasR,room})} style={{background:sc.bg,border:"1px solid "+sc.bd,borderRadius:6,padding:"4px 8px",cursor:"pointer",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",fontSize:11,color:sc.tx,fontWeight:600,minHeight:28,display:"flex",alignItems:"center"}}>{g?g.first_name+" "+g.last_name.charAt(0)+".":"..."}</div></td>}}}if(rs.length>0&&!hasR)return null;return<td key={di} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff",cursor:"pointer"}} onClick={()=>setModal({type:"new",room})}><div style={{height:28,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",opacity:.3}}><I n="plus" s={12} c="#9CA3AF"/></div></td>})}</tr>})}
+            <tr style={{background:(ut.color||"#6366F1")+"0C"}}><td style={{padding:"6px 12px",fontWeight:800,fontSize:10,color:ut.color||"#6366F1",borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"12",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:4,marginLeft:4}}>&#128176; Preisvorschlag</div></td>{days.map((d,i)=>{const p=getP(ut.id,d);const reason=getReason(ut.id,d);return<td key={i} title={reason} style={{textAlign:"center",borderBottom:"2px solid #E5E7EB",padding:2}}><PBadge price={p} base={ut.base_price} min={minPrices[ut.id]}/></td>})}</tr>
+          </React.Fragment>})}
+          <tr style={{background:"#F1F5F9"}}><td style={{padding:"8px 12px",fontWeight:800,fontSize:11,color:"#475569",position:"sticky",left:0,background:"#F1F5F9",zIndex:1}}>GESAMT</td>{days.map((d,i)=>{const o=totOcc(d);const bg=o.pct>85?"#FEE2E2":o.pct>60?"#FEF3C7":o.pct>30?"#D1FAE5":"#F1F5F9";return<td key={i} style={{textAlign:"center",padding:"6px 0",background:bg}}><div style={{fontSize:13,fontWeight:800,color:o.pct>85?"#DC2626":o.pct>60?"#D97706":"#059669"}}>{o.pct}%</div><div style={{fontSize:9,color:"#6B7280"}}>{o.oc}/{o.tot}</div></td>})}</tr>
+          </tbody></table>
         {aRms.length===0&&<div style={{padding:40,textAlign:"center",color:"#9CA3AF"}}>Keine aktiven Zimmer.</div>}
       </div>
-      {modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} hotelInfo={hi} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>;})()}
+      {modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} hotelInfo={hi} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>})()}
       {modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
     </div>;
   };
 
-  // ─── GUESTS REGISTER ───
-  const GuestsView=()=>{
-    const[search,setSearch]=useState("");const[sel,setSel]=useState(null);
-    const filtered=guests.filter(g=>{const s=search.toLowerCase();return!s||(g.first_name||"").toLowerCase().includes(s)||(g.last_name||"").toLowerCase().includes(s)||(g.email||"").toLowerCase().includes(s)||(g.company||"").toLowerCase().includes(s)});
+  // ─── PREISKATEGORIE VIEW ───
+  const PreiskategorieView=()=>{
+    const[editCell,setEditCell]=useState(null);const[editVal,setEditVal]=useState("");const[minPrices,setMinPrices]=useState({});
+    useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]=u.min_price||Math.round((u.base_price||80)*0.65)});setMinPrices(m)},[uts]);
+    const startEdit=(tid,field,val)=>{setEditCell(tid+"_"+field);setEditVal(String(val))};
+    const saveEdit=async(tid,field)=>{const v=parseFloat(editVal)||0;if(field==="min_price"){setMinPrices(p=>({...p,[tid]:v}));try{await api.patch("unit_types",tid,{min_price:v});show("Mindestpreis gespeichert")}catch(e){show("Lokal gespeichert")}}else if(field==="base_price"){try{await api.patch("unit_types",tid,{base_price:v});setUts(p=>p.map(u=>u.id==tid?{...u,base_price:v}:u));show("Basispreis gespeichert")}catch(e){show(e.message,"error")}}setEditCell(null)};
+    const EditField=({tid,field,value,color})=>{if(editCell===tid+"_"+field)return<input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={()=>saveEdit(tid,field)} onKeyDown={e=>{if(e.key==="Enter")saveEdit(tid,field);if(e.key==="Escape")setEditCell(null)}} autoFocus style={{width:70,padding:"4px 8px",borderRadius:6,border:"2px solid #3B82F6",fontSize:14,fontWeight:700,textAlign:"center",outline:"none"}}/>;return<span onClick={()=>startEdit(tid,field,value)} style={{cursor:"pointer",borderBottom:"2px dashed "+(color||"#9CA3AF"),fontSize:16,fontWeight:800,color:color||"#374151",padding:"2px 4px"}}>{value}&#8364;</span>};
     return<div>
-      <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center"}}>
-        <div style={{flex:1,position:"relative"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Gäste suchen..." style={{width:"100%",padding:"10px 12px 10px 36px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}}/><I n="search" s={16} c="#9CA3AF" st={{position:"absolute",left:12,top:12}}/></div>
-        <span style={{fontSize:13,color:"#6B7280"}}>{filtered.length} Gäste</span>
-      </div>
-      <div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-          <thead><tr style={{background:"#F9FAFB"}}>{["Name","E-Mail","Telefon","Ort","VIP","Aufenthalte"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead>
-          <tbody>{filtered.slice(0,50).map(g=><tr key={g.id} style={{cursor:"pointer",borderBottom:"1px solid #F3F4F6"}} onClick={()=>setSel(g)} onMouseOver={e=>e.currentTarget.style.background="#F9FAFB"} onMouseOut={e=>e.currentTarget.style.background=""}>
-            <td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{g.salutation?g.salutation+" ":""}{g.first_name} {g.last_name}</div>{g.company&&<div style={{fontSize:11,color:"#6B7280"}}>{g.company}</div>}</td>
-            <td style={{padding:"10px 12px",color:"#6B7280"}}>{g.email}</td>
-            <td style={{padding:"10px 12px",color:"#6B7280"}}>{g.phone||"–"}</td>
-            <td style={{padding:"10px 12px",color:"#6B7280"}}>{g.city?`${g.zip} ${g.city}`:"–"}</td>
-            <td style={{padding:"10px 12px"}}>{g.vip?"⭐":""}</td>
-            <td style={{padding:"10px 12px",color:"#6B7280"}}>{g.total_stays||0}</td>
-          </tr>)}</tbody>
-        </table>
-      </div>
-      {sel&&<GuestDetailModal guest={sel} api={api} reservations={ress.filter(r=>r.guest_id===sel.id)} rooms={rms} unitTypes={uts} onClose={()=>{setSel(null);load()}} showToast={show}/>}
-    </div>;
-  };
-
-  // ─── GUEST DETAIL MODAL ───
-  const GuestDetailModal=({guest:g,api:api2,reservations:gRes,rooms:allRooms,unitTypes:allUts,onClose,showToast:sh})=>{
-    const[gf,setGf]=useState({...g});const[sv,setSv]=useState(false);
-    const ug=(k,v)=>setGf(p=>({...p,[k]:v}));
-    const save=async()=>{setSv(true);try{await api2.patch("guests",g.id,gf);sh("Gespeichert")}catch(e){sh(e.message,"error")}setSv(false)};
-    return<Modal title={`${g.first_name} ${g.last_name}`} onClose={onClose} width={640}>
-      <div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}>
-        <Sel label="Anrede" value={gf.salutation||""} onChange={e=>ug("salutation",e.target.value)}>{SALUTATIONS.map(s=><option key={s} value={s}>{s||"–"}</option>)}</Sel>
-        <Inp label="Vorname" value={gf.first_name||""} onChange={e=>ug("first_name",e.target.value)}/>
-        <Inp label="Nachname" value={gf.last_name||""} onChange={e=>ug("last_name",e.target.value)}/>
-      </div>
-      <Inp label="Firma" value={gf.company||""} onChange={e=>ug("company",e.target.value)}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        <Inp label="E-Mail" value={gf.email||""} onChange={e=>ug("email",e.target.value)}/>
-        <Inp label="Telefon" value={gf.phone||""} onChange={e=>ug("phone",e.target.value)}/>
-      </div>
-      <Inp label="Adresse" value={gf.address||""} onChange={e=>ug("address",e.target.value)}/>
-      <div style={{display:"grid",gridTemplateColumns:"100px 1fr 100px",gap:12}}>
-        <Inp label="PLZ" value={gf.zip||""} onChange={e=>ug("zip",e.target.value)}/>
-        <Inp label="Ort" value={gf.city||""} onChange={e=>ug("city",e.target.value)}/>
-        <Inp label="Land" value={gf.country||"DE"} onChange={e=>ug("country",e.target.value)}/>
-      </div>
-      <Inp label="Notizen" value={gf.notes||""} onChange={e=>ug("notes",e.target.value)} textarea/>
-      <div style={{display:"flex",gap:8,marginBottom:16,justifyContent:"flex-end"}}><Btn disabled={sv} onClick={save}><I n="save" s={14}/> Speichern</Btn></div>
-      {gRes.length>0&&<Card title={`${gRes.length} Reservierung(en)`}>
-        {gRes.map(r=>{const rm=allRooms.find(x=>x.id===r.room_id);return<div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #F3F4F6",fontSize:13}}>
-          <div><strong>Zi. {rm?.name}</strong> · {fd(r.check_in)} – {fd(r.check_out)}</div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontWeight:600}}>€ {fmt(r.total_price)}</span><Badge s={r.status}/></div>
-        </div>})}
-      </Card>}
-    </Modal>;
-  };
-
-  // ─── SETTINGS ───
-  const SettingsView=()=>{
-    const[tab,setTab]=useState("types");const[modal,setModal]=useState(null);const[exp,setExp]=useState({});
-    const[hf,setHf]=useState(hi||{});const[sv,setSv]=useState(false);
-    const rbt=useMemo(()=>{const m={};uts.forEach(u=>{m[u.id]=rms.filter(r=>r.unit_type_id===u.id)});return m},[uts,rms]);
-    const tabs=[{id:"types",label:"Einheiten",icon:<I n="layers" s={16}/>},{id:"rooms",label:"Zimmer",icon:<I n="bed" s={16}/>},{id:"products",label:"Produkte",icon:<I n="pkg" s={16}/>},{id:"hotel",label:"Hoteldaten",icon:<I n="building" s={16}/>}];
-    return<div>
-      <Tab tabs={tabs} active={tab} onChange={setTab}/>
-      {tab==="types"&&<div>
-        <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><span style={{color:"#6B7280"}}>{uts.length} Einheiten</span><Btn sz="sm" onClick={()=>setModal({type:"addUT"})}><I n="plus" s={14}/> Neue Einheit</Btn></div>
-        {uts.map(ut=>{const rs=rbt[ut.id]||[];return<div key={ut.id} style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",marginBottom:12,overflow:"hidden"}}>
-          <div onClick={()=>setExp(p=>({...p,[ut.id]:!p[ut.id]}))} style={{padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
-            <div style={{display:"flex",alignItems:"center",gap:12}}><CD color={ut.color} size={16}/><div><div style={{fontWeight:700}}>{ut.name} <span style={{color:"#9CA3AF",fontSize:12}}>({ut.short_name})</span></div><div style={{fontSize:12,color:"#6B7280"}}>{ut.description}</div></div></div>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{textAlign:"right"}}><div style={{fontWeight:700}}>{fmt(ut.base_price)} €/N.</div><div style={{fontSize:11,color:"#6B7280"}}>{rs.length} Zimmer</div></div>
-              <button onClick={e=>{e.stopPropagation();setModal({type:"editUT",ut})}} style={{background:"none",border:"none",cursor:"pointer",color:"#6B7280"}}><I n="edit" s={16}/></button>
-              <button onClick={e=>{e.stopPropagation();if(rs.length){show("Erst Zimmer entfernen!","error");return}delUT(ut.id)}} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={16}/></button>
-              <I n={exp[ut.id]?"cU":"cD"} s={18} c="#9CA3AF"/>
-            </div>
+      <div style={{marginBottom:20}}><h2 style={{fontSize:18,fontWeight:800,margin:"0 0 4px"}}>Preiskategorie</h2><p style={{color:"#6B7280",fontSize:13,margin:0}}>Basis- und Mindestpreise pro Zimmerkategorie. Preisvorschlaege im Belegungsplan fallen nie unter den Mindestpreis.</p></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat("+Math.min(uts.length,4)+", 1fr)",gap:16}}>
+        {uts.map(ut=>{const tR=aRms.filter(r=>r.unit_type_id==ut.id);const mp=minPrices[ut.id]||0;const spread=ut.base_price-mp;const spreadPct=mp>0?Math.round((1-mp/ut.base_price)*100):0;
+        return<div key={ut.id} style={{background:"#fff",borderRadius:16,border:"2px solid "+(ut.color||"#ddd")+"40",overflow:"hidden"}}>
+          <div style={{background:(ut.color||"#6366F1")+"15",padding:"16px 20px",display:"flex",alignItems:"center",gap:10}}><CD color={ut.color||"#999"} size={16}/><div><div style={{fontWeight:800,fontSize:15}}>{ut.name}</div><div style={{fontSize:11,color:"#6B7280"}}>{ut.short_name} | {tR.length} Zimmer | max. {ut.capacity} Pers.</div></div></div>
+          <div style={{padding:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><div><div style={{fontSize:11,color:"#6B7280",fontWeight:600,marginBottom:4}}>Basispreis / Nacht</div><EditField tid={ut.id} field="base_price" value={ut.base_price} color="#1E40AF"/></div><div style={{textAlign:"right"}}><div style={{fontSize:11,color:"#6B7280",fontWeight:600,marginBottom:4}}>Mindestpreis / Nacht</div><EditField tid={ut.id} field="min_price" value={mp} color="#DC2626"/></div></div>
+            <div style={{background:"#F3F4F6",borderRadius:8,padding:12}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#6B7280",marginBottom:6}}><span>Preisflexibilitaet</span><span style={{fontWeight:700,color:spread>20?"#059669":"#D97706"}}>{spread}&#8364; ({spreadPct}%)</span></div><div style={{background:"#E5E7EB",borderRadius:4,height:8,overflow:"hidden"}}><div style={{background:spread>20?"#10B981":"#F59E0B",height:"100%",width:Math.min(100,spreadPct*2)+"%",borderRadius:4}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#9CA3AF",marginTop:4}}><span>{mp}&#8364;</span><span>{ut.base_price}&#8364;</span></div></div>
+            <div style={{marginTop:12}}><div style={{fontSize:10,fontWeight:600,color:"#9CA3AF",marginBottom:6}}>Zimmer:</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{tR.map(r=><span key={r.id} style={{background:(ut.color||"#6366F1")+"12",border:"1px solid "+(ut.color||"#6366F1")+"30",borderRadius:6,padding:"3px 10px",fontSize:11,fontWeight:600}}>{r.name}{r.price_override!=null?" ("+r.price_override+"&#8364;)":""}</span>)}</div></div>
           </div>
-          {exp[ut.id]&&<div style={{borderTop:"1px solid #F3F4F6",padding:"12px 20px",background:"#FAFAFA"}}>
-            {rs.length>0?<div style={{display:"flex",flexWrap:"wrap",gap:8}}>{rs.map(r=><div key={r.id} style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:8,padding:"8px 12px",opacity:r.active?1:.5,display:"flex",alignItems:"center",gap:8}}><div><div style={{fontWeight:700}}>{r.name}</div><div style={{fontSize:11,color:"#6B7280"}}>{r.floor}. OG · {gP(r,uts)}€</div></div><button onClick={()=>delRoom(r.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></div>)}</div>:<div style={{color:"#9CA3AF",fontSize:13}}>Keine Zimmer.</div>}
-            <div style={{marginTop:12}}><Btn sz="sm" v="ghost" onClick={()=>setModal({type:"addRoom",pre:ut.id})}><I n="plus" s={12}/> Zimmer</Btn></div>
-          </div>}
         </div>})}
-      </div>}
-      {tab==="rooms"&&<div>
-        <div style={{marginBottom:16}}><Btn sz="sm" onClick={()=>setModal({type:"addRoom"})}><I n="plus" s={14}/> Zimmer</Btn></div>
-        <div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-            <thead><tr style={{background:"#F9FAFB"}}>{["Nr.","Einheit","Etage","Preis","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead>
-            <tbody>{rms.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(r=>{const ut=gUT(r,uts);return<tr key={r.id} style={{opacity:r.active?1:.5}}>
-              <td style={{padding:"10px 12px",fontWeight:700,borderBottom:"1px solid #F3F4F6"}}>{r.name}</td>
-              <td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><CD color={ut?.color}/>{ut?.name}</span></td>
-              <td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}>{r.floor}. OG</td>
-              <td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6",fontWeight:600}}>{gP(r,uts)} €</td>
-              <td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6",fontSize:11,fontWeight:600,color:r.active?"#059669":"#9CA3AF"}}>{r.active?"● Aktiv":"○ Inaktiv"}</td>
-              <td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><div style={{display:"flex",gap:4}}>
-                <button onClick={()=>setModal({type:"editRoom",room:r})} style={{background:"none",border:"none",cursor:"pointer",color:"#6B7280"}}><I n="edit" s={15}/></button>
-                <button onClick={()=>delRoom(r.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={15}/></button>
-              </div></td>
-            </tr>})}</tbody>
-          </table>
-        </div>
-      </div>}
-      {tab==="products"&&<ProductsView api={api} products={products} onRefresh={load} showToast={show}/>}
-      {tab==="hotel"&&<div style={{background:"#fff",borderRadius:12,padding:20,border:"1px solid #E5E7EB",maxWidth:500}}>
-        <Inp label="Hotelname" value={hf.name||""} onChange={e=>setHf(p=>({...p,name:e.target.value}))}/>
-        <Inp label="Adresse" value={hf.address||""} onChange={e=>setHf(p=>({...p,address:e.target.value}))}/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Telefon" value={hf.phone||""} onChange={e=>setHf(p=>({...p,phone:e.target.value}))}/><Inp label="E-Mail" value={hf.email||""} onChange={e=>setHf(p=>({...p,email:e.target.value}))}/></div>
-        <Inp label="Website" value={hf.website||""} onChange={e=>setHf(p=>({...p,website:e.target.value}))}/>
-        <Inp label="MwSt. (%)" type="number" value={hf.tax_rate||7} onChange={e=>setHf(p=>({...p,tax_rate:parseFloat(e.target.value)||0}))}/>
-        <Btn disabled={sv} onClick={async()=>{setSv(true);try{await api.patch("hotel_info",hi.id,hf);setHi({...hi,...hf});show("Gespeichert")}catch(e){show("Fehler","error")}setSv(false)}}><I n="save" s={14}/> Speichern</Btn>
-      </div>}
-      {modal?.type==="addUT"&&<UTEditor usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d);setModal(null)}}/>}
-      {modal?.type==="editUT"&&<UTEditor ut={modal.ut} usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d,modal.ut.id);setModal(null)}}/>}
-      {modal?.type==="addRoom"&&<RoomEditor unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom({...d,unit_type_id:modal.pre||d.unit_type_id});setModal(null)}}/>}
-      {modal?.type==="editRoom"&&<RoomEditor room={modal.room} unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom(d,modal.room.id);setModal(null)}}/>}
+      </div>
+      <div style={{marginTop:16,padding:12,background:"#FFFBEB",borderRadius:10,borderLeft:"3px solid #F59E0B",fontSize:12,color:"#92400E"}}><strong>Hinweis:</strong> Klick auf einen Preis um ihn zu aendern. Basispreis = Normalpreis bei mittlerer Auslastung. Mindestpreis = absolute Untergrenze.</div>
     </div>;
   };
 
-  // ─── PRODUCTS ───
-  const ProductsView=({api:a,products:prods,onRefresh:ref,showToast:sh})=>{
-    const[modal,setModal]=useState(null);
-    const saveProd=async(d,id)=>{try{if(id)await a.patch("products",id,d);else await a.post("products",d);await ref();sh(id?"Aktualisiert":"Angelegt");setModal(null)}catch(e){sh(e.message,"error")}};
-    const delProd=async id=>{try{await a.del("products",id);await ref();sh("Gelöscht")}catch(e){sh(e.message,"error")}};
-    return<div>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><span style={{color:"#6B7280"}}>{prods.length} Produkte</span><Btn sz="sm" onClick={()=>setModal({type:"add"})}><I n="plus" s={14}/> Neues Produkt</Btn></div>
-      <div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-          <thead><tr style={{background:"#F9FAFB"}}>{["Produkt","Kategorie","Einheit","Preis","MwSt.","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead>
-          <tbody>{prods.map(p=><tr key={p.id} style={{opacity:p.active?1:.5,borderBottom:"1px solid #F3F4F6"}}>
-            <td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{p.name}</div>{p.description&&<div style={{fontSize:11,color:"#6B7280"}}>{p.description}</div>}</td>
-            <td style={{padding:"10px 12px"}}>{p.category}</td>
-            <td style={{padding:"10px 12px"}}>{p.unit}</td>
-            <td style={{padding:"10px 12px",fontWeight:600}}>{parseFloat(p.price)>0?`€ ${fmt(p.price)}`:"Gratis"}</td>
-            <td style={{padding:"10px 12px",fontSize:11}}>{(p.tax_type||"einfach")==="gemischt"?<span style={{color:"#8B5CF6"}}>{p.tax_split_1_pct}%×{p.tax_split_1_rate}% + {p.tax_split_2_pct}%×{p.tax_split_2_rate}%</span>:<span>{p.tax_rate||7}%</span>}</td>
-            <td style={{padding:"10px 12px",fontSize:11,fontWeight:600,color:p.active?"#059669":"#9CA3AF"}}>{p.active?"Aktiv":"Inaktiv"}</td>
-            <td style={{padding:"10px 12px"}}><div style={{display:"flex",gap:4}}>
-              <button onClick={()=>setModal({type:"edit",prod:p})} style={{background:"none",border:"none",cursor:"pointer",color:"#6B7280"}}><I n="edit" s={15}/></button>
-              <button onClick={()=>delProd(p.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={15}/></button>
-            </div></td>
-          </tr>)}</tbody>
-        </table>
-      </div>
-      {modal&&<ProductEditor prod={modal.prod} onClose={()=>setModal(null)} onSave={saveProd}/>}
-    </div>;
-  };
-  const ProductEditor=({prod,onClose,onSave})=>{
-    const[fm,setFm]=useState(prod?{...prod}:{name:"",description:"",price:0,unit:"pro Nacht",category:"sonstige",active:true});
-    const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);
-    return<Modal title={prod?"Produkt bearbeiten":"Neues Produkt"} onClose={onClose} width={440}>
-      <Inp label="Name *" value={fm.name} onChange={e=>u("name",e.target.value)}/>
-      <Inp label="Beschreibung" value={fm.description} onChange={e=>u("description",e.target.value)}/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        <Inp label="Preis (€)" type="number" min={0} value={fm.price} onChange={e=>u("price",parseFloat(e.target.value)||0)}/>
-        <Sel label="Einheit" value={fm.unit} onChange={e=>u("unit",e.target.value)}><option value="pro Nacht">pro Nacht</option><option value="pro Aufenthalt">pro Aufenthalt</option><option value="pro Person">pro Person</option><option value="pro Person/Nacht">pro Person/Nacht</option><option value="einmalig">einmalig</option></Sel>
-      </div>
-      <Sel label="Kategorie" value={fm.category} onChange={e=>u("category",e.target.value)}><option value="verpflegung">Verpflegung</option><option value="service">Service</option><option value="parkplatz">Parkplatz</option><option value="wellness">Wellness</option><option value="sonstige">Sonstige</option></Sel>
-      <label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer"}}><input type="checkbox" checked={fm.active} onChange={()=>u("active",!fm.active)}/><span style={{fontSize:13,fontWeight:600}}>Aktiv</span></label>
-      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm,prod?.id);setSv(false)}}><I n="save" s={14}/> {prod?"Speichern":"Anlegen"}</Btn></div>
-    </Modal>;
-  };
+  // ─── GAESTE ───
+  const GuestsView=()=>{const[search,setSearch]=useState("");const[sel,setSel]=useState(null);const filtered=guests.filter(g=>{const s=search.toLowerCase();return!s||(g.first_name||"").toLowerCase().includes(s)||(g.last_name||"").toLowerCase().includes(s)||(g.email||"").toLowerCase().includes(s)||(g.company||"").toLowerCase().includes(s)});return<div><div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center"}}><div style={{flex:1,position:"relative"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Gaeste suchen..." style={{width:"100%",padding:"10px 12px 10px 36px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}}/><I n="search" s={16} c="#9CA3AF" st={{position:"absolute",left:12,top:12}}/></div><span style={{fontSize:13,color:"#6B7280"}}>{filtered.length} Gaeste</span></div><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#F9FAFB"}}>{["Name","E-Mail","Telefon","Ort","VIP","Aufenthalte"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead><tbody>{filtered.slice(0,50).map(g=><tr key={g.id} style={{cursor:"pointer",borderBottom:"1px solid #F3F4F6"}} onClick={()=>setSel(g)} onMouseOver={e=>e.currentTarget.style.background="#F9FAFB"} onMouseOut={e=>e.currentTarget.style.background=""}><td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{g.salutation?g.salutation+" ":""}{g.first_name} {g.last_name}</div>{g.company&&<div style={{fontSize:11,color:"#6B7280"}}>{g.company}</div>}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.email}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.phone||"-"}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.city?g.zip+" "+g.city:"-"}</td><td style={{padding:"10px 12px"}}>{g.vip?"VIP":""}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.total_stays||0}</td></tr>)}</tbody></table></div>{sel&&<GuestDetailModal guest={sel} api={api} reservations={ress.filter(r=>r.guest_id===sel.id)} rooms={rms} unitTypes={uts} onClose={()=>{setSel(null);load()}} showToast={show}/>}</div>};
+  const GuestDetailModal=({guest:g,api:api2,reservations:gRes,rooms:allRooms,unitTypes:allUts,onClose,showToast:sh})=>{const[gf,setGf]=useState({...g});const[sv,setSv]=useState(false);const ug=(k,v)=>setGf(p=>({...p,[k]:v}));const save=async()=>{setSv(true);try{await api2.patch("guests",g.id,gf);sh("Gespeichert")}catch(e){sh(e.message,"error")}setSv(false)};return<Modal title={g.first_name+" "+g.last_name} onClose={onClose} width={640}><div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}><Sel label="Anrede" value={gf.salutation||""} onChange={e=>ug("salutation",e.target.value)}>{SALUTATIONS.map(s=><option key={s} value={s}>{s||"-"}</option>)}</Sel><Inp label="Vorname" value={gf.first_name||""} onChange={e=>ug("first_name",e.target.value)}/><Inp label="Nachname" value={gf.last_name||""} onChange={e=>ug("last_name",e.target.value)}/></div><Inp label="Firma" value={gf.company||""} onChange={e=>ug("company",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="E-Mail" value={gf.email||""} onChange={e=>ug("email",e.target.value)}/><Inp label="Telefon" value={gf.phone||""} onChange={e=>ug("phone",e.target.value)}/></div><Inp label="Adresse" value={gf.address||""} onChange={e=>ug("address",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"100px 1fr 100px",gap:12}}><Inp label="PLZ" value={gf.zip||""} onChange={e=>ug("zip",e.target.value)}/><Inp label="Ort" value={gf.city||""} onChange={e=>ug("city",e.target.value)}/><Inp label="Land" value={gf.country||"DE"} onChange={e=>ug("country",e.target.value)}/></div><Inp label="Notizen" value={gf.notes||""} onChange={e=>ug("notes",e.target.value)} textarea/><div style={{display:"flex",gap:8,marginBottom:16,justifyContent:"flex-end"}}><Btn disabled={sv} onClick={save}><I n="save" s={14}/> Speichern</Btn></div>{gRes.length>0&&<Card title={gRes.length+" Reservierung(en)"}>{gRes.map(r=>{const rm=allRooms.find(x=>x.id===r.room_id);return<div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #F3F4F6",fontSize:13}}><div><strong>Zi. {rm?.name}</strong> - {fd(r.check_in)} - {fd(r.check_out)}</div><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontWeight:600}}>EUR {fmt(r.total_price)}</span><Badge s={r.status}/></div></div>})}</Card>}</Modal>};
+
+  // ─── EINSTELLUNGEN ───
+  const SettingsView=()=>{const[tab,setTab]=useState("types");const[modal,setModal]=useState(null);const[exp,setExp]=useState({});const[hf,setHf]=useState(hi||{});const[sv,setSv]=useState(false);const rbt=useMemo(()=>{const m={};uts.forEach(u=>{m[u.id]=rms.filter(r=>r.unit_type_id===u.id)});return m},[uts,rms]);const tabs=[{id:"types",label:"Einheiten",icon:<I n="layers" s={16}/>},{id:"rooms",label:"Zimmer",icon:<I n="bed" s={16}/>},{id:"products",label:"Produkte",icon:<I n="pkg" s={16}/>},{id:"hotel",label:"Hoteldaten",icon:<I n="building" s={16}/>}];return<div><Tab tabs={tabs} active={tab} onChange={setTab}/>
+    {tab==="types"&&<div><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><span style={{color:"#6B7280"}}>{uts.length} Einheiten</span><Btn sz="sm" onClick={()=>setModal({type:"addUT"})}><I n="plus" s={14}/> Neue Einheit</Btn></div>{uts.map(ut=>{const rs=rbt[ut.id]||[];return<div key={ut.id} style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",marginBottom:12,overflow:"hidden"}}><div onClick={()=>setExp(p=>({...p,[ut.id]:!p[ut.id]}))} style={{padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}><CD color={ut.color} size={16}/><div><div style={{fontWeight:700}}>{ut.name} <span style={{color:"#9CA3AF",fontSize:12}}>({ut.short_name})</span></div><div style={{fontSize:12,color:"#6B7280"}}>{ut.description}</div></div></div><div style={{display:"flex",alignItems:"center",gap:12}}><div style={{textAlign:"right"}}><div style={{fontWeight:700}}>{fmt(ut.base_price)} EUR/N.</div><div style={{fontSize:11,color:"#6B7280"}}>{rs.length} Zimmer</div></div><button onClick={e=>{e.stopPropagation();setModal({type:"editUT",ut})}} style={{background:"none",border:"none",cursor:"pointer",color:"#6B7280"}}><I n="edit" s={16}/></button><button onClick={e=>{e.stopPropagation();if(rs.length){show("Erst Zimmer entfernen!","error");return}delUT(ut.id)}} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={16}/></button><I n={exp[ut.id]?"cU":"cD"} s={18} c="#9CA3AF"/></div></div>{exp[ut.id]&&<div style={{borderTop:"1px solid #F3F4F6",padding:"12px 20px",background:"#FAFAFA"}}>{rs.length>0?<div style={{display:"flex",flexWrap:"wrap",gap:8}}>{rs.map(r=><div key={r.id} style={{background:"#fff",border:"1px solid #E5E7EB",borderRadius:8,padding:"8px 12px",opacity:r.active?1:.5,display:"flex",alignItems:"center",gap:8}}><div><div style={{fontWeight:700}}>{r.name}</div><div style={{fontSize:11,color:"#6B7280"}}>{r.floor}. OG - {gP(r,uts)}EUR</div></div><button onClick={()=>delRoom(r.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></div>)}</div>:<div style={{color:"#9CA3AF",fontSize:13}}>Keine Zimmer.</div>}<div style={{marginTop:12}}><Btn sz="sm" v="ghost" onClick={()=>setModal({type:"addRoom",pre:ut.id})}><I n="plus" s={12}/> Zimmer</Btn></div></div>}</div>})}</div>}
+    {tab==="rooms"&&<div><div style={{marginBottom:16}}><Btn sz="sm" onClick={()=>setModal({type:"addRoom"})}><I n="plus" s={14}/> Zimmer</Btn></div><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#F9FAFB"}}>{["Nr.","Einheit","Etage","Preis","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead><tbody>{rms.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(r=>{const ut=gUT(r,uts);return<tr key={r.id} style={{opacity:r.active?1:.5}}><td style={{padding:"10px 12px",fontWeight:700,borderBottom:"1px solid #F3F4F6"}}>{r.name}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><span style={{display:"inline-flex",alignItems:"center",gap:6}}><CD color={ut?.color}/>{ut?.name}</span></td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}>{r.floor}. OG</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6",fontWeight:600}}>{gP(r,uts)} EUR</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6",fontSize:11,fontWeight:600,color:r.active?"#059669":"#9CA3AF"}}>{r.active?"Aktiv":"Inaktiv"}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><div style={{display:"flex",gap:4}}><button onClick={()=>setModal({type:"editRoom",room:r})} style={{background:"none",border:"none",cursor:"pointer",color:"#6B7280"}}><I n="edit" s={15}/></button><button onClick={()=>delRoom(r.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={15}/></button></div></td></tr>})}</tbody></table></div></div>}
+    {tab==="products"&&<ProductsView api={api} products={products} onRefresh={load} showToast={show}/>}
+    {tab==="hotel"&&<div style={{background:"#fff",borderRadius:12,padding:20,border:"1px solid #E5E7EB",maxWidth:500}}><Inp label="Hotelname" value={hf.name||""} onChange={e=>setHf(p=>({...p,name:e.target.value}))}/><Inp label="Adresse" value={hf.address||""} onChange={e=>setHf(p=>({...p,address:e.target.value}))}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Telefon" value={hf.phone||""} onChange={e=>setHf(p=>({...p,phone:e.target.value}))}/><Inp label="E-Mail" value={hf.email||""} onChange={e=>setHf(p=>({...p,email:e.target.value}))}/></div><Inp label="Website" value={hf.website||""} onChange={e=>setHf(p=>({...p,website:e.target.value}))}/><Inp label="MwSt. (%)" type="number" value={hf.tax_rate||7} onChange={e=>setHf(p=>({...p,tax_rate:parseFloat(e.target.value)||0}))}/><Btn disabled={sv} onClick={async()=>{setSv(true);try{await api.patch("hotel_info",hi.id,hf);setHi({...hi,...hf});show("Gespeichert")}catch(e){show("Fehler","error")}setSv(false)}}><I n="save" s={14}/> Speichern</Btn></div>}
+    {modal?.type==="addUT"&&<UTEditor usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d);setModal(null)}}/>}
+    {modal?.type==="editUT"&&<UTEditor ut={modal.ut} usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d,modal.ut.id);setModal(null)}}/>}
+    {modal?.type==="addRoom"&&<RoomEditor unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom({...d,unit_type_id:modal.pre||d.unit_type_id});setModal(null)}}/>}
+    {modal?.type==="editRoom"&&<RoomEditor room={modal.room} unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom(d,modal.room.id);setModal(null)}}/>}
+  </div>};
+
+  // ─── PRODUKTE ───
+  const ProductsView=({api:a,products:prods,onRefresh:ref,showToast:sh})=>{const[modal,setModal]=useState(null);const saveProd=async(d,id)=>{try{if(id)await a.patch("products",id,d);else await a.post("products",d);await ref();sh(id?"Aktualisiert":"Angelegt");setModal(null)}catch(e){sh(e.message,"error")}};const delProd=async id=>{try{await a.del("products",id);await ref();sh("Geloescht")}catch(e){sh(e.message,"error")}};return<div><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><span style={{color:"#6B7280"}}>{prods.length} Produkte</span><Btn sz="sm" onClick={()=>setModal({type:"add"})}><I n="plus" s={14}/> Neues Produkt</Btn></div><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#F9FAFB"}}>{["Produkt","Kategorie","Einheit","Preis","MwSt.","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead><tbody>{prods.map(p=><tr key={p.id} style={{opacity:p.active?1:.5,borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{p.name}</div>{p.description&&<div style={{fontSize:11,color:"#6B7280"}}>{p.description}</div>}</td><td style={{padding:"10px 12px"}}>{p.category}</td><td style={{padding:"10px 12px"}}>{p.unit}</td><td style={{padding:"10px 12px",fontWeight:600}}>{parseFloat(p.price)>0?"EUR "+fmt(p.price):"Gratis"}</td><td style={{padding:"10px 12px",fontSize:11}}>{(p.tax_type||"einfach")==="gemischt"?<span style={{color:"#8B5CF6"}}>{p.tax_split_1_pct}%x{p.tax_split_1_rate}% + {p.tax_split_2_pct}%x{p.tax_split_2_rate}%</span>:<span>{p.tax_rate||7}%</span>}</td><td style={{padding:"10px 12px",fontSize:11,fontWeight:600,color:p.active?"#059669":"#9CA3AF"}}>{p.active?"Aktiv":"Inaktiv"}</td><td style={{padding:"10px 12px"}}><div style={{display:"flex",gap:4}}><button onClick={()=>setModal({type:"edit",prod:p})} style={{background:"none",border:"none",cursor:"pointer",color:"#6B7280"}}><I n="edit" s={15}/></button><button onClick={()=>delProd(p.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={15}/></button></div></td></tr>)}</tbody></table></div>{modal&&<ProductEditor prod={modal.prod} onClose={()=>setModal(null)} onSave={saveProd}/>}</div>};
+  const ProductEditor=({prod,onClose,onSave})=>{const[fm,setFm]=useState(prod?{...prod}:{name:"",description:"",price:0,unit:"pro Nacht",category:"sonstige",active:true});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);return<Modal title={prod?"Produkt bearbeiten":"Neues Produkt"} onClose={onClose} width={440}><Inp label="Name *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Inp label="Beschreibung" value={fm.description} onChange={e=>u("description",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Preis (EUR)" type="number" min={0} value={fm.price} onChange={e=>u("price",parseFloat(e.target.value)||0)}/><Sel label="Einheit" value={fm.unit} onChange={e=>u("unit",e.target.value)}><option value="pro Nacht">pro Nacht</option><option value="pro Aufenthalt">pro Aufenthalt</option><option value="pro Person">pro Person</option><option value="pro Person/Nacht">pro Person/Nacht</option><option value="einmalig">einmalig</option></Sel></div><Sel label="Kategorie" value={fm.category} onChange={e=>u("category",e.target.value)}><option value="verpflegung">Verpflegung</option><option value="service">Service</option><option value="parkplatz">Parkplatz</option><option value="wellness">Wellness</option><option value="sonstige">Sonstige</option></Sel><label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer"}}><input type="checkbox" checked={fm.active} onChange={()=>u("active",!fm.active)}/><span style={{fontSize:13,fontWeight:600}}>Aktiv</span></label><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm,prod?.id);setSv(false)}}><I n="save" s={14}/> {prod?"Speichern":"Anlegen"}</Btn></div></Modal>};
 
   // ─── DASHBOARD ───
-  const Dashboard=()=>{
-    const s=useMemo(()=>({rooms:aRms.length,types:uts.length,ang:ress.filter(r=>r.status==="angebot").length,res:ress.filter(r=>r.status==="reservierung").length,ein:ress.filter(r=>r.status==="checkedin").length,umsatz:ress.filter(r=>["reservierung","checkedin","checkedout"].includes(r.status)).reduce((s,r)=>s+parseFloat(r.total_price||0),0),gaeste:guests.length}),[aRms,uts,ress,guests]);
-    return<div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:24}}>
-        {[{l:"Zimmer",v:s.rooms,ic:"bed",c:"#6366F1"},{l:"Angebote",v:s.ang,ic:"send",c:"#F59E0B"},{l:"Reservierungen",v:s.res,ic:"cal",c:"#3B82F6"},{l:"Eingecheckt",v:s.ein,ic:"check",c:"#10B981"},{l:"Umsatz",v:`${s.umsatz.toFixed(0)} €`,ic:"credit",c:"#8B5CF6"},{l:"Gäste",v:s.gaeste,ic:"users",c:"#EC4899"}].map((c,i)=><div key={i} style={{background:"#fff",borderRadius:12,padding:16,border:"1px solid #E5E7EB"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontSize:12,color:"#6B7280"}}>{c.l}</span><I n={c.ic} s={20} c={c.c}/></div><div style={{fontSize:22,fontWeight:800}}>{c.v}</div></div>)}
-      </div>
-      <div style={{background:"#fff",borderRadius:12,padding:16,border:"1px solid #E5E7EB"}}>
-        <h3 style={{margin:"0 0 12px",fontWeight:700,fontSize:14}}>Letzte Reservierungen</h3>
-        {ress.slice(0,8).map(r=>{const rm=rms.find(x=>x.id===r.room_id);const g=gMap[r.guest_id];return<div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F3F4F6"}}>
-          <div><div style={{fontWeight:600,fontSize:13}}>{g?`${g.first_name} ${g.last_name}`:"..."}</div><div style={{fontSize:11,color:"#9CA3AF"}}>Zi. {rm?.name} · {fd(r.check_in)} · {SOURCES[r.source]||""}</div></div>
-          <Badge s={r.status}/>
-        </div>})}
-      </div>
-    </div>;
-  };
-// ─── PRICING VIEW ───
-  const PricingView=()=>{
-    const[pSugg,setPSugg]=useState({});
-    const[pLoad,setPLoad]=useState(false);
-    const[pErr,setPErr]=useState(null);
-    const[lastUpd,setLastUpd]=useState(null);
-    const[comps,setComps]=useState(null);
-    const[showComp,setShowComp]=useState(false);
-    const[showCfg,setShowCfg]=useState(false);
-    const[autoP,setAutoP]=useState(false);
-    const[minPrices,setMinPrices]=useState({});
-    const[editCell,setEditCell]=useState(null);
-    const[editVal,setEditVal]=useState("");
-
-    const days=Array.from({length:14},(_,i)=>addD(ws,i));
-
-    useEffect(()=>{
-      const m={};uts.forEach(u=>{m[u.id]=Math.round((u.base_price||80)*0.65)});
-      setMinPrices(m);
-    },[uts]);
-
-    useEffect(()=>{
-      if(!autoP)return;
-      const iv=setInterval(()=>fetchPrices(),30*60000);
-      return()=>clearInterval(iv);
-    },[autoP]);
-
-    const getOcc=(tid,date)=>{
-      const ds=toDS(date);
-      const tr=aRms.filter(r=>r.unit_type_id==tid);
-      const oc=tr.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&!["abgelehnt","checkedout","storniert"].includes(rv.status))).length;
-      return{oc,tot:tr.length,pct:tr.length?Math.round(oc/tr.length*100):0};
-    };
-
-    const totOcc=(date)=>{
-      const ds=toDS(date);
-      const oc=aRms.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&!["abgelehnt","checkedout","storniert"].includes(rv.status))).length;
-      return{oc,tot:aRms.length,pct:aRms.length?Math.round(oc/aRms.length*100):0};
-    };
-
-    const fetchPrices=async()=>{
-      setPLoad(true);setPErr(null);
-      try{
-        const occD={};
-        uts.forEach(ut=>{
-          occD[ut.id]=days.map(d=>{
-            const o=getOcc(ut.id,d);
-            return{date:toDS(d),weekday:["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()],occupied:o.oc,total:o.tot,pct:o.pct};
-          });
-        });
-
-        const prompt="You are a hotel revenue management AI for \"Hotel Europa Ruesselsheim\" (3-star, rating 7.5/10, near Frankfurt Airport).\n\nSearch Booking.com for current hotel prices near Ruesselsheim, Frankfurt Airport, Kelsterbach, Raunheim for "+toDS(days[0])+" to "+toDS(days[13])+".\n\nOUR ROOM CATEGORIES:\n"+uts.map(ut=>"- ID "+ut.id+" \""+ut.name+"\": Basispreis "+ut.base_price+"EUR, Mindestpreis "+(minPrices[ut.id]||39)+"EUR\n  Belegung: "+JSON.stringify(occD[ut.id])).join("\n")+"\n\nRULES:\n- Never suggest below minimum price\n- High occupancy >80%: price 10-20% above market\n- Low occupancy <50%: price 5-15% below market but above minimum\n- Weekend Fr/Sa premium +10-15%\n- Compare vs competitor prices\n\nRespond ONLY valid JSON (no markdown no backticks):\n{\"competitors\":[{\"name\":\"string\",\"stars\":0,\"rating\":0,\"priceRange\":\"string\"}],\"suggestions\":{\""+uts.map(u=>u.id).join("\":[...],\"")+"\":[{\"date\":\"YYYY-MM-DD\",\"price\":0,\"reason\":\"short German reason\"}]},\"marketSummary\":\"2-3 German sentences\"}";
-
-        const resp=await fetch("https://api.anthropic.com/v1/messages",{
-          method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,
-            tools:[{type:"web_search_20250305",name:"web_search"}],
-            messages:[{role:"user",content:prompt}]})
-        });
-        if(!resp.ok)throw new Error("API "+resp.status);
-        const data=await resp.json();
-        const txt=data.content?.filter(b=>b.type==="text").map(b=>b.text).join("\n")||"";
-        const clean=txt.replace(/```json|```/g,"").trim();
-        const m=clean.match(/\{[\s\S]*"suggestions"[\s\S]*\}/);
-        if(!m)throw new Error("Keine Preisdaten erhalten");
-        const parsed=JSON.parse(m[0]);
-        setPSugg(parsed.suggestions||{});
-        setComps(parsed);
-        setLastUpd(new Date());
-        show("Preisvorschlaege aktualisiert");
-      }catch(e){setPErr(e.message);show(e.message,"error")}
-      finally{setPLoad(false)}
-    };
-
-    const getP=(tid,d)=>{const a=pSugg[String(tid)];return a?.find(e=>e.date===toDS(d))?.price||null};
-    const getReason=(tid,d)=>{const a=pSugg[String(tid)];return a?.find(e=>e.date===toDS(d))?.reason||""};
-
-    const startEdit=(tid,field,val)=>{setEditCell(tid+"_"+field);setEditVal(String(val))};
-    const saveEdit=async(tid,field)=>{
-      const v=parseFloat(editVal)||0;
-      if(field==="min_price"){setMinPrices(p=>({...p,[tid]:v}))}
-      else if(field==="base_price"){
-        try{await api.patch("unit_types",tid,{base_price:v});
-          setUts(p=>p.map(u=>u.id==tid?{...u,base_price:v}:u));
-          show("Basispreis gespeichert");
-        }catch(e){show(e.message,"error")}
-      }
-      setEditCell(null);
-    };
-
-    const PBadge=({price,base,min})=>{
-      if(pLoad)return<div style={{width:28,height:14,background:"#E2E8F0",borderRadius:4,margin:"0 auto"}}></div>;
-      if(!price)return<span style={{color:"#CBD5E1",fontSize:10}}>-</span>;
-      const cl=Math.max(price,min||0);
-      const diff=cl-base;const pct=Math.round((diff/base)*100);
-      const c=diff>2?"#DC2626":diff<-2?"#059669":"#6B7280";
-      const bg=diff>2?"#FEF2F2":diff<-2?"#ECFDF5":"#F9FAFB";
-      return<div style={{background:bg,borderRadius:6,padding:"2px 4px",textAlign:"center"}}>
-        <div style={{fontSize:12,fontWeight:800,color:c,lineHeight:1.1}}>{cl}&#8364;</div>
-        {diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>2?"&#9650;":"&#9660;"}{pct>0?"+":""}{pct}%</div>}
-        {price<(min||0)&&<div style={{fontSize:7,color:"#F59E0B",fontWeight:700}}>MIN</div>}
-      </div>;
-    };
-
-    return<div>
-      {/* Controls */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))}><I n="cL" s={16}/></Btn>
-          <Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn>
-          <Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))}><I n="cR" s={16}/></Btn>
-          <span style={{fontSize:14,fontWeight:600}}>{fd(ws)} - {fd(addD(ws,13))}</span>
-        </div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <Btn v="ghost" sz="sm" onClick={()=>setShowCfg(!showCfg)} style={{background:showCfg?"#EFF6FF":"transparent"}}><I n="settings" s={14}/> Preise konfigurieren</Btn>
-          <Btn sz="sm" onClick={fetchPrices} disabled={pLoad} style={{background:pLoad?"#94A3B8":"#1E40AF"}}><I n="dollar" s={14} c="#fff"/> {pLoad?"Lade...":"Preise abrufen"}</Btn>
-          <label style={{fontSize:11,color:"#6B7280",display:"flex",alignItems:"center",gap:4,cursor:"pointer"}}>
-            <input type="checkbox" checked={autoP} onChange={e=>setAutoP(e.target.checked)} style={{width:14,height:14}}/>
-            Auto (30m)
-          </label>
-        </div>
-      </div>
-
-      {/* Config Panel */}
-      {showCfg&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",padding:16,marginBottom:16}}>
-        <div style={{fontSize:14,fontWeight:800,marginBottom:12,color:"#1E40AF"}}>Preiskonfiguration pro Zimmerkategorie</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat("+Math.min(uts.length,4)+", 1fr)",gap:12}}>
-          {uts.map(ut=><div key={ut.id} style={{background:"#F9FAFB",borderRadius:10,padding:12,border:"2px solid "+(ut.color||"#ddd")+"30"}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-              <CD color={ut.color||"#999"} size={12}/>
-              <span style={{fontWeight:700,fontSize:13}}>{ut.name}</span>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:11,color:"#6B7280"}}>Basispreis</span>
-                {editCell===ut.id+"_base_price"
-                  ?<input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={()=>saveEdit(ut.id,"base_price")} onKeyDown={e=>{if(e.key==="Enter")saveEdit(ut.id,"base_price");if(e.key==="Escape")setEditCell(null)}} autoFocus style={{width:60,padding:"2px 6px",borderRadius:4,border:"1px solid #3B82F6",fontSize:12,fontWeight:700,textAlign:"center"}}/>
-                  :<span onClick={()=>startEdit(ut.id,"base_price",ut.base_price)} style={{cursor:"pointer",borderBottom:"1px dashed #9CA3AF",fontSize:12,fontWeight:700}}>{ut.base_price}&#8364;</span>
-                }
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:11,color:"#6B7280"}}>Mindestpreis</span>
-                {editCell===ut.id+"_min_price"
-                  ?<input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={()=>saveEdit(ut.id,"min_price")} onKeyDown={e=>{if(e.key==="Enter")saveEdit(ut.id,"min_price");if(e.key==="Escape")setEditCell(null)}} autoFocus style={{width:60,padding:"2px 6px",borderRadius:4,border:"1px solid #3B82F6",fontSize:12,fontWeight:700,textAlign:"center"}}/>
-                  :<span onClick={()=>startEdit(ut.id,"min_price",minPrices[ut.id]||0)} style={{cursor:"pointer",borderBottom:"1px dashed #9CA3AF",fontSize:12,fontWeight:700,color:"#DC2626"}}>{minPrices[ut.id]||0}&#8364;</span>
-                }
-              </div>
-              <div style={{borderTop:"1px solid #E5E7EB",paddingTop:6,display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:10,color:"#9CA3AF"}}>Spielraum</span>
-                <span style={{fontSize:11,fontWeight:700,color:"#059669"}}>{ut.base_price-(minPrices[ut.id]||0)}&#8364;</span>
-              </div>
-            </div>
-          </div>)}
-        </div>
-        <div style={{fontSize:11,color:"#9CA3AF",marginTop:8}}>Klick auf einen Preis um ihn zu aendern. Basispreis wird in Supabase gespeichert. Mindestpreis wird nie unterschritten.</div>
-      </div>}
-
-      {/* Status Bar */}
-      {(lastUpd||pErr)&&<div style={{background:pErr?"#FEF2F2":"#EFF6FF",borderRadius:8,padding:"6px 12px",marginBottom:12,fontSize:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        {pErr?<span style={{color:"#DC2626"}}>Fehler: {pErr}</span>
-          :<span style={{color:"#1E40AF"}}>Preise aktualisiert: {lastUpd.toLocaleTimeString("de-DE")}{autoP?" | naechstes Update in 30 Min.":""}</span>}
-        {comps&&<button onClick={()=>setShowComp(!showComp)} style={{background:"none",border:"none",color:"#1E40AF",cursor:"pointer",fontSize:11,fontWeight:600,textDecoration:"underline"}}>{showComp?"Ausblenden":(comps.competitors?.length||0)+" Konkurrenten"}</button>}
-      </div>}
-
-      {/* Competitors */}
-      {showComp&&comps&&<div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",padding:12,marginBottom:16}}>
-        {comps.marketSummary&&<div style={{fontSize:12,color:"#475569",marginBottom:8,padding:"8px 10px",background:"#FFFBEB",borderRadius:8,borderLeft:"3px solid #F59E0B"}}>{comps.marketSummary}</div>}
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {comps.competitors?.map((c,i)=><div key={i} style={{background:"#F9FAFB",border:"1px solid #E5E7EB",borderRadius:8,padding:"8px 12px",fontSize:12}}>
-            <div style={{fontWeight:700}}>{c.name}</div>
-            <div style={{color:"#6B7280",fontSize:11}}>{"★".repeat(c.stars||0)} | {c.rating}/10 | <strong>{c.priceRange}</strong></div>
-          </div>)}
-        </div>
-      </div>}
-
-      {/* Grid */}
-      <div style={{overflowX:"auto",borderRadius:12,border:"1px solid #E5E7EB"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
-          <thead><tr style={{background:"#F9FAFB"}}>
-            <th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:130}}>Kategorie / Zimmer</th>
-            {days.map((d,i)=>{const isT=toDS(d)===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;const o=totOcc(d);return<th key={i} style={{padding:"6px 4px",textAlign:"center",fontWeight:isT?800:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:54}}>
-              <div style={{fontSize:10,color:isT?"#2563EB":"#6B7280"}}>{["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()]}</div>
-              <div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate()}</div>
-              <div style={{fontSize:9,fontWeight:700,color:o.pct>80?"#DC2626":o.pct>50?"#D97706":"#059669"}}>{o.pct}%</div>
-            </th>})}
-          </tr></thead>
-          <tbody>
-            {uts.map(ut=>{
-              const tR=aRms.filter(r=>r.unit_type_id==ut.id);
-              const rendered=new Set();
-              return<React.Fragment key={ut.id}>
-                {/* Category Header Row */}
-                <tr style={{background:(ut.color||"#6366F1")+"15"}}>
-                  <td style={{padding:"6px 12px",fontWeight:800,borderBottom:"1px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"15",zIndex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <CD color={ut.color||"#999"} size={12}/>
-                      <span>{ut.short_name||ut.name}</span>
-                      <span style={{fontSize:10,color:"#9CA3AF"}}>({tR.length})</span>
-                    </div>
-                    <div style={{fontSize:9,color:"#6B7280",marginLeft:18}}>Basis: {ut.base_price}&#8364; | Min: {minPrices[ut.id]||"?"}&#8364;</div>
-                  </td>
-                  {days.map((d,i)=>{
-                    const o=getOcc(ut.id,d);
-                    return<td key={i} style={{textAlign:"center",borderBottom:"1px solid #E5E7EB",fontSize:10,fontWeight:700,color:o.pct>80?"#DC2626":o.pct>50?"#D97706":"#059669",background:(ut.color||"#6366F1")+"08"}}>{o.oc}/{o.tot}</td>;
-                  })}
-                </tr>
-
-                {/* Room rows with reservation bars */}
-                {tR.map(room=>{
-                  return<tr key={room.id}>
-                    <td style={{padding:"4px 12px",fontWeight:600,borderBottom:"1px solid #F3F4F6",position:"sticky",left:0,background:"#fff",zIndex:1,fontSize:12}}>
-                      <span style={{marginLeft:18}}>{room.name}</span>
-                    </td>
-                    {days.map((d,di)=>{
-                      const ds=toDS(d);
-                      const isT=ds===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;
-                      const rs=ress.filter(r=>r.room_id===room.id&&ds>=r.check_in&&ds<r.check_out&&!["abgelehnt","checkedout","storniert"].includes(r.status));
-                      const hasR=rs.find(r=>!rendered.has(r.id));
-                      if(hasR){
-                        const vs=ds===hasR.check_in||ds===toDS(Math.max(new Date(ws),new Date(hasR.check_in)));
-                        if(vs){rendered.add(hasR.id);const eI=days.findIndex(dd=>toDS(dd)>=hasR.check_out);const sp=Math.min((eI===-1?14:eI)-di,14-di);
-                          if(sp>0){const sc=SC[hasR.status];const g=gMap[hasR.guest_id];
-                            return<td key={di} colSpan={sp} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}>
-                              <div style={{background:sc.bg,border:"1px solid "+sc.bd,borderRadius:6,padding:"2px 6px",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",fontSize:10,color:sc.tx,fontWeight:600,minHeight:24,display:"flex",alignItems:"center"}}>{g?g.last_name:"..."}</div>
-                            </td>
-                          }
-                        }
-                      }
-                      if(rs.length>0&&!hasR)return null;
-                      return<td key={di} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}></td>;
-                    })}
-                  </tr>
-                })}
-
-                {/* PRICE SUGGESTION ROW */}
-                <tr style={{background:(ut.color||"#6366F1")+"08"}}>
-                  <td style={{padding:"6px 12px",fontWeight:800,fontSize:10,color:ut.color||"#6366F1",borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"10",zIndex:1}}>
-                    <span style={{marginLeft:4}}>&#128176; Preisvorschlag</span>
-                  </td>
-                  {days.map((d,i)=>{
-                    const p=getP(ut.id,d);
-                    const reason=getReason(ut.id,d);
-                    return<td key={i} title={reason} style={{textAlign:"center",borderBottom:"2px solid #E5E7EB",padding:2}}>
-                      <PBadge price={p} base={ut.base_price} min={minPrices[ut.id]}/>
-                    </td>;
-                  })}
-                </tr>
-              </React.Fragment>
-            })}
-
-            {/* Total Row */}
-            <tr style={{background:"#F1F5F9"}}>
-              <td style={{padding:"8px 12px",fontWeight:800,fontSize:11,color:"#475569",position:"sticky",left:0,background:"#F1F5F9",zIndex:1}}>GESAMT</td>
-              {days.map((d,i)=>{
-                const o=totOcc(d);
-                const bg=o.pct>85?"#FEE2E2":o.pct>60?"#FEF3C7":o.pct>30?"#D1FAE5":"#F1F5F9";
-                return<td key={i} style={{textAlign:"center",padding:"6px 0",background:bg}}>
-                  <div style={{fontSize:13,fontWeight:800,color:o.pct>85?"#DC2626":o.pct>60?"#D97706":"#059669"}}>{o.pct}%</div>
-                  <div style={{fontSize:9,color:"#6B7280"}}>{o.oc}/{o.tot}</div>
-                </td>;
-              })}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Legend */}
-      <div style={{display:"flex",gap:12,marginTop:12,flexWrap:"wrap",alignItems:"center",fontSize:11,color:"#6B7280"}}>
-        <span style={{fontWeight:700}}>LEGENDE:</span>
-        {Object.entries(SC).filter(([k])=>!["checkedout","abgelehnt","storniert"].includes(k)).map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,borderRadius:3,background:v.bd}}/>{v.l}</span>)}
-        <span>|</span>
-        <span style={{color:"#DC2626",fontWeight:700}}>&#9650; erhoehen</span>
-        <span style={{color:"#059669",fontWeight:700}}>&#9660; senken</span>
-        <span style={{color:"#F59E0B",fontWeight:700}}>MIN = Mindestpreis</span>
-      </div>
-    </div>;
-  };
+  const Dashboard=()=>{const s=useMemo(()=>({rooms:aRms.length,types:uts.length,ang:ress.filter(r=>r.status==="angebot").length,res:ress.filter(r=>r.status==="reservierung").length,ein:ress.filter(r=>r.status==="checkedin").length,umsatz:ress.filter(r=>["reservierung","checkedin","checkedout"].includes(r.status)).reduce((s,r)=>s+parseFloat(r.total_price||0),0),gaeste:guests.length}),[aRms,uts,ress,guests]);return<div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:24}}>{[{l:"Zimmer",v:s.rooms,ic:"bed",c:"#6366F1"},{l:"Angebote",v:s.ang,ic:"send",c:"#F59E0B"},{l:"Reservierungen",v:s.res,ic:"cal",c:"#3B82F6"},{l:"Eingecheckt",v:s.ein,ic:"check",c:"#10B981"},{l:"Umsatz",v:s.umsatz.toFixed(0)+" EUR",ic:"credit",c:"#8B5CF6"},{l:"Gaeste",v:s.gaeste,ic:"users",c:"#EC4899"}].map((c,i)=><div key={i} style={{background:"#fff",borderRadius:12,padding:16,border:"1px solid #E5E7EB"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontSize:12,color:"#6B7280"}}>{c.l}</span><I n={c.ic} s={20} c={c.c}/></div><div style={{fontSize:22,fontWeight:800}}>{c.v}</div></div>)}</div><div style={{background:"#fff",borderRadius:12,padding:16,border:"1px solid #E5E7EB"}}><h3 style={{margin:"0 0 12px",fontWeight:700,fontSize:14}}>Letzte Reservierungen</h3>{ress.slice(0,8).map(r=>{const rm=rms.find(x=>x.id===r.room_id);const g=gMap[r.guest_id];return<div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #F3F4F6"}}><div><div style={{fontWeight:600,fontSize:13}}>{g?g.first_name+" "+g.last_name:"..."}</div><div style={{fontSize:11,color:"#9CA3AF"}}>Zi. {rm?.name} - {fd(r.check_in)} - {SOURCES[r.source]||""}</div></div><Badge s={r.status}/></div>})}</div></div>};
 
   if(ld)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><I n="clock" s={32} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/></div>;
 
-  const nav=[{id:"dashboard",l:"Dashboard",ic:"chart"},{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"pricing",l:"Preissteuerung",ic:"dollar"},{id:"guests",l:"Gäste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
+  const nav=[{id:"dashboard",l:"Dashboard",ic:"chart"},{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preiskategorie",l:"Preiskategorie",ic:"dollar"},{id:"guests",l:"Gaeste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
 
   return<div style={{minHeight:"100vh"}}>
     <div style={{background:"#fff",borderBottom:"1px solid #E5E7EB",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center"}}><I n="home" s={20} c="#fff"/></div>
-        <div><div style={{fontWeight:800,fontSize:16}}>{hi?.name||"Hotel"}</div><div style={{fontSize:11,color:"#9CA3AF"}}>{uts.length} Einheiten · {aRms.length} Zimmer · {guests.length} Gäste</div></div>
-      </div>
-      <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
-        {nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:8,border:"none",background:view===n.id?"#EFF6FF":"transparent",color:view===n.id?"#2563EB":"#6B7280",fontWeight:view===n.id?700:500,fontSize:13,cursor:"pointer"}}><I n={n.ic} s={18}/> {n.l}</button>)}
-        <button onClick={load} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}} title="Neu laden"><I n="refresh" s={16}/></button>
-        <button onClick={onLogout} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}} title="Abmelden"><I n="logout" s={16}/></button>
-      </div>
+      <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center"}}><I n="home" s={20} c="#fff"/></div><div><div style={{fontWeight:800,fontSize:16}}>{hi?.name||"Hotel"}</div><div style={{fontSize:11,color:"#9CA3AF"}}>{uts.length} Einheiten - {aRms.length} Zimmer - {guests.length} Gaeste</div></div></div>
+      <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>{nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:8,border:"none",background:view===n.id?"#EFF6FF":"transparent",color:view===n.id?"#2563EB":"#6B7280",fontWeight:view===n.id?700:500,fontSize:13,cursor:"pointer"}}><I n={n.ic} s={18}/> {n.l}</button>)}<button onClick={load} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}} title="Neu laden"><I n="refresh" s={16}/></button><button onClick={onLogout} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}} title="Abmelden"><I n="logout" s={16}/></button></div>
     </div>
     <div style={{padding:20,maxWidth:1200,margin:"0 auto"}}>
       {view==="dashboard"&&<Dashboard/>}
       {view==="plan"&&<PlanView/>}
-      {view==="pricing"&&<PricingView/>}
+      {view==="preiskategorie"&&<PreiskategorieView/>}
       {view==="guests"&&<GuestsView/>}
+      {view==="settings"&&<SettingsView/>}
     </div>
     {toast&&<div style={{position:"fixed",bottom:24,right:24,background:toast.t==="success"?"#10B981":"#EF4444",color:"#fff",padding:"12px 20px",borderRadius:12,fontWeight:600,fontSize:14,boxShadow:"0 10px 25px rgba(0,0,0,.15)",zIndex:2000,animation:"slideIn .3s ease"}}>{toast.m}</div>}
   </div>;
