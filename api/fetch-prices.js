@@ -33,9 +33,15 @@ export default async function handler(req, res) {
       `- ID ${c.id} "${c.name}": Basispreis ${c.base_price} EUR, Mindestpreis ${c.min_price} EUR\n  Belegung: ${JSON.stringify(c.occupancy)}`
     ).join("\n");
 
-    const prompt = `You are a hotel revenue management AI for "Hotel Europa Ruesselsheim" (3-star, rating 6.5/10, near Frankfurt Airport).
+    const prompt = `You are a hotel revenue management AI for "Hotel Europa Ruesselsheim" (3-star, rating 7.5/10, near Frankfurt Airport).
 
 Search for current hotel prices near Ruesselsheim, Frankfurt Airport, Kelsterbach, Raunheim on Booking.com for the period ${dateFrom} to ${dateTo}.
+
+ROOM TYPE OCCUPANCY RULES (important for price comparison):
+- "Einzelzimmer" / "Single" = 1 person occupancy -> compare with single rooms at competitors
+- "Doppelzimmer" / "Zweibettzimmer" / "Double" / "Twin" = 2 person occupancy -> compare with double/twin rooms
+- "Dreibettzimmer" / "Triple" = 3 person occupancy -> compare with triple rooms or double+extra bed
+- "Familienzimmer" / "Family" = 3-4 person occupancy -> compare with family rooms
 
 OUR ROOM CATEGORIES:
 ${catLines}
@@ -45,7 +51,7 @@ PRICING RULES:
 - High occupancy >80%: price 10-20% above market average
 - Low occupancy <50%: price 5-15% below market but always above minimum
 - Weekend (Friday/Saturday) premium +10-15%
-- Compare our prices vs competitor prices for similar room types
+- Compare our prices vs competitor prices for MATCHING room types (single vs single, double vs double etc.)
 - Consider our 3-star / 7.5 rating positioning
 
 IMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no backticks, no explanation before or after. No newlines inside JSON string values. Keep all reason strings short (max 10 words) and on one line.
