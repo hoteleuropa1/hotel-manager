@@ -320,7 +320,7 @@ return<div><Tab tabs={tabs} active={tab} onChange={setTab}/>
 </div>};
 
 if(ld)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><I n="clock" s={32} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/></div>;
-const nav=[{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preiskategorie",l:"Preiskategorie",ic:"dollar"},{id:"guests",l:"Gaeste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
+const nav=[{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preiskategorie",l:"Preiskategorie",ic:"dollar"},{id:"guests",l:"Gaeste",ic:"users"},{id:"preise",l:"Preise",ic:"chart"},{id:"settings",l:"Einstellungen",ic:"settings"}];
 return<div style={{minHeight:"100vh"}}>
 <div style={{background:"#fff",borderBottom:"1px solid #E5E7EB",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center"}}><I n="home" s={20} c="#fff"/></div><div><div style={{fontWeight:800,fontSize:16}}>{hi?.name||"Hotel"}</div><div style={{fontSize:11,color:"#9CA3AF"}}>{aRms.length} Zimmer</div></div></div>
