@@ -66,6 +66,11 @@ input:focus,select:focus{border-color:#8B7D6B;box-shadow:0 0 0 3px rgba(139,125,
 .breakfast-row{display:flex;align-items:flex-start;gap:10px;margin:10px 0;padding:12px 16px;background:#F5F3EF;border:1px solid #DDD9D2;border-radius:10px}
 .breakfast-row input[type=checkbox]{width:18px;height:18px;margin-top:2px;accent-color:#8B7D6B;flex-shrink:0}
 .breakfast-row label{font-size:14px;font-weight:500;color:#58585A;margin-bottom:0;cursor:pointer}
+.compare{background:#FEF9F0;border:1px solid #E8D5B0;border-radius:10px;padding:10px 14px;margin:10px 0 4px;font-size:13px}
+.compare .old{text-decoration:line-through;color:#DC2626;font-weight:600}
+.compare .new{color:#059669;font-weight:800;font-size:15px}
+.compare .save{background:#D1FAE5;color:#059669;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px}
+.loading-comp{font-size:12px;color:#7A7A7A;font-style:italic;margin-top:6px}
 @media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}.wrap{padding:12px}}
 </style>
 </head>
@@ -83,7 +88,7 @@ var HW="www.hotel-europa-ruesselsheim.de";
 var LOGO="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";
 var BF_PRICE=14;
 
-var state={step:1,cats:[],rooms:[],reservations:[],dailyPrices:{},selections:{},checkIn:"",checkOut:"",adults:1,children:0,breakfast:false,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",agbAccepted:false,loading:true,saving:false,error:"",resNumber:"",resNumbers:[]};
+var state={step:1,cats:[],rooms:[],reservations:[],dailyPrices:{},selections:{},checkIn:"",checkOut:"",adults:1,children:0,breakfast:false,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",agbAccepted:false,loading:true,saving:false,error:"",resNumber:"",resNumbers:[],compPrices:[],compLoading:false};
 
 function sb(path,method,body){
   var opts={method:method||"GET",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}};
@@ -152,6 +157,50 @@ function availableRoomsForCat(catId){
   });
 }
 
+// --- Competitor price matching ---
+function matchCompPrice(catName){
+  if(!state.compPrices||!state.compPrices.length)return null;
+  var name=(catName||"").toLowerCase().replace(/[^a-z0-9äöü]/g,"");
+  var keywords={
+    einzel:["einzel","single","ez"],
+    doppel:["doppel","double","twin","dz"],
+    drei:["drei","triple","dreibett","dbz"],
+    vier:["vier","quad","vierbett","family","famili"]
+  };
+  // Find which group our category belongs to
+  var myGroup=null;
+  Object.keys(keywords).forEach(function(g){
+    keywords[g].forEach(function(kw){if(name.indexOf(kw)>=0)myGroup=g});
+  });
+
+  for(var i=0;i<state.compPrices.length;i++){
+    var cp=state.compPrices[i];
+    var cn=(cp.category_name||cp.category||"").toLowerCase().replace(/[^a-z0-9äöü]/g,"");
+    // Direct match
+    if(cn===name)return cp;
+    // Group match
+    if(myGroup){
+      var match=false;
+      keywords[myGroup].forEach(function(kw){if(cn.indexOf(kw)>=0)match=true});
+      if(match)return cp;
+    }
+  }
+  return null;
+}
+
+function fetchCompetitorPrices(){
+  state.compLoading=true;state.compPrices=[];render();
+  fetch("/api/competitor-prices?check_in="+state.checkIn+"&check_out="+state.checkOut)
+    .then(function(r){return r.json()})
+    .then(function(data){
+      state.compPrices=data.prices||[];
+      state.compLoading=false;render();
+    })
+    .catch(function(){
+      state.compLoading=false;render();
+    });
+}
+
 function saveStep3(){
   if(state.step!==3)return;
   var el;
@@ -207,11 +256,33 @@ function render(){
       var isAvail=avail.length>0;
       var sel=state.selections[cat.id]||0;
       var catTotal=catNightlyTotal(cat.id);
+      var comp=matchCompPrice(cat.name);
 
       html+='<div class="card'+(sel>0?" selected":"")+(isAvail?"":" not-avail")+'">';
       html+='<div class="cat-img" style="'+(cat.image_url?"background-image:url("+cat.image_url+");background-size:cover;background-position:center":"")+'">'+(!cat.image_url?cat.name:"")+'</div>';
       html+='<div class="card-body"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px"><div style="flex:1;min-width:200px"><div class="cat-name">'+cat.name+'</div><div class="cat-info">Max. '+cat.capacity+' '+(cat.capacity===1?"Person":"Personen")+' pro Zimmer</div>';
-      html+='<div style="margin-top:6px"><span class="avail '+(isAvail?"yes":"no")+'">'+(isAvail?avail.length+" verf&uuml;gbar":"Ausgebucht")+'</span></div></div>';
+      html+='<div style="margin-top:6px"><span class="avail '+(isAvail?"yes":"no")+'">'+(isAvail?avail.length+" verf&uuml;gbar":"Ausgebucht")+'</span></div>';
+
+      // Competitor price comparison
+      if(comp&&comp.price_per_night>0){
+        var directPrice=cat.base_price;
+        var bookingPrice=parseFloat(comp.price_per_night);
+        if(bookingPrice>directPrice){
+          var saving=Math.round(bookingPrice-directPrice);
+          var savePct=Math.round((saving/bookingPrice)*100);
+          html+='<div class="compare">';
+          html+='<span class="old">Booking.com: '+bookingPrice.toFixed(0)+' &euro;/Nacht</span><br>';
+          html+='<span class="new">Direktpreis: '+directPrice+' &euro;/Nacht</span>';
+          html+='<span class="save">&minus;'+saving+' &euro; ('+savePct+'%)</span>';
+          html+='</div>';
+        } else if(bookingPrice===directPrice){
+          html+='<div class="compare" style="background:#D1FAE5;border-color:#A7F3D0">Gleicher Preis wie Booking.com &ndash; ohne Umweg direkt buchen!</div>';
+        }
+      } else if(state.compLoading){
+        html+='<div class="loading-comp">Preisvergleich wird geladen...</div>';
+      }
+
+      html+='</div>';
       html+='<div style="text-align:right"><div class="cat-price">'+cat.base_price+' EUR <span>/ Nacht</span></div>';
       if(n>0)html+='<div style="font-size:13px;color:#7A7A7A;margin-top:2px">'+catTotal+' EUR / '+n+' '+(n===1?"Nacht":"N&auml;chte")+'</div>';
       if(isAvail){
@@ -274,7 +345,7 @@ function render(){
     html+='<div class="field"><label>Stra&szlig;e und Hausnummer</label><input id="addr" value="'+esc(state.address)+'" oninput="saveStep3()"/></div>';
     html+='<div class="grid3"><div class="field"><label>PLZ</label><input id="zip" value="'+esc(state.zip)+'" oninput="saveStep3()"/></div><div class="field"><label>Ort</label><input id="city" value="'+esc(state.city)+'" oninput="saveStep3()"/></div><div class="field"><label>Land</label><input id="country" value="'+esc(state.country||"DE")+'" oninput="saveStep3()"/></div></div>';
 
-    // Buchungsbedingungen - immer sichtbar
+    // Buchungsbedingungen
     html+='<div class="agb-box">';
     html+='<h3>Stornierung &amp; No-Show</h3><ul>';
     html+='<li>Stornierungen bitten wir schriftlich mitzuteilen.</li>';
@@ -344,6 +415,8 @@ function goStep2(){
   state.children=parseInt(document.getElementById("ch").value)||0;
   if(!state.checkIn||!state.checkOut||state.checkIn>=state.checkOut){alert("Bitte gueltigen Zeitraum waehlen");return}
   state.step=2;state.selections={};state.breakfast=false;render();
+  // Fetch competitor prices in background
+  fetchCompetitorPrices();
 }
 
 function goStep3(){
@@ -361,7 +434,6 @@ function doBook(){
   if(!state.first_name.trim()||!state.last_name.trim()){state.error="Bitte Vor- und Nachname eingeben.";render();return}
   if(!state.email.trim()||!state.email.includes("@")){state.error="Bitte g&uuml;ltige E-Mail-Adresse eingeben.";render();return}
 
-  // Collect rooms to book
   var roomsToBook=[];
   Object.keys(state.selections).forEach(function(catId){
     var cnt=state.selections[catId];
@@ -418,7 +490,6 @@ function buildConfirmationHtml(guest){
     var cat=state.cats.find(function(c){return c.id===catId});
     if(cat)selCats.push({cat:cat,count:cnt});
   });
-
   var h='<table width="100%" style="width:100%;max-width:650px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0">';
   h+='<tr><td><img src="'+LOGO+'" width="100%" style="width:100%"/></td></tr>';
   h+='<tr><td height="20"></td></tr>';
@@ -450,7 +521,7 @@ function buildConfirmationHtml(guest){
 }
 
 function resetBooking(){
-  state={step:1,cats:state.cats,rooms:state.rooms,reservations:state.reservations,dailyPrices:state.dailyPrices,selections:{},checkIn:"",checkOut:"",adults:1,children:0,breakfast:false,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",agbAccepted:false,loading:false,saving:false,error:"",resNumber:"",resNumbers:[]};
+  state={step:1,cats:state.cats,rooms:state.rooms,reservations:state.reservations,dailyPrices:state.dailyPrices,selections:{},checkIn:"",checkOut:"",adults:1,children:0,breakfast:false,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",agbAccepted:false,loading:false,saving:false,error:"",resNumber:"",resNumbers:[],compPrices:[],compLoading:false};
   loadData();
 }
 
