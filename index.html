@@ -280,7 +280,7 @@ return<React.Fragment key={ut.id}>
 
 // ─── PREISKATEGORIE ───
 const PreiskategorieView=()=>{const[prices,setPrices]=useState({});const[sv,setSv]=useState(false);
-useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]={base:u.base_price||80,min:u.min_price||Math.round((u.base_price||80)*0.65)}});setPrices(m)},[uts]);
+useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]={base:u.base_price||80,min:u.min_price||Math.round((u.base_price||80)*0.65),bk:u.booking_com_price||0}});setPrices(m)},[uts]);
 const updP=(tid,f,v)=>setPrices(p=>({...p,[tid]:{...p[tid],[f]:v}}));
 const saveSingle=async(tid)=>{setSv(true);const p=prices[tid];try{await api.patch("unit_types",tid,{base_price:p.base,min_price:p.min});await load();show("Gespeichert")}catch(e){show(e.message,"error")}setSv(false)};
 return<div>
