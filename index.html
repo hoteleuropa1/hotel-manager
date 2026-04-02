@@ -151,7 +151,7 @@ const UTEditor=({ut,usedColors,onSave,onClose})=>{const[fm,setFm]=useState(ut?{.
 
 const RoomEditor=({room,unitTypes:uts2,onSave,onClose})=>{const[fm,setFm]=useState(room?{...room}:{name:"",unit_type_id:uts2[0]?.id,floor:1,price_override:null,active:true});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);return<Modal title={room?"Zimmer "+room.name:"Neues Zimmer"} onClose={onClose}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Nr. *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Sel label="Einheit *" value={fm.unit_type_id||""} onChange={e=>u("unit_type_id",e.target.value)}>{uts2.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</Sel><Inp label="Etage" type="number" value={fm.floor} onChange={e=>u("floor",parseInt(e.target.value)||0)}/></div><label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer"}}><input type="checkbox" checked={fm.active} onChange={()=>u("active",!fm.active)}/><span style={{fontSize:13,fontWeight:600}}>Aktiv</span></label><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {room?"Speichern":"Anlegen"}</Btn></div></Modal>};
 
-function App(){const[token,setToken]=useState(null);const sb={url:"https://ztdtkncoyrkvdpytwuhy.supabase.co",key:"sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT"};if(!token)return<AuthScreen sb={sb} onAuth={(t,u)=>setToken(t)}/>;return<MainApp sb={sb} token={token} onLogout={()=>setToken(null)}/>}
+function App(){const[token,setToken]=useState(()=>{try{return window.sessionStorage.getItem("pms_token")||null}catch(e){return null}});const sb={url:"https://ztdtkncoyrkvdpytwuhy.supabase.co",key:"sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT"};const doAuth=(t,u)=>{setToken(t);try{window.sessionStorage.setItem("pms_token",t)}catch(e){}};const doLogout=()=>{setToken(null);try{window.sessionStorage.removeItem("pms_token")}catch(e){}};if(!token)return<AuthScreen sb={sb} onAuth={doAuth}/>;return<MainApp sb={sb} token={token} onLogout={doLogout}/>}
 
 function MainApp({sb,token,onLogout}){
 const api=useAPI(sb.url,sb.key,token);
@@ -168,8 +168,19 @@ const[pTick,setPTick]=useState(0);
 const pForce=()=>setPTick(t=>t+1);
 const pr=pRef.current;
 
-const load=useCallback(async()=>{setLd(true);try{const[h,u,r,rv,g,p]=await Promise.all([api.get("hotel_info","limit=1"),api.get("unit_types","order=sort_order"),api.get("rooms","order=name"),api.get("reservations","order=created_at.desc"),api.get("guests","order=last_name"),api.get("products","order=sort_order")]);setHi(h[0]||{});setUts(u);setRms(r);setRess(rv);setGuests(g);setProducts(p)}catch(e){show("Ladefehler: "+e.message,"error")}setLd(false)},[api]);
+const load=useCallback(async()=>{setLd(true);try{const[h,u,r,rv,g,p]=await Promise.all([api.get("hotel_info","limit=1"),api.get("unit_types","order=sort_order"),api.get("rooms","order=name"),api.get("reservations","order=created_at.desc"),api.get("guests","order=last_name"),api.get("products","order=sort_order")]);setHi(h[0]||{});setUts(u);setRms(r);setRess(rv);setGuests(g);setProducts(p)}catch(e){if(String(e.message).includes("401")){show("Sitzung abgelaufen - bitte neu anmelden","error");onLogout()}else{show("Ladefehler: "+e.message,"error")}}setLd(false)},[api]);
 useEffect(()=>{load()},[]);
+
+// Auto-Refresh alle 30 Sekunden
+const lastCountRef=useRef(0);
+useEffect(()=>{
+const iv=setInterval(async()=>{
+try{const r=await api.get("reservations","select=id&order=created_at.desc&limit=1");
+const newCount=r.length?r[0].id:0;
+if(lastCountRef.current&&newCount!==lastCountRef.current){await load();show("Neue Buchung eingegangen!")}
+lastCountRef.current=newCount}catch(e){}
+},30000);
+return()=>clearInterval(iv)},[api]);
 useEffect(()=>{if(uts.length){const m={};const s={};uts.forEach(u=>{m[u.id]=u.min_price||Math.round((u.base_price||80)*0.65);s[u.id]=true});pr.minPrices=m;pr.selCats=s;pForce()}},[uts]);
 
 const saveUT=async(d,id)=>{try{if(id)await api.patch("unit_types",id,d);else await api.post("unit_types",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
@@ -490,7 +501,7 @@ const nav=[{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preise",l:"Preise",ic:"cr
 return<div style={{minHeight:"100vh"}}>
 <div style={{background:"#58585A",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}><img src="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg" style={{height:36,borderRadius:4}} alt="Hotel Europa"/><div><div style={{fontWeight:700,fontSize:14,color:"#fff"}}>{hi?.name||"Hotel"}</div><div style={{fontSize:10,color:"#ABA596"}}>{aRms.length} Zimmer</div></div></div>
-<div style={{display:"flex",gap:2,alignItems:"center",flexWrap:"wrap"}}>{nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:8,border:"none",background:view===n.id?"rgba(255,255,255,.15)":"transparent",color:view===n.id?"#fff":"#ABA596",fontWeight:view===n.id?700:500,fontSize:13,cursor:"pointer"}}><I n={n.ic} s={16} c={view===n.id?"#fff":"#ABA596"}/> {n.l}</button>)}<button onClick={load} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><I n="refresh" s={16} c="#ABA596"/></button><button onClick={onLogout} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><I n="logout" s={16} c="#ABA596"/></button></div>
+<div style={{display:"flex",gap:2,alignItems:"center",flexWrap:"wrap"}}>{nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",borderRadius:8,border:"none",background:view===n.id?"rgba(255,255,255,.15)":"transparent",color:view===n.id?"#fff":"#ABA596",fontWeight:view===n.id?700:500,fontSize:13,cursor:"pointer"}}><I n={n.ic} s={16} c={view===n.id?"#fff":"#ABA596"}/> {n.l}</button>)}<button onClick={load} style={{background:"none",border:"none",cursor:"pointer",padding:8}}><I n="refresh" s={16} c="#ABA596"/></button><button onClick={onLogout} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:8,cursor:"pointer",padding:"6px 12px",display:"flex",alignItems:"center",gap:6,color:"#ABA596",fontSize:12,fontWeight:600}}><I n="logout" s={14} c="#ABA596"/> Abmelden</button></div>
 </div>
 <div style={{padding:20,maxWidth:1400,margin:"0 auto"}}>
 {view==="plan"&&<PlanView/>}
