@@ -255,6 +255,7 @@ return<div>
 <span style={{fontSize:14,fontWeight:600,marginLeft:4}}>{MONATE[ws.getMonth()]} {ws.getFullYear()}</span>
 </div>
 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+<Btn sz="sm" onClick={()=>{setShowImport(true);setImportResult(null);setImportError("")}} style={{background:"#7C3AED",color:"#fff"}}><I n="mail" s={14} c="#fff"/> HRS Import</Btn>
 </div>
 </div>
 <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>{Object.entries(SC).filter(([k])=>k!=="checkedout"&&k!=="abgelehnt"&&k!=="storniert").map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{width:10,height:10,borderRadius:3,background:v.bd}}/>{v.l}</span>)}</div>
