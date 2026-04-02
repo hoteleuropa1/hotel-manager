@@ -485,10 +485,17 @@ function doBook(){
     return Promise.all(promises).then(function(results){
       state.resNumbers=results.map(function(rs){return rs[0].reservation_number||rs[0].id.toString().slice(0,8).toUpperCase()});
       state.resNumber=state.resNumbers[0];
-      return fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      // Email an Gast
+      var guestEmailPromise=fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         to:state.email.trim(),subject:"Ihre Reservierungsbestaetigung - "+HN,
         html:buildConfirmationHtml(guest),emailType:"bestaetigung"
       })}).catch(function(){});
+      // Kopie an Hotel
+      var hotelEmailPromise=fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        to:"info@hotel-europa-ruesselsheim.de",subject:"Neue Website-Buchung: "+state.first_name+" "+state.last_name+" ("+fd(state.checkIn)+" - "+fd(state.checkOut)+")",
+        html:buildHotelNotificationHtml(guest),emailType:"hotel-notification"
+      })}).catch(function(){});
+      return Promise.all([guestEmailPromise,hotelEmailPromise]);
     });
   }).then(function(){
     state.saving=false;state.step=4;render();
@@ -533,6 +540,47 @@ function buildConfirmationHtml(guest){
   h+='Bei vorzeitiger Abreise ist keine Erstattung moeglich.</td></tr>';
   h+='<tr><td height="15"></td></tr>';
   h+='<tr><td style="background-color:#ABA596;padding:15px;color:#fff;font-size:13px;"><strong>'+HN+'</strong><br>'+HA+'<br>Tel.: '+HP+'<br>E-Mail: '+HE+'<br>'+HW+'</td></tr></table>';
+  return h;
+}
+
+function buildHotelNotificationHtml(guest){
+  var n=nights();var tg=totalGuests();var tp=totalPrice();var rp=roomsPrice();var bp=breakfastTotal();
+  var selCats=[];
+  Object.keys(state.selections).forEach(function(catId){
+    var cnt=state.selections[catId];if(cnt<=0)return;
+    var cat=state.cats.find(function(c){return c.id===catId});
+    if(cat)selCats.push({cat:cat,count:cnt});
+  });
+  var h='<table width="100%" style="width:100%;max-width:600px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0">';
+  h+='<tr><td style="background:#58585A;padding:20px 28px;text-align:center;"><img src="'+LOGO+'" width="280" style="width:100%;max-width:280px;"/></td></tr>';
+  h+='<tr><td style="padding:24px 28px;">';
+  h+='<h1 style="font-size:20px;color:#58585A;margin:0 0 4px;">Neue Website-Buchung</h1>';
+  h+='<div style="width:50px;height:3px;background:#8B7D6B;border-radius:2px;margin-bottom:20px;"></div>';
+  h+='<div style="background:#D1FAE5;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#059669;font-weight:700;">Buchung ueber Direktbuchung (Website) eingegangen</div>';
+  h+='<div style="background:#F5F3EF;border-radius:10px;padding:16px;margin-bottom:20px;"><table width="100%" style="font-size:14px;color:#58585A;">';
+  h+='<tr><td style="padding:5px 0;font-weight:700;width:40%;">Buchungsnr.:</td><td style="padding:5px 0;">'+state.resNumbers.join(", ")+'</td></tr>';
+  selCats.forEach(function(sc){h+='<tr><td style="padding:5px 0;font-weight:600;">Zimmer:</td><td style="padding:5px 0;">'+sc.count+'x '+sc.cat.name+'</td></tr>'});
+  h+='<tr><td style="padding:5px 0;font-weight:600;">Anreise:</td><td style="padding:5px 0;">'+fd(state.checkIn)+'</td></tr>';
+  h+='<tr><td style="padding:5px 0;font-weight:600;">Abreise:</td><td style="padding:5px 0;">'+fd(state.checkOut)+'</td></tr>';
+  h+='<tr><td style="padding:5px 0;font-weight:600;">Naechte:</td><td style="padding:5px 0;">'+n+'</td></tr>';
+  h+='<tr><td style="padding:5px 0;font-weight:600;">Erwachsene:</td><td style="padding:5px 0;">'+state.adults+'</td></tr>';
+  if(state.children>0)h+='<tr><td style="padding:5px 0;font-weight:600;">Kinder:</td><td style="padding:5px 0;">'+state.children+'</td></tr>';
+  if(state.breakfast)h+='<tr><td style="padding:5px 0;font-weight:600;">Fruehstueck:</td><td style="padding:5px 0;">Ja ('+tg+' Pers., '+bp+' EUR)</td></tr>';
+  h+='<tr><td style="padding:10px 0 5px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">Gesamtpreis:</td><td style="padding:10px 0 5px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">'+tp.toFixed(2)+' EUR</td></tr>';
+  h+='</table></div>';
+  h+='<div style="background:#F5F3EF;border-radius:10px;padding:16px;margin-bottom:20px;"><div style="font-weight:700;font-size:14px;color:#58585A;margin-bottom:8px;">Gastdaten</div><table width="100%" style="font-size:13px;color:#58585A;">';
+  h+='<tr><td style="padding:4px 0;font-weight:600;width:40%;">Name:</td><td style="padding:4px 0;">'+state.salutation+' '+state.first_name.trim()+' '+state.last_name.trim()+'</td></tr>';
+  if(state.company.trim())h+='<tr><td style="padding:4px 0;font-weight:600;">Firma:</td><td style="padding:4px 0;">'+state.company.trim()+'</td></tr>';
+  h+='<tr><td style="padding:4px 0;font-weight:600;">E-Mail:</td><td style="padding:4px 0;"><a href="mailto:'+state.email.trim()+'" style="color:#1E40AF;">'+state.email.trim()+'</a></td></tr>';
+  if(state.phone.trim())h+='<tr><td style="padding:4px 0;font-weight:600;">Telefon:</td><td style="padding:4px 0;">'+state.phone.trim()+'</td></tr>';
+  if(state.address.trim())h+='<tr><td style="padding:4px 0;font-weight:600;">Adresse:</td><td style="padding:4px 0;">'+state.address.trim()+'</td></tr>';
+  if(state.zip.trim()||state.city.trim())h+='<tr><td style="padding:4px 0;font-weight:600;">PLZ / Ort:</td><td style="padding:4px 0;">'+state.zip.trim()+' '+state.city.trim()+'</td></tr>';
+  h+='<tr><td style="padding:4px 0;font-weight:600;">Land:</td><td style="padding:4px 0;">'+(state.country||"DE")+'</td></tr>';
+  h+='</table></div>';
+  h+='<div style="font-size:12px;color:#9CA3AF;">Diese Buchung wurde automatisch im PMS als Reservierung angelegt (Quelle: Website).</div>';
+  h+='</td></tr>';
+  h+='<tr><td style="background:#ABA596;padding:14px 28px;color:#fff;font-size:11px;text-align:center;">Hotel Europa &middot; Marktplatz 1 &middot; 65428 Ruesselsheim</td></tr>';
+  h+='</table>';
   return h;
 }
 
