@@ -1,212 +1,507 @@
-// api/offer-response.js
-// Handles guest accept/decline of offers
-// Sends automatic confirmation email on accept
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HotelManager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F3F4F6;color:#111827}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
+input,select,textarea{font-family:inherit}
+table{border-spacing:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useMemo,useEffect,useCallback,useRef}=React;
+const P=({d,s=18,c="currentColor",st={}})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,...st}}>{Array.isArray(d)?d.map((p,i)=><path key={i} d={p}/>):<path d={d}/>}</svg>;
+const IC={home:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",logout:"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",plus:"M12 5v14 M5 12h14",x:"M18 6L6 18 M6 6l12 12",check:"M20 6L9 17l-5-5",edit:"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",trash:"M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",save:"M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8",cal:"M16 2v4 M8 2v4 M3 10h18 M21 8v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",user:"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",mail:"M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6",phone:"M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72",send:"M22 2L11 13 M22 2l-7 20-4-9-9-4 20-7z",bed:"M2 4v16 M2 8h18a2 2 0 0 1 2 2v10 M2 17h20 M6 8v3",users:"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75",settings:"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",chart:"M18 20V10 M12 20V4 M6 20v-6",layers:"M12 2L2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5",credit:"M21 4H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z M1 10h22",building:"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2 M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2",refresh:"M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0 0 20.49 15",cL:"M15 18l-6-6 6-6",cR:"M9 18l6-6-6-6",cD:"M6 9l6 6 6-6",cU:"M18 15l-6-6-6 6",xc:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M15 9l-6 6 M9 9l6 6",eye:"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",dollar:"M12 1v22 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",file:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6",search:"M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.35-4.35",pkg:"M16.5 9.4l-9-5.19 M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01l8.73-5.05 M12 22.08V12",clock:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 6v6l4 2"};
+const I=({n,s,c,st})=><P d={IC[n]||""} s={s} c={c} st={st}/>;
+const TCOLORS=["#6366F1","#3B82F6","#8B5CF6","#EC4899","#F59E0B","#10B981","#EF4444","#06B6D4","#84CC16","#F97316"];
+const SC={angebot:{bg:"#FEF3C7",bd:"#F59E0B",tx:"#92400E",l:"Angebot"},reservierung:{bg:"#DBEAFE",bd:"#3B82F6",tx:"#1E40AF",l:"Reservierung"},checkedin:{bg:"#D1FAE5",bd:"#10B981",tx:"#065F46",l:"Eingecheckt"},checkedout:{bg:"#E5E7EB",bd:"#6B7280",tx:"#374151",l:"Ausgecheckt"},abgelehnt:{bg:"#FEE2E2",bd:"#EF4444",tx:"#991B1B",l:"Abgelehnt"},storniert:{bg:"#FEE2E2",bd:"#EF4444",tx:"#991B1B",l:"Storniert"}};
+const SOURCES={telefon:"Telefon",laufgast:"Laufgast",booking:"Booking.com",hrs:"HRS",expedia:"Expedia",email:"E-Mail",website:"Website",sonstige:"Sonstige"};
+const PMETHODS={bar:"Bar",ec:"EC-Karte",mastercard:"Mastercard",visa:"Visa",amex:"American Express",rechnung:"Auf Rechnung",ueberweisung:"Ueberweisung",paypal:"PayPal",booking_online:"Booking Online Zahlung"};
+const SALUTATIONS=["","Herr","Frau","Firma"];
+const fd=d=>{const t=new Date(d);return t.getDate().toString().padStart(2,"0")+"."+(t.getMonth()+1).toString().padStart(2,"0")+"."+t.getFullYear()};
+const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
+const toDS=d=>{const t=new Date(d);return t.getFullYear()+"-"+(t.getMonth()+1).toString().padStart(2,"0")+"-"+t.getDate().toString().padStart(2,"0")};
+const dBet=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
+const gP=(r,uts)=>r.price_override!=null?r.price_override:(uts.find(u=>u.id===r.unit_type_id)||{}).base_price||0;
+const gUT=(r,uts)=>uts.find(u=>u.id===r.unit_type_id);
+const fmt=n=>parseFloat(n||0).toFixed(2);
+const MONATE=["Jan","Feb","Marz","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const WTAG=["So","Mo","Di","Mi","Do","Fr","Sa"];
 
-const SB_URL = "https://ztdtkncoyrkvdpytwuhy.supabase.co";
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || "sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT";
-const RESEND_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || "onboarding@resend.dev";
+function useAPI(url,key,token){
+const h=useCallback(()=>{const hd={"Content-Type":"application/json",Prefer:"return=representation"};hd.apikey=key;hd.Authorization="Bearer "+(token||key);return hd},[key,token]);
+return useMemo(()=>({
+get:async(t,q="")=>{const r=await fetch(url+"/rest/v1/"+t+"?"+q,{headers:h()});if(!r.ok)throw new Error(r.status);return r.json()},
+post:async(t,d)=>{const r=await fetch(url+"/rest/v1/"+t,{method:"POST",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}return r.json()},
+patch:async(t,id,d)=>{const q=String(id).includes("=")?id:"id=eq."+id;const r=await fetch(url+"/rest/v1/"+t+"?"+q,{method:"PATCH",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}return r.json()},
+del:async(t,id)=>{const q=String(id).includes("=")?id:"id=eq."+id;const r=await fetch(url+"/rest/v1/"+t+"?"+q,{method:"DELETE",headers:h()});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}}
+}),[url,h])}
 
-const LOGO = "https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";
-const HN = "Hotel Europa";
-const HA = "Marktplatz 1";
-const HC = "65428 Ruesselsheim";
-const HP = "015903081422";
-const HE = "info@hotel-europa-ruesselsheim.de";
-const HW = "www.hotel-europa-ruesselsheim.de";
+const Badge=({s})=>{const c=SC[s];return c?<span style={{background:c.bg,color:c.tx,border:"1px solid "+c.bd,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.l}</span>:null};
+const Btn=({children,onClick,v="primary",sz="md",disabled:di,style:st={}})=>{const vs={primary:{background:"#3B82F6",color:"#fff"},success:{background:"#10B981",color:"#fff"},danger:{background:"#EF4444",color:"#fff"},warning:{background:"#F59E0B",color:"#fff"},ghost:{background:"transparent",color:"#6B7280",border:"1px solid #E5E7EB"}};const ss={sm:{padding:"5px 10px",fontSize:12},md:{padding:"8px 16px",fontSize:13}};return<button onClick={onClick} disabled={di} style={{border:"none",borderRadius:8,cursor:di?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:6,fontWeight:600,opacity:di?.5:1,...ss[sz],...vs[v],...st}}>{children}</button>};
+const Inp=({label:lb,textarea:ta,...p})=><div style={{marginBottom:12}}>{lb&&<label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{lb}</label>}{ta?<textarea {...p} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box",minHeight:60,resize:"vertical",...p.style}}/>:<input {...p} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box",...p.style}}/>}</div>;
+const Sel=({label:lb,children,...p})=><div style={{marginBottom:12}}>{lb&&<label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{lb}</label>}<select {...p} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box",background:"#fff"}}>{children}</select></div>;
+const Modal=({title,onClose,children,width:w=600})=><div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={onClose}><div style={{background:"#fff",borderRadius:16,width:w,maxWidth:"95vw",maxHeight:"92vh",overflow:"auto",boxShadow:"0 25px 50px rgba(0,0,0,.25)"}} onClick={e=>e.stopPropagation()}><div style={{padding:"16px 20px",borderBottom:"1px solid #E5E7EB",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#fff",zIndex:1,borderRadius:"16px 16px 0 0"}}><h3 style={{margin:0,fontSize:16,fontWeight:700}}>{title}</h3><button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><I n="x" s={18} c="#9CA3AF"/></button></div><div style={{padding:20}}>{children}</div></div></div>;
+const CD=({color:c,size:s=12})=><span style={{width:s,height:s,borderRadius:s,background:c,display:"inline-block",flexShrink:0}}/>;
+const Tab=({tabs,active,onChange})=><div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"2px solid #E5E7EB"}}>{tabs.map(t=><button key={t.id} onClick={()=>onChange(t.id)} style={{padding:"10px 16px",fontSize:13,fontWeight:active===t.id?700:500,color:active===t.id?"#2563EB":"#6B7280",background:"none",border:"none",borderBottom:active===t.id?"2px solid #2563EB":"2px solid transparent",cursor:"pointer",marginBottom:-2,display:"flex",alignItems:"center",gap:6}}>{t.icon}{t.label}</button>)}</div>;
+const Card=({title,children,style:st={}})=><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"hidden",...st}}>{title&&<div style={{padding:"12px 16px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:14}}>{title}</div>}<div style={{padding:16}}>{children}</div></div>;
 
-function fd(d) {
-  var t = new Date(d);
-  return t.getDate().toString().padStart(2, "0") + "." + (t.getMonth() + 1).toString().padStart(2, "0") + "." + t.getFullYear();
-}
+const COUNTRIES=[["AF","Afghanistan"],["EG","Aegypten"],["AL","Albanien"],["DZ","Algerien"],["AD","Andorra"],["AO","Angola"],["AR","Argentinien"],["AM","Armenien"],["AZ","Aserbaidschan"],["ET","Aethiopien"],["AU","Australien"],["BS","Bahamas"],["BH","Bahrain"],["BD","Bangladesch"],["BB","Barbados"],["BY","Belarus"],["BE","Belgien"],["BZ","Belize"],["BJ","Benin"],["BT","Bhutan"],["BO","Bolivien"],["BA","Bosnien-Herzegowina"],["BW","Botswana"],["BR","Brasilien"],["BN","Brunei"],["BG","Bulgarien"],["BF","Burkina Faso"],["BI","Burundi"],["CL","Chile"],["CN","China"],["CR","Costa Rica"],["DK","Daenemark"],["DE","Deutschland"],["DM","Dominica"],["DO","Dominikanische Republik"],["DJ","Dschibuti"],["EC","Ecuador"],["SV","El Salvador"],["CI","Elfenbeinkueste"],["ER","Eritrea"],["EE","Estland"],["SZ","Eswatini"],["FJ","Fidschi"],["FI","Finnland"],["FR","Frankreich"],["GA","Gabun"],["GM","Gambia"],["GE","Georgien"],["GH","Ghana"],["GD","Grenada"],["GR","Griechenland"],["GB","Grossbritannien"],["GT","Guatemala"],["GN","Guinea"],["GY","Guyana"],["HT","Haiti"],["HN","Honduras"],["IN","Indien"],["ID","Indonesien"],["IQ","Irak"],["IR","Iran"],["IE","Irland"],["IS","Island"],["IL","Israel"],["IT","Italien"],["JM","Jamaika"],["JP","Japan"],["YE","Jemen"],["JO","Jordanien"],["KH","Kambodscha"],["CM","Kamerun"],["CA","Kanada"],["QA","Katar"],["KZ","Kasachstan"],["KE","Kenia"],["KG","Kirgisistan"],["CO","Kolumbien"],["KM","Komoren"],["HR","Kroatien"],["CU","Kuba"],["KW","Kuwait"],["LA","Laos"],["LS","Lesotho"],["LV","Lettland"],["LB","Libanon"],["LR","Liberia"],["LY","Libyen"],["LI","Liechtenstein"],["LT","Litauen"],["LU","Luxemburg"],["MG","Madagaskar"],["MW","Malawi"],["MY","Malaysia"],["MV","Malediven"],["ML","Mali"],["MT","Malta"],["MA","Marokko"],["MR","Mauretanien"],["MU","Mauritius"],["MX","Mexiko"],["MD","Moldawien"],["MC","Monaco"],["MN","Mongolei"],["ME","Montenegro"],["MZ","Mosambik"],["MM","Myanmar"],["NA","Namibia"],["NP","Nepal"],["NZ","Neuseeland"],["NI","Nicaragua"],["NL","Niederlande"],["NE","Niger"],["NG","Nigeria"],["MK","Nordmazedonien"],["NO","Norwegen"],["OM","Oman"],["AT","Oesterreich"],["PK","Pakistan"],["PA","Panama"],["PG","Papua-Neuguinea"],["PY","Paraguay"],["PE","Peru"],["PH","Philippinen"],["PL","Polen"],["PT","Portugal"],["RW","Ruanda"],["RO","Rumaenien"],["RU","Russland"],["SA","Saudi-Arabien"],["SE","Schweden"],["CH","Schweiz"],["SN","Senegal"],["RS","Serbien"],["SL","Sierra Leone"],["ZW","Simbabwe"],["SG","Singapur"],["SK","Slowakei"],["SI","Slowenien"],["SO","Somalia"],["ES","Spanien"],["LK","Sri Lanka"],["ZA","Suedafrika"],["KR","Suedkorea"],["SD","Sudan"],["SR","Suriname"],["SY","Syrien"],["TJ","Tadschikistan"],["TW","Taiwan"],["TZ","Tansania"],["TH","Thailand"],["TG","Togo"],["TT","Trinidad und Tobago"],["TD","Tschad"],["CZ","Tschechien"],["TN","Tunesien"],["TR","Tuerkei"],["TM","Turkmenistan"],["UG","Uganda"],["UA","Ukraine"],["HU","Ungarn"],["UY","Uruguay"],["UZ","Usbekistan"],["VE","Venezuela"],["AE","Ver. Arabische Emirate"],["US","USA"],["VN","Vietnam"],["ZM","Sambia"]];
+const CountrySel=({value,onChange,label})=>{const[open,setOpen]=useState(false);const[q,setQ]=useState("");const ref=useRef(null);
+const display=COUNTRIES.find(c=>c[0]===value);
+const filtered=q?COUNTRIES.filter(c=>c[1].toLowerCase().indexOf(q.toLowerCase())>=0||c[0].toLowerCase().indexOf(q.toLowerCase())>=0):COUNTRIES;
+useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false)};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h)},[]);
+return<div style={{marginBottom:12}} ref={ref}>{label&&<label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>}<div style={{position:"relative"}}><div onClick={()=>{setOpen(!open);setQ("")}} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,cursor:"pointer",background:"#fff",boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>{display?display[0]+" "+display[1]:(value||"Waehlen...")}</span><I n="cD" s={14} c="#9CA3AF"/></div>
+{open&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid #D1D5DB",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,.15)",zIndex:50,maxHeight:250,overflow:"auto"}}><div style={{position:"sticky",top:0,background:"#fff",padding:6,borderBottom:"1px solid #E5E7EB"}}><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Land suchen..." autoFocus style={{width:"100%",padding:"6px 10px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>{filtered.map(c=><div key={c[0]} onClick={()=>{onChange(c[0]);setOpen(false);setQ("")}} style={{padding:"8px 12px",cursor:"pointer",fontSize:13,background:c[0]===value?"#EFF6FF":"#fff",fontWeight:c[0]===value?700:400}} onMouseOver={e=>e.currentTarget.style.background="#F0F9FF"} onMouseOut={e=>e.currentTarget.style.background=c[0]===value?"#EFF6FF":"#fff"}><span style={{fontWeight:700,marginRight:6}}>{c[0]}</span>{c[1]}</div>)}{filtered.length===0&&<div style={{padding:12,color:"#9CA3AF",fontSize:12}}>Kein Land gefunden</div>}</div>}
+</div></div>};
 
-function fmt(n) {
-  return parseFloat(n || 0).toFixed(2);
-}
+const AuthScreen=({sb,onAuth})=>{const[em,setEm]=useState("");const[pw,setPw]=useState("");const[err,setErr]=useState("");const[ld,setLd]=useState(false);const go=async()=>{if(!em||!pw){setErr("Bitte ausfuellen");return}setLd(true);setErr("");try{const r=await fetch(sb.url+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json",apikey:sb.key},body:JSON.stringify({email:em,password:pw})});const d=await r.json();if(d.error)throw new Error(d.error_description||d.error);onAuth(d.access_token,d.user)}catch(e){setErr(e.message)}setLd(false)};return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"#fff",borderRadius:20,padding:40,maxWidth:400,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,.1)"}}><div style={{textAlign:"center",marginBottom:32}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:16,width:56,height:56,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:16}}><I n="home" s={28} c="#fff"/></div><h1 style={{fontSize:22,fontWeight:800,marginBottom:4}}>HotelManager</h1></div><Inp label="E-Mail" value={em} onChange={e=>setEm(e.target.value)} type="email"/><div style={{marginBottom:20}}><label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>Passwort</label><input value={pw} onChange={e=>setPw(e.target.value)} type="password" style={{width:"100%",padding:"10px 14px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}} onKeyDown={e=>e.key==="Enter"&&go()}/></div>{err&&<div style={{background:"#FEE2E2",color:"#DC2626",padding:"10px 14px",borderRadius:10,fontSize:13,marginBottom:16}}>{err}</div>}<button onClick={go} disabled={ld} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:"pointer"}}>{ld?"...":"Anmelden"}</button></div></div>};
 
-var emailFooter = '<table style="background-color:#ABA596;font-family:arial,sans-serif;font-size:13px;color:#ffffff;padding:10px;" width="575"><tr><td><b>' + HN + '</b><br>' + HA + '<br>' + HC + '<br>Tel.: ' + HP + '<br>E-Mail: <a style="color:#ffffff;text-decoration:none;" href="mailto:' + HE + '">' + HE + '</a><br><a href="http://' + HW + '" target="_blank" style="color:#ffffff;text-decoration:none;">' + HW + '</a></td></tr></table>';
+const NewResForm=({room,ut,unitTypes,api,guests:allGuests,onClose,onRefresh,showToast})=>{const price=gP(room,unitTypes);const[fm,setFm]=useState({salutation:"Herr",first_name:"",last_name:"",company:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",check_in:toDS(new Date()),check_out:toDS(addD(new Date(),1)),adults:1,children:0,notes:"",source:"telefon"});const[existingGuestId,setExistingGuestId]=useState(null);const[guestSearch,setGuestSearch]=useState("");const[showGuestList,setShowGuestList]=useState(false);const nights=Math.max(1,dBet(fm.check_in,fm.check_out));const total=nights*price;const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);const isFirma=fm.salutation==="Firma";
+const filteredGuests=allGuests?allGuests.filter(g=>{const s=guestSearch.toLowerCase();return s.length>=2&&((g.first_name||"").toLowerCase().includes(s)||(g.last_name||"").toLowerCase().includes(s)||(g.email||"").toLowerCase().includes(s)||(g.company||"").toLowerCase().includes(s))}).slice(0,8):[];
+const selectGuest=(g)=>{setExistingGuestId(g.id);setFm(p=>({...p,salutation:g.salutation||"Herr",first_name:g.first_name||"",last_name:g.last_name||"",company:g.company||"",email:g.email||"",phone:g.phone||"",address:g.address||"",zip:g.zip||"",city:g.city||"",country:g.country||"DE"}));setGuestSearch("");setShowGuestList(false)};
+const clearGuest=()=>{setExistingGuestId(null);setFm(p=>({...p,salutation:"Herr",first_name:"",last_name:"",company:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE"}))};
+const save=async()=>{if(!fm.first_name||!fm.last_name)return;setSv(true);try{let gid=existingGuestId;if(!gid){const gd={salutation:fm.salutation,first_name:fm.first_name,last_name:fm.last_name,email:fm.email||"",phone:fm.phone||"",address:fm.address||"",zip:fm.zip||"",city:fm.city||"",country:fm.country||"DE"};if(isFirma)gd.company=fm.company||"";const[g]=await api.post("guests",gd);gid=g.id}const otoken="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==="x"?r:(r&0x3|0x8)).toString(16)});await api.post("reservations",{room_id:room.id,guest_id:gid,check_in:fm.check_in,check_out:fm.check_out,status:"angebot",adults:fm.adults,children:fm.children,total_price:total,notes:fm.notes||"",source:fm.source,offer_token:otoken});await onRefresh();showToast("Angebot erstellt");onClose()}catch(e){showToast(e.message,"error")}setSv(false)};
+return<Modal title={"Neu - "+(ut?.name||"")+" "+room.name} onClose={onClose} width={560}>
+<div style={{background:existingGuestId?"#D1FAE5":"#F0F9FF",borderRadius:10,padding:12,marginBottom:16}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+<span style={{fontSize:13,fontWeight:700,color:existingGuestId?"#065F46":"#1E40AF"}}>{existingGuestId?"Bestehender Gast ausgewaehlt":"Gast suchen oder neu anlegen"}</span>
+{existingGuestId&&<button onClick={clearGuest} style={{background:"none",border:"none",cursor:"pointer",color:"#DC2626",fontSize:12,fontWeight:600}}>Zuruecksetzen</button>}
+</div>
+{!existingGuestId&&<div style={{position:"relative"}}><input value={guestSearch} onChange={e=>{setGuestSearch(e.target.value);setShowGuestList(e.target.value.length>=2)}} placeholder="Name, E-Mail oder Firma eingeben..." style={{width:"100%",padding:"8px 12px 8px 32px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:13,outline:"none",boxSizing:"border-box"}}/><I n="search" s={14} c="#9CA3AF" st={{position:"absolute",left:10,top:10}}/>
+{showGuestList&&filteredGuests.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid #D1D5DB",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,.12)",zIndex:50,maxHeight:240,overflow:"auto"}}>{filteredGuests.map(g=><div key={g.id} onClick={()=>selectGuest(g)} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #F3F4F6",fontSize:13}} onMouseOver={e=>e.currentTarget.style.background="#F0F9FF"} onMouseOut={e=>e.currentTarget.style.background="#fff"}><div style={{fontWeight:600}}>{g.salutation?g.salutation+" ":""}{g.first_name} {g.last_name}{g.company?" ("+g.company+")":""}</div><div style={{fontSize:11,color:"#6B7280"}}>{g.email||""}{g.phone?" | "+g.phone:""}{g.city?" | "+g.city:""}</div></div>)}</div>}
+{showGuestList&&filteredGuests.length===0&&guestSearch.length>=2&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid #D1D5DB",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#9CA3AF"}}>Kein Gast gefunden</div>}
+</div>}
+{existingGuestId&&<div style={{fontSize:12,color:"#065F46"}}>{fm.salutation} {fm.first_name} {fm.last_name} | {fm.email||"keine E-Mail"}</div>}
+</div>
+<div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}><Sel label="Anrede *" value={fm.salutation} onChange={e=>u("salutation",e.target.value)}><option value="Herr">Herr</option><option value="Frau">Frau</option><option value="Firma">Firma</option></Sel><Inp label="Vorname *" value={fm.first_name} onChange={e=>{u("first_name",e.target.value);if(existingGuestId)setExistingGuestId(null)}}/><Inp label="Nachname *" value={fm.last_name} onChange={e=>{u("last_name",e.target.value);if(existingGuestId)setExistingGuestId(null)}}/></div>
+{isFirma&&<Inp label="Firmenname *" value={fm.company} onChange={e=>u("company",e.target.value)}/>}
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="E-Mail" type="email" value={fm.email} onChange={e=>u("email",e.target.value)}/><Inp label="Telefon" value={fm.phone} onChange={e=>u("phone",e.target.value)}/></div>
+<Inp label="Strasse und Hausnummer" value={fm.address} onChange={e=>u("address",e.target.value)}/>
+<div style={{display:"grid",gridTemplateColumns:"120px 1fr 120px",gap:12}}><Inp label="PLZ" value={fm.zip} onChange={e=>u("zip",e.target.value)}/><Inp label="Ort" value={fm.city} onChange={e=>u("city",e.target.value)}/><CountrySel label="Land" value={fm.country} onChange={v=>u("country",v)}/></div>
+<div style={{borderTop:"1px solid #E5E7EB",margin:"8px 0",paddingTop:12}}/>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Anreise" type="date" value={fm.check_in} onChange={e=>u("check_in",e.target.value)}/><Inp label="Abreise" type="date" value={fm.check_out} onChange={e=>u("check_out",e.target.value)}/></div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}><Inp label="Erwachsene" type="number" min={1} value={fm.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/><Inp label="Kinder" type="number" min={0} value={fm.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/><Sel label="Quelle" value={fm.source} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel></div>
+<Inp label="Anmerkungen" value={fm.notes} onChange={e=>u("notes",e.target.value)} textarea/>
+<div style={{background:"#F0F9FF",borderRadius:8,padding:12,margin:"4px 0 16px",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:13,color:"#1E40AF"}}>{nights} N. x {fmt(price)} EUR</span><span style={{fontSize:18,fontWeight:700,color:"#1E40AF"}}>{fmt(total)} EUR</span></div>
+<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.first_name||!fm.last_name||(isFirma&&!fm.company)||sv} onClick={save}>{sv?"...":"Angebot erstellen"}</Btn></div>
+</Modal>};
 
-async function sbFetch(path, method, body) {
-  var opts = {
-    method: method || "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": SB_KEY,
-      "Authorization": "Bearer " + SB_KEY,
-      "Prefer": "return=representation"
-    }
-  };
-  if (body) opts.body = JSON.stringify(body);
-  var r = await fetch(SB_URL + "/rest/v1/" + path, opts);
-  if (!r.ok) {
-    var t = await r.text();
-    throw new Error(r.status + ": " + t.slice(0, 200));
-  }
-  if (method === "GET" || method === "PATCH") return r.json();
-  return null;
-}
+const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,hotelInfo:hi,onClose,onRefresh,showToast})=>{const[tab,setTab]=useState("res");const[gf,setGf]=useState(guest||{});const[rf,setRf]=useState(res);const[items,setItems]=useState([]);const[payments,setPayments]=useState([]);const[saving,setSaving]=useState(false);const[addProduct,setAddProduct]=useState(false);const[addPayment,setAddPayment]=useState(false);const loadItems=useCallback(async()=>{try{const[it,py]=await Promise.all([api.get("reservation_items","reservation_id=eq."+res.id+"&order=created_at"),api.get("payments","reservation_id=eq."+res.id+"&order=created_at.desc")]);setItems(it);setPayments(py)}catch(e){showToast(e.message,"error")}},[res.id]);useEffect(()=>{loadItems()},[]);const nights=dBet(rf.check_in,rf.check_out);const roomPrice=gP(room,unitTypes);const roomTotal=nights*roomPrice;const itemsTotal=items.filter(i=>i.item_type==="product").reduce((s,i)=>s+parseFloat(i.total_price||0),0);const grandTotal=roomTotal+itemsTotal;const totalPaid=payments.filter(p=>p.status==="eingegangen").reduce((s,p)=>s+parseFloat(p.amount||0),0);const balance=grandTotal-totalPaid;const u=(k,v)=>setRf(p=>({...p,[k]:v}));const ug=(k,v)=>setGf(p=>({...p,[k]:v}));
+const saveRes=async()=>{setSaving(true);try{await api.patch("reservations",res.id,{status:rf.status,source:rf.source,check_in:rf.check_in,check_out:rf.check_out,adults:rf.adults,children:rf.children,notes:rf.notes,internal_notes:rf.internal_notes,total_price:grandTotal});await onRefresh();showToast("Gespeichert")}catch(e){showToast(e.message,"error")}setSaving(false)};
+const saveGuest=async()=>{setSaving(true);try{await api.patch("guests",guest.id,gf);showToast("Gast gespeichert")}catch(e){showToast(e.message,"error")}setSaving(false)};
+const updateStatus=async(s)=>{try{const x={status:s};if(s==="checkedin")x.checked_in_at=new Date().toISOString();if(s==="checkedout")x.checked_out_at=new Date().toISOString();await api.patch("reservations",res.id,x);setRf(p=>({...p,status:s}));await onRefresh();showToast("Status: "+(SC[s]||{}).l)}catch(e){showToast(e.message,"error")}};
+const LOGO="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";const HN="Hotel Europa";const HA="Marktplatz 1";const HC="65428 Ruesselsheim";const HP="015903081422";const HE="info@hotel-europa-ruesselsheim.de";const HW="www.hotel-europa-ruesselsheim.de";
+const emailFooter='<table style="background-color:#ABA596;font-family:arial,sans-serif;font-size:13px;color:#ffffff;padding:10px;" width="575"><tr><td><b>'+HN+'</b><br>'+HA+'<br>'+HC+'<br>Tel.: '+HP+'<br>E-Mail: <a style="color:#ffffff;text-decoration:none;" href="mailto:'+HE+'">'+HE+'</a><br><a href="http://'+HW+'" target="_blank" style="color:#ffffff;text-decoration:none;">'+HW+'</a></td></tr></table>';
+const emailHeader='<table width="575" style="font-family:arial,sans-serif;font-size:14px;"><tr><td><img src="'+LOGO+'" width="575" style="width:100%;max-width:575px;"/></td></tr>';
+const sendEmail=(type)=>{const g=guest||{};const greet=(g.salutation==="Frau"?"Sehr geehrte Frau":g.salutation==="Herr"?"Sehr geehrter Herr":"Sehr geehrte/r")+" "+(g.last_name||"Gast");let subj="",html="";
+const LOGO="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";const HN="Hotel Europa";
+const wrap=(content)=>'<table width="100%" cellspacing="0" cellpadding="0" style="background-color:#F5F3EF;font-family:Arial,sans-serif;"><tr><td align="center" style="padding:20px 10px;"><table width="580" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);"><tr><td style="background:#58585A;padding:20px 30px;text-align:center;"><img src="'+LOGO+'" width="320" style="width:100%;max-width:320px;"/></td></tr>'+content+'<tr><td style="background:#ABA596;padding:18px 30px;color:#ffffff;font-size:12px;line-height:1.6;text-align:center;"><strong>'+HN+'</strong><br>Marktplatz 1 &middot; 65428 Ruesselsheim<br>Tel.: 015903081422<br>E-Mail: <a style="color:#ffffff;" href="mailto:info@hotel-europa-ruesselsheim.de">info@hotel-europa-ruesselsheim.de</a><br><a style="color:#ffffff;" href="http://www.hotel-europa-ruesselsheim.de">www.hotel-europa-ruesselsheim.de</a></td></tr></table></td></tr></table>';
+const detailTable='<table width="100%" cellspacing="0" style="font-size:14px;color:#58585A;"><tr><td style="padding:6px 0;font-weight:600;width:45%;">Zimmerkategorie:</td><td style="padding:6px 0;">'+(ut?.name||"")+'</td></tr><tr><td style="padding:6px 0;font-weight:600;">Anreise:</td><td style="padding:6px 0;">'+fd(rf.check_in)+'</td></tr><tr><td style="padding:6px 0;font-weight:600;">Abreise:</td><td style="padding:6px 0;">'+fd(rf.check_out)+'</td></tr><tr><td style="padding:6px 0;font-weight:600;">Naechte:</td><td style="padding:6px 0;">'+nights+'</td></tr><tr><td style="padding:6px 0;font-weight:600;">Erwachsene:</td><td style="padding:6px 0;">'+(rf.adults||1)+'</td></tr>'+(rf.children>0?'<tr><td style="padding:6px 0;font-weight:600;">Kinder:</td><td style="padding:6px 0;">'+rf.children+'</td></tr>':'')+'<tr><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">Gesamtpreis:</td><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">'+fmt(grandTotal)+' EUR</td></tr></table>';
+const baseUrl=window.location.origin;
+if(type==="angebot"){
+subj="Ihr Angebot vom "+HN;
+html=wrap('<tr><td style="padding:30px 30px 10px;"><h1 style="font-size:22px;color:#58585A;margin:0 0 6px;">Ihr Angebot</h1><div style="width:60px;height:3px;background:#8B7D6B;border-radius:2px;margin-bottom:20px;"></div></td></tr><tr><td style="padding:0 30px;font-size:15px;color:#58585A;line-height:1.7;">'+greet+',<br><br>vielen Dank fuer Ihre Anfrage! Gerne unterbreiten wir Ihnen folgendes Angebot:</td></tr><tr><td style="padding:20px 30px;"><div style="background:#F5F3EF;border-radius:10px;padding:18px;">'+detailTable+'</div></td></tr><tr><td style="padding:10px 30px 10px;font-size:14px;color:#58585A;line-height:1.6;">Es wuerde uns sehr freuen, Sie in unserem Hause begruessen zu duerfen. Sollten Sie Fragen haben, stehen wir Ihnen jederzeit gerne zur Verfuegung.</td></tr><tr><td style="padding:10px 30px 30px;text-align:center;"><a href="'+baseUrl+'/api/offer-response?token='+res.offer_token+'&action=accept" style="display:inline-block;background:#8B7D6B;color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:10px;font-weight:700;font-size:16px;margin:6px;">Angebot annehmen</a><br><a href="'+baseUrl+'/api/offer-response?token='+res.offer_token+'&action=decline" style="display:inline-block;color:#ABA596;text-decoration:none;padding:10px 20px;font-size:13px;margin-top:4px;">Nein danke, Angebot ablehnen</a></td></tr><tr><td style="padding:0 30px 24px;font-size:14px;color:#58585A;">Mit herzlichen Gruessen<br><br><strong>'+HN+'</strong></td></tr>')}
+if(type==="bestaetigung"){
+subj="Ihre Reservierungsbestaetigung - "+HN;
+html=wrap('<tr><td style="padding:30px 30px 10px;"><h1 style="font-size:22px;color:#58585A;margin:0 0 6px;">Reservierungsbestaetigung</h1><div style="width:60px;height:3px;background:#8B7D6B;border-radius:2px;margin-bottom:20px;"></div></td></tr><tr><td style="padding:0 30px;font-size:15px;color:#58585A;line-height:1.7;">'+greet+',<br><br>vielen Dank fuer Ihre Reservierung! Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr><tr><td style="padding:20px 30px;"><div style="background:#F5F3EF;border-radius:10px;padding:18px;">'+detailTable+'</div></td></tr><tr><td style="padding:10px 30px;"><div style="background:#F5F3EF;border-radius:10px;padding:16px;font-size:12px;color:#58585A;line-height:1.7;"><strong>Wichtige Hinweise</strong><br>Check-in ab 15:00 Uhr | Check-out bis 11:00 Uhr<br>Stornierung bis 7 Tage vor Anreise: 80% Gebuehr. Ab 3 Tagen / No-Show: voller Preis.<br>Im gesamten Hotel gilt striktes Rauchverbot (Reinigungspauschale 300 EUR).</div></td></tr><tr><td style="padding:20px 30px 24px;font-size:14px;color:#58585A;">Wir wuenschen Ihnen eine angenehme Anreise!<br><br>Mit herzlichen Gruessen<br><strong>'+HN+'</strong></td></tr>')}
+if(type==="storno"){
+subj="Stornierungsbestaetigung - "+HN;
+html=wrap('<tr><td style="padding:30px 30px 10px;"><h1 style="font-size:22px;color:#58585A;margin:0 0 6px;">Stornierungsbestaetigung</h1><div style="width:60px;height:3px;background:#8B7D6B;border-radius:2px;margin-bottom:20px;"></div></td></tr><tr><td style="padding:0 30px;font-size:15px;color:#58585A;line-height:1.7;">'+greet+',<br><br>wir bedauern es sehr, dass Sie nun doch nicht unser Gast sein werden, und bestaetigen Ihnen hiermit Ihre Stornierung.<br><br><strong>Zimmerkategorie:</strong> '+(ut?.name||"")+'<br><strong>Zeitraum:</strong> '+fd(rf.check_in)+' &ndash; '+fd(rf.check_out)+'</td></tr><tr><td style="padding:20px 30px 24px;font-size:14px;color:#58585A;">Wir wuerden uns freuen, Sie ein anderes Mal in unserem Hause begruessen zu duerfen!<br><br>Mit herzlichen Gruessen<br><strong>'+HN+'</strong></td></tr>')}
+if(!g.email){showToast("Keine E-Mail","error");return}
+fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:g.email,subject:subj,html,emailType:type})}).then(r=>r.json()).then(d=>{if(d.success){showToast(type+" gesendet!");if(type==="angebot")api.patch("reservations",res.id,{offer_sent_at:new Date().toISOString()});if(type==="bestaetigung")api.patch("reservations",res.id,{confirmation_sent_at:new Date().toISOString()})}else showToast("Fehler: "+(d.error||d.details),"error")}).catch(e=>showToast(e.message,"error"))};
+const[showStorno,setShowStorno]=useState(false);
+const doStorno=async(wi)=>{try{await api.patch("reservations",res.id,{status:"storniert",internal_notes:(rf.internal_notes||"")+" | STORNO "+(wi?"MIT RECHNUNG":"KOSTENLOS")+" "+fd(new Date())});if(wi&&guest?.email)sendEmail("storno");setRf(p=>({...p,status:"storniert"}));await onRefresh();showToast(wi?"Storniert mit Rechnung":"Kostenlos storniert");setShowStorno(false)}catch(e){showToast(e.message,"error")}};
+const doDelete=async()=>{try{await api.del("reservation_items","reservation_id=eq."+res.id);await api.del("payments","reservation_id=eq."+res.id)}catch(e){}try{await api.del("reservations",res.id);await onRefresh();showToast("Geloescht");onClose()}catch(e){showToast(e.message,"error")}};
+const addItem=async(prod)=>{try{let qty=1,up=parseFloat(prod.price);if(prod.unit==="pro Nacht")qty=nights;if(prod.unit==="pro Person/Nacht")qty=nights*(rf.adults||1);if(prod.unit==="pro Person")qty=rf.adults||1;await api.post("reservation_items",{reservation_id:res.id,item_type:"product",product_id:prod.id,description:prod.name,quantity:qty,unit_price:up,total_price:qty*up});await loadItems();setAddProduct(false);showToast("Hinzugefuegt")}catch(e){showToast(e.message,"error")}};
+const removeItem=async(id)=>{try{await api.del("reservation_items",id);await loadItems();showToast("Entfernt")}catch(e){showToast(e.message,"error")}};
+const addPay=async(pay)=>{try{await api.post("payments",{reservation_id:res.id,guest_id:guest?.id,...pay});await loadItems();showToast("Zahlung erfasst")}catch(e){showToast(e.message,"error")}};
+const tabs=[{id:"res",label:"Reservierung",icon:<I n="file" s={15}/>},{id:"guest",label:"Gast",icon:<I n="user" s={15}/>},{id:"payment",label:"Zahlung",icon:<I n="credit" s={15}/>},{id:"room",label:"Zimmer",icon:<I n="bed" s={15}/>}];
+return<Modal title={"RES / "+(res.reservation_number||"Neu")} onClose={onClose} width={780}>
+<div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}><Badge s={rf.status}/><span style={{fontSize:12,color:"#6B7280"}}>{SOURCES[rf.source]||rf.source}</span><div style={{marginLeft:"auto",display:"flex",gap:6}}>{rf.status==="angebot"&&<Btn v="success" sz="sm" onClick={()=>updateStatus("reservierung")}><I n="check" s={14}/> Reservierung</Btn>}{rf.status==="reservierung"&&<Btn v="success" sz="sm" onClick={()=>updateStatus("checkedin")}><I n="check" s={14}/> Check-in</Btn>}{rf.status==="checkedin"&&<Btn v="warning" sz="sm" onClick={()=>updateStatus("checkedout")}><I n="xc" s={14}/> Check-out</Btn>}<Btn v="danger" sz="sm" onClick={()=>setShowStorno(true)}><I n="trash" s={14}/></Btn></div></div>
+{showStorno&&<Modal title="Stornieren" onClose={()=>setShowStorno(false)} width={440}><div style={{display:"flex",flexDirection:"column",gap:10}}><button onClick={()=>doStorno(false)} style={{padding:"14px 20px",borderRadius:10,border:"2px solid #10B981",background:"#F0FDF4",cursor:"pointer",textAlign:"left"}}><div style={{fontWeight:700,color:"#059669"}}>Kostenlos stornieren</div></button><button onClick={()=>doStorno(true)} style={{padding:"14px 20px",borderRadius:10,border:"2px solid #F59E0B",background:"#FFFBEB",cursor:"pointer",textAlign:"left"}}><div style={{fontWeight:700,color:"#D97706"}}>Mit Rechnung stornieren</div></button><button onClick={()=>{if(confirm("ENDGUELTIG loeschen?"))doDelete()}} style={{padding:"14px 20px",borderRadius:10,border:"2px solid #EF4444",background:"#FEF2F2",cursor:"pointer",textAlign:"left"}}><div style={{fontWeight:700,color:"#DC2626"}}>Endgueltig loeschen</div></button></div></Modal>}
+<div style={{display:"flex",gap:8,marginBottom:16,padding:"12px 16px",background:"#F9FAFB",borderRadius:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:12,fontWeight:600}}>E-Mail:</span><Btn v="primary" sz="sm" onClick={()=>sendEmail("angebot")}>Angebot</Btn><Btn v="success" sz="sm" onClick={()=>sendEmail("bestaetigung")}>Bestaetigung</Btn><Btn v="danger" sz="sm" onClick={()=>sendEmail("storno")}>Storno</Btn></div>
+<Tab tabs={tabs} active={tab} onChange={setTab}/>
+{tab==="res"&&<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}><Sel label="Status" value={rf.status} onChange={e=>u("status",e.target.value)}>{Object.entries(SC).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</Sel><Sel label="Quelle" value={rf.source||""} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel><div/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:20}}><Inp label="Anreise" type="date" value={rf.check_in} onChange={e=>u("check_in",e.target.value)}/><Inp label="Abreise" type="date" value={rf.check_out} onChange={e=>u("check_out",e.target.value)}/><Inp label="Erw." type="number" min={1} value={rf.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/><Inp label="Kinder" type="number" min={0} value={rf.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/></div>
+<Card title="Warenkorb" style={{marginBottom:16}}><table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}><tbody><tr style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"10px 12px"}}>1</td><td style={{padding:"10px 12px",fontWeight:600}}>{room.name}, {ut?.name} ({nights} N.)</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>EUR {fmt(roomTotal)}</td><td/></tr>{items.filter(i=>i.item_type==="product").map(it=><tr key={it.id} style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"10px 12px"}}>{it.quantity}</td><td style={{padding:"10px 12px"}}>{it.description}</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>EUR {fmt(it.total_price)}</td><td style={{padding:"10px 12px"}}><button onClick={()=>removeItem(it.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></td></tr>)}<tr style={{background:"#F0FDF4"}}><td/><td style={{padding:"10px 12px",fontWeight:700}}>GESAMT</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:16,color:"#059669"}}>EUR {fmt(grandTotal)}</td><td/></tr></tbody></table><div style={{marginTop:12}}><Btn v="ghost" sz="sm" onClick={()=>setAddProduct(true)}><I n="plus" s={14}/> Produkt</Btn></div></Card>
+<Inp label="Anmerkungen" value={rf.notes||""} onChange={e=>u("notes",e.target.value)} textarea/><Inp label="Interne Notizen" value={rf.internal_notes||""} onChange={e=>u("internal_notes",e.target.value)} textarea/>
+<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn disabled={saving} onClick={saveRes}><I n="save" s={14}/> Speichern</Btn></div>
+{addProduct&&<Modal title="Produkt" onClose={()=>setAddProduct(false)} width={480}><div style={{display:"flex",flexDirection:"column",gap:8}}>{allProducts.filter(p=>p.active).map(p=><div key={p.id} onClick={()=>addItem(p)} style={{display:"flex",justifyContent:"space-between",padding:"12px 16px",borderRadius:8,border:"1px solid #E5E7EB",cursor:"pointer"}}><div><div style={{fontWeight:600}}>{p.name}</div><div style={{fontSize:12,color:"#6B7280"}}>{p.unit}</div></div><div style={{fontWeight:700,color:"#3B82F6"}}>{fmt(p.price)} EUR</div></div>)}</div></Modal>}</div>}
+{tab==="guest"&&<div><div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}><Sel label="Anrede" value={gf.salutation||""} onChange={e=>ug("salutation",e.target.value)}>{SALUTATIONS.map(s=><option key={s} value={s}>{s||"-"}</option>)}</Sel><Inp label="Vorname" value={gf.first_name||""} onChange={e=>ug("first_name",e.target.value)}/><Inp label="Nachname" value={gf.last_name||""} onChange={e=>ug("last_name",e.target.value)}/></div><Inp label="Firma" value={gf.company||""} onChange={e=>ug("company",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="E-Mail" value={gf.email||""} onChange={e=>ug("email",e.target.value)}/><Inp label="Telefon" value={gf.phone||""} onChange={e=>ug("phone",e.target.value)}/></div><Inp label="Adresse" value={gf.address||""} onChange={e=>ug("address",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"120px 1fr 120px",gap:12}}><Inp label="PLZ" value={gf.zip||""} onChange={e=>ug("zip",e.target.value)}/><Inp label="Ort" value={gf.city||""} onChange={e=>ug("city",e.target.value)}/><CountrySel label="Land" value={gf.country||"DE"} onChange={v=>ug("country",v)}/></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn disabled={saving} onClick={saveGuest}><I n="save" s={14}/> Speichern</Btn></div></div>}
+{tab==="payment"&&<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}><Card><div style={{fontSize:12,color:"#6B7280"}}>Gesamt</div><div style={{fontSize:20,fontWeight:800}}>EUR {fmt(grandTotal)}</div></Card><Card><div style={{fontSize:12,color:"#6B7280"}}>Bezahlt</div><div style={{fontSize:20,fontWeight:800,color:"#059669"}}>EUR {fmt(totalPaid)}</div></Card><Card><div style={{fontSize:12,color:"#6B7280"}}>Offen</div><div style={{fontSize:20,fontWeight:800,color:balance>0?"#DC2626":"#059669"}}>EUR {fmt(balance)}</div></Card></div><Card title="Zahlungen">{payments.length===0?<div style={{color:"#9CA3AF",fontSize:13}}>Keine Zahlungen.</div>:<table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}><tbody>{payments.map(p=><tr key={p.id} style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:8}}>{fd(p.paid_at||p.created_at)}</td><td style={{padding:8}}>{({bar:"Bar",ec:"EC-Karte",mastercard:"Mastercard",visa:"Visa"})[p.payment_method]||p.payment_method}</td><td style={{padding:8,textAlign:"right",fontWeight:600}}>EUR {fmt(p.amount)}</td><td style={{padding:8,fontSize:11,color:p.status==="eingegangen"?"#059669":"#F59E0B"}}>{p.status==="eingegangen"?"Eingegangen":"Ausstehend"}</td></tr>)}</tbody></table>}<div style={{marginTop:12}}><Btn v="ghost" sz="sm" onClick={()=>setAddPayment(true)}><I n="plus" s={14}/> Zahlung</Btn></div></Card>
+{addPayment&&<Modal title="Zahlung" onClose={()=>setAddPayment(false)} width={440}><PaymentFormInner onClose={()=>setAddPayment(false)} onSave={async d=>{await addPay(d);setAddPayment(false)}} balance={balance}/></Modal>}</div>}
+{tab==="room"&&<Card title="Zimmer"><div style={{display:"flex",alignItems:"center",gap:12,padding:8}}><CD color={ut?.color||"#999"} size={20}/><div><div style={{fontWeight:700,fontSize:18}}>Zimmer {room.name}</div><div style={{fontSize:13,color:"#6B7280"}}>{ut?.name} - max. {ut?.capacity} Pers.</div><div style={{fontSize:13,color:"#3B82F6",fontWeight:600}}>EUR {fmt(roomPrice)}/N. x {nights} = EUR {fmt(roomTotal)}</div></div></div></Card>}
+</Modal>};
 
-async function sendConfirmationEmail(reservation, guest, unitType) {
-  if (!RESEND_KEY) {
-    console.log("offer-response: no RESEND_API_KEY, skipping email");
-    return;
-  }
-  if (!guest.email) {
-    console.log("offer-response: no guest email, skipping");
-    return;
-  }
+const PaymentFormInner=({onClose,onSave,balance})=>{const[fm,setFm]=useState({amount:balance>0?balance:0,payment_method:"bar",status:"eingegangen"});const[sv,setSv]=useState(false);const u=(k,v)=>setFm(p=>({...p,[k]:v}));return<div><Inp label="Betrag EUR" type="number" min={0} step={.01} value={fm.amount} onChange={e=>u("amount",parseFloat(e.target.value)||0)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Sel label="Methode" value={fm.payment_method} onChange={e=>u("payment_method",e.target.value)}><option value="bar">Bar</option><option value="ec">EC-Karte</option><option value="mastercard">Mastercard</option><option value="visa">Visa</option><option value="ueberweisung">Ueberweisung</option><option value="paypal">PayPal</option></Sel><Sel label="Status" value={fm.status} onChange={e=>u("status",e.target.value)}><option value="eingegangen">Eingegangen</option><option value="ausstehend">Ausstehend</option></Sel></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.amount||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}>Erfassen</Btn></div></div>};
 
-  var greet = (guest.salutation || "Sehr geehrte/r") + " " + (guest.last_name || "Gast");
-  var nights = Math.round((new Date(reservation.check_out) - new Date(reservation.check_in)) / 86400000);
-  var catName = unitType ? unitType.name : "Zimmer";
+const UTEditor=({ut,usedColors,onSave,onClose})=>{const[fm,setFm]=useState(ut?{...ut}:{name:"",short_name:"",base_price:100,capacity:2,color:TCOLORS.find(c=>!usedColors.includes(c))||TCOLORS[0]});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);return<Modal title={ut?ut.name+" bearbeiten":"Neue Einheit"} onClose={onClose} width={440}><div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12}}><Inp label="Name *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Inp label="Kuerzel" value={fm.short_name} onChange={e=>u("short_name",e.target.value)}/></div><Inp label="Max. Personen" type="number" min={1} value={fm.capacity} onChange={e=>u("capacity",parseInt(e.target.value)||1)}/><div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8}}>Farbe</label><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{TCOLORS.map(c=><button key={c} onClick={()=>u("color",c)} style={{width:32,height:32,borderRadius:8,background:c,border:fm.color===c?"3px solid #111":"2px solid #E5E7EB",cursor:"pointer"}}/>)}</div></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {ut?"Speichern":"Anlegen"}</Btn></div></Modal>};
 
-  var html = '<table width="100%" style="width:100%;max-width:650px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0">';
-  html += '<tr><td><img src="' + LOGO + '" width="100%" style="width:100%;"/></td></tr>';
-  html += '<tr><td height="20"></td></tr>';
-  html += '<tr><td><h1 style="font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#58585a;margin:0;">Ihre Reservierungsbestaetigung</h1></td></tr>';
-  html += '<tr><td style="border:1px solid #ccc;padding:10px;">';
-  html += '<table width="100%"><tr><td width="96" style="text-align:center;vertical-align:top;">';
-  html += '<div style="width:64px;height:64px;background:#10B981;border-radius:32px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:32px;">&#10003;</div>';
-  html += '</td><td width="10"></td><td style="font-family:Arial,sans-serif;font-size:14px;">';
-  html += greet + ',<br><br>vielen Dank fuer Ihre Reservierung!<br><br>';
-  html += 'Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr></table></td></tr>';
-  html += '<tr><td height="10"></td></tr>';
-  html += '<tr><td style="border:1px solid #ccc;padding:10px;background:#e7e7e7;text-align:center;font-family:Arial,sans-serif;font-size:14px;">';
-  html += 'Gesamtpreis:<br><span style="font-size:24px;font-weight:bold;">EUR ' + fmt(reservation.total_price) + '</span><br>inkl. Steuern</td></tr>';
-  html += '<tr><td height="20"></td></tr>';
-  html += '<tr><td><h1 style="font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#58585a;margin:0;">Ihre Buchung</h1></td></tr>';
-  html += '<tr><td><table width="100%" cellspacing="0"><tr>';
-  html += '<td style="width:50%;border:1px solid #ccc;padding:10px;vertical-align:top;font-family:Arial,sans-serif;font-size:14px;">';
-  html += '<table width="100%">';
-  html += '<tr><td>Gebuchte Kategorie:</td><td>' + catName + '</td></tr>';
-  html += '<tr><td>Anreise:</td><td>' + fd(reservation.check_in) + '</td></tr>';
-  html += '<tr><td>Abreise:</td><td>' + fd(reservation.check_out) + '</td></tr>';
-  html += '<tr><td>Naechte:</td><td>' + nights + '</td></tr>';
-  html += '<tr><td>Erwachsene:</td><td>' + (reservation.adults || 1) + '</td></tr>';
-  html += '<tr><td>Kinder:</td><td>' + (reservation.children || 0) + '</td></tr>';
-  html += '</table></td>';
-  html += '<td style="width:50%;border:1px solid #ccc;padding:10px;vertical-align:top;font-family:Arial,sans-serif;font-size:14px;">';
-  html += '<table width="100%">';
-  html += '<tr><td>Anrede:</td><td>' + (guest.salutation || "") + '</td></tr>';
-  html += '<tr><td>Name:</td><td>' + (guest.first_name || "") + ' ' + (guest.last_name || "") + '</td></tr>';
-  html += '<tr><td>Adresse:</td><td>' + (guest.address || "") + '</td></tr>';
-  html += '<tr><td>PLZ / Ort:</td><td>' + (guest.zip || "") + ' ' + (guest.city || "") + '</td></tr>';
-  html += '<tr><td>Land:</td><td>' + (guest.country || "DE") + '</td></tr>';
-  html += '</table></td></tr></table></td></tr>';
-  html += '<tr><td height="20"></td></tr>';
-  html += '<tr><td>' + emailFooter + '</td></tr></table>';
+const RoomEditor=({room,unitTypes:uts2,onSave,onClose})=>{const[fm,setFm]=useState(room?{...room}:{name:"",unit_type_id:uts2[0]?.id,floor:1,price_override:null,active:true});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);return<Modal title={room?"Zimmer "+room.name:"Neues Zimmer"} onClose={onClose}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Nr. *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Sel label="Einheit *" value={fm.unit_type_id||""} onChange={e=>u("unit_type_id",e.target.value)}>{uts2.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</Sel><Inp label="Etage" type="number" value={fm.floor} onChange={e=>u("floor",parseInt(e.target.value)||0)}/></div><label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer"}}><input type="checkbox" checked={fm.active} onChange={()=>u("active",!fm.active)}/><span style={{fontSize:13,fontWeight:600}}>Aktiv</span></label><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {room?"Speichern":"Anlegen"}</Btn></div></Modal>};
 
-  try {
-    var r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + RESEND_KEY
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: guest.email,
-        subject: "Ihre Reservierungsbestaetigung - " + HN,
-        html: html
-      })
-    });
-    var result = await r.json();
-    console.log("offer-response: confirmation email sent to " + guest.email, result);
-  } catch (e) {
-    console.error("offer-response: email error:", e.message);
-  }
-}
+function App(){const[token,setToken]=useState(null);const sb={url:"https://ztdtkncoyrkvdpytwuhy.supabase.co",key:"sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT"};if(!token)return<AuthScreen sb={sb} onAuth={(t,u)=>setToken(t)}/>;return<MainApp sb={sb} token={token} onLogout={()=>setToken(null)}/>}
 
-export default async function handler(req, res) {
-  var token = req.query.token;
-  var action = req.query.action;
+function MainApp({sb,token,onLogout}){
+const api=useAPI(sb.url,sb.key,token);
+const[view,setView]=useState("plan");
+const[ws,setWs]=useState(new Date(new Date().setHours(0,0,0,0)));
+const[toast,setToast]=useState(null);
+const show=(m,t="success")=>{setToast({m,t});setTimeout(()=>setToast(null),3000)};
+const[hi,setHi]=useState(null);const[uts,setUts]=useState([]);const[rms,setRms]=useState([]);
+const[ress,setRess]=useState([]);const[guests,setGuests]=useState([]);const[products,setProducts]=useState([]);
+const[ld,setLd]=useState(true);
 
-  if (!token || !action) {
-    return res.status(400).send(errorPage("Ungueltiger Link", "Token oder Aktion fehlt."));
-  }
+const pRef=useRef({sugg:{},load:false,err:null,lastUpd:null,comps:null,showComp:false,debug:"",period:14,selCats:{},minPrices:{},customFrom:toDS(new Date()),customTo:toDS(addD(new Date(),14)),savedPrices:{},reqLog:[],cooldown:0});
+const[pTick,setPTick]=useState(0);
+const pForce=()=>setPTick(t=>t+1);
+const pr=pRef.current;
 
-  try {
-    // Find reservation by offer_token
-    var reservations = await sbFetch("reservations?offer_token=eq." + token + "&limit=1", "GET");
+const load=useCallback(async()=>{setLd(true);try{const[h,u,r,rv,g,p]=await Promise.all([api.get("hotel_info","limit=1"),api.get("unit_types","order=sort_order"),api.get("rooms","order=name"),api.get("reservations","order=created_at.desc"),api.get("guests","order=last_name"),api.get("products","order=sort_order")]);setHi(h[0]||{});setUts(u);setRms(r);setRess(rv);setGuests(g);setProducts(p)}catch(e){show("Ladefehler: "+e.message,"error")}setLd(false)},[api]);
+useEffect(()=>{load()},[]);
+useEffect(()=>{if(uts.length){const m={};const s={};uts.forEach(u=>{m[u.id]=u.min_price||Math.round((u.base_price||80)*0.65);s[u.id]=true});pr.minPrices=m;pr.selCats=s;pForce()}},[uts]);
 
-    if (!reservations || reservations.length === 0) {
-      return res.status(404).send(errorPage("Nicht gefunden", "Dieses Angebot wurde nicht gefunden oder ist bereits abgelaufen."));
-    }
+const saveUT=async(d,id)=>{try{if(id)await api.patch("unit_types",id,d);else await api.post("unit_types",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
+const delUT=async id=>{try{await api.del("unit_types",id);await load();show("Geloescht")}catch(e){show(e.message,"error")}};
+const saveRoom=async(d,id)=>{try{if(id)await api.patch("rooms",id,d);else await api.post("rooms",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
+const delRoom=async id=>{try{await api.del("rooms",id);await load();show("Geloescht")}catch(e){show(e.message,"error")}};
+const delGuest=async id=>{try{await api.del("guests",id);await load();show("Gast geloescht")}catch(e){show("Loeschen fehlgeschlagen","error")}};
+const aRms=useMemo(()=>rms.filter(r=>r.active).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})),[rms]);
+const gMap=useMemo(()=>Object.fromEntries(guests.map(g=>[g.id,g])),[guests]);
 
-    var reservation = reservations[0];
+const getOcc=(tid,date)=>{const ds=toDS(date);const tr=aRms.filter(r=>r.unit_type_id==tid);const oc=tr.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&rv.status!=="abgelehnt"&&rv.status!=="checkedout"&&rv.status!=="storniert")).length;return{oc,tot:tr.length,pct:tr.length?Math.round(oc/tr.length*100):0}};
+const totOcc=(date)=>{const ds=toDS(date);const oc=aRms.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&rv.status!=="abgelehnt"&&rv.status!=="checkedout"&&rv.status!=="storniert")).length;return{oc,tot:aRms.length,pct:aRms.length?Math.round(oc/aRms.length*100):0}};
 
-    if (reservation.status !== "angebot") {
-      return res.status(400).send(infoPage("Bereits bearbeitet", "Dieses Angebot wurde bereits " + (reservation.status === "reservierung" ? "angenommen" : reservation.status === "abgelehnt" ? "abgelehnt" : "bearbeitet") + "."));
-    }
+const fetchPrices=async()=>{pr.load=true;pr.err=null;pr.debug="";pForce();try{
+let startD=ws,numDays=pr.period;
+if(pr.period===-1){startD=new Date(pr.customFrom);numDays=Math.max(1,dBet(pr.customFrom,pr.customTo))}
+else if(pr.period===1){startD=new Date();startD.setHours(0,0,0,0);numDays=1}
+else if(pr.period===2){startD=new Date();startD.setHours(0,0,0,0);startD=addD(startD,1);numDays=1}
+const fetchDays=[];for(let i=0;i<numDays;i++)fetchDays.push(addD(startD,i));
+const activeCats=uts.filter(ut=>pr.selCats[ut.id]);
+if(!activeCats.length){pr.err="Bitte mind. eine Kategorie waehlen";pr.load=false;pForce();return}
+// Chunk into max 14-day batches to avoid Gemini truncation
+const CHUNK=14;const chunks=[];
+for(let i=0;i<fetchDays.length;i+=CHUNK)chunks.push(fetchDays.slice(i,i+CHUNK));
+let totalSugg=0;let chunkErrs=[];
+for(let ci=0;ci<chunks.length;ci++){
+// Rate limit check
+const now2=Date.now();pr.reqLog=(pr.reqLog||[]).filter(t=>t>now2-60000);
+if(pr.cooldown>now2){const ws2=Math.ceil((pr.cooldown-now2)/1000);chunkErrs.push("Rate-Limit aktiv, noch "+ws2+"s warten");break}
+if(pr.reqLog.length>=14){const ws2=Math.ceil((pr.reqLog[0]+60000-now2)/1000);chunkErrs.push("15 Anfragen/Min erreicht, "+ws2+"s warten");break}
+if(ci>0)await new Promise(r=>setTimeout(r,2500));
+const chunk=chunks[ci];
+const categories=activeCats.map(ut=>{const occ=chunk.map(d=>{const o=getOcc(ut.id,d);return{date:toDS(d),weekday:WTAG[d.getDay()],occupied:o.oc,total:o.tot,pct:o.pct}});return{id:String(ut.id),name:ut.name,base_price:ut.base_price,min_price:pr.minPrices[ut.id]||39,occupancy:occ}});
+try{
+pr.reqLog.push(Date.now());
+const resp=await fetch("/api/fetch-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({categories,dateFrom:toDS(chunk[0]),dateTo:toDS(chunk[chunk.length-1])})});
+if(resp.status===429){pr.cooldown=Date.now()+65000;chunkErrs.push("API Rate-Limit (429). 60s Pause.");pForce();break}
+const rawText=await resp.text();
+let result;try{result=JSON.parse(rawText)}catch(pe){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+" (Status "+resp.status+"): "+rawText.slice(0,300));continue}
+if(!resp.ok||!result.success){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+": "+(result.error||"Status "+resp.status));continue}
+const sugg=result.data?.suggestions||{};const sKeys=Object.keys(sugg);
+activeCats.forEach((cat,idx)=>{const cid=String(cat.id);
+const src=sugg[cid]||(idx<sKeys.length?sugg[sKeys[idx]]:null);
+if(src){
+const existing={};(pr.sugg[cid]||[]).forEach(item=>{if(item.date)existing[item.date]=item});
+const normed=(Array.isArray(src)?src:[]).map(item=>{if(item.date){const pp=item.date.split("-");if(pp.length===3)item.date=pp[0]+"-"+pp[1].padStart(2,"0")+"-"+pp[2].padStart(2,"0")}item.price=parseInt(item.price)||0;return item});
+normed.forEach(item=>{if(item.date&&item.price)existing[item.date]=item});
+pr.sugg[cid]=Object.values(existing);totalSugg+=normed.filter(i=>i.price).length}});
+if(!pr.comps&&result.data)pr.comps=result.data;
+}catch(ce){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+": "+ce.message)}
+pForce()}
+if(chunkErrs.length)pr.err=chunkErrs.join(" | ");
+pr.lastUpd=new Date();show(activeCats.length+" Kat., "+totalSugg+" Preise"+(chunks.length>1?" ("+chunks.length+" Abfragen)":""));
+}catch(e){pr.err=e.message}finally{pr.load=false;pForce()}};
 
-    if (action === "accept") {
-      // Update status to reservierung
-      await sbFetch("reservations?id=eq." + reservation.id, "PATCH", {
-        status: "reservierung",
-        accepted_at: new Date().toISOString()
-      });
+const getP=(tid,d)=>{const cid=String(tid);const a=pr.sugg[cid];if(!a)return null;const ds=toDS(d);return(a.find(e=>e&&e.date===ds)||{}).price||null};
 
-      // Load guest data
-      var guests = await sbFetch("guests?id=eq." + reservation.guest_id + "&limit=1", "GET");
-      var guest = guests && guests.length > 0 ? guests[0] : {};
+const upsertDP=async(utId,ds,price,src)=>{try{await api.post("daily_prices",{unit_type_id:utId,date:ds,price,source:src||"manuell"});return true}catch(e){if(e.message&&(e.message.includes("23505")||e.message.includes("409")||e.message.includes("duplicate"))){try{await api.patch("daily_prices","unit_type_id=eq."+utId+"&date=eq."+ds,{price,source:src||"manuell"});return true}catch(e2){return false}}return false}};
 
-      // Load unit type via room
-      var unitType = null;
-      if (reservation.room_id) {
-        var rooms = await sbFetch("rooms?id=eq." + reservation.room_id + "&limit=1", "GET");
-        if (rooms && rooms.length > 0) {
-          var unitTypes = await sbFetch("unit_types?id=eq." + rooms[0].unit_type_id + "&limit=1", "GET");
-          if (unitTypes && unitTypes.length > 0) unitType = unitTypes[0];
-        }
-      }
+// =============================================
+// BELEGUNGSPLAN
+// =============================================
+const PlanView=()=>{
+const days=Array.from({length:14},(_,i)=>addD(ws,i));
+const[modal,setModal]=useState(null);
+const[showImport,setShowImport]=useState(false);
+const[emailText,setEmailText]=useState("");
+const[importResult,setImportResult]=useState(null);
+const[importing,setImporting]=useState(false);
+const[importError,setImportError]=useState("");
 
-      // Send automatic confirmation email
-      await sendConfirmationEmail(reservation, guest, unitType);
+const doImport=async()=>{
+if(!emailText.trim()){setImportError("Bitte Email-Text einfuegen");return}
+setImporting(true);setImportError("");setImportResult(null);
+try{const resp=await fetch("/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:emailText.trim()})});
+const data=await resp.json();
+if(data.success){setImportResult(data);setEmailText("");await load()}
+else{setImportError(data.error||"Import fehlgeschlagen")}}
+catch(e){setImportError(e.message)}
+setImporting(false)};
 
-      // Update confirmation_sent_at
-      await sbFetch("reservations?id=eq." + reservation.id, "PATCH", {
-        confirmation_sent_at: new Date().toISOString()
-      });
+const goMonth=n=>{const d=new Date(ws);d.setMonth(d.getMonth()+n);d.setDate(1);setWs(d)};
+const goYear=n=>{const d=new Date(ws);d.setFullYear(d.getFullYear()+n);d.setDate(1);setWs(d)};
+const[planDP,setPlanDP]=useState({});
+useEffect(()=>{const from=toDS(days[0]);const to=toDS(days[days.length-1]);
+api.get("daily_prices","date=gte."+from+"&date=lte."+to+"&order=date").then(data=>{const m={};data.forEach(d=>{m[d.unit_type_id+"_"+d.date]=d.price});setPlanDP(m)}).catch(()=>{});},[ws]);
+const PBadge=({price,base,min,utId,date})=>{const dp=planDP[utId+"_"+date];
+if(dp!=null){const diff=dp-base;const pct=base>0?Math.round(diff/base*100):0;const c=diff>2?"#DC2626":diff<-2?"#059669":"#374151";
+return<div style={{background:"#EFF6FF",borderRadius:6,padding:"2px 4px",textAlign:"center",border:"2px solid #3B82F6"}}><div style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>{dp}</div>{diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>0?"+":""}{pct}%</div>}</div>}
+if(pr.load)return<div style={{width:28,height:14,background:"#E2E8F0",borderRadius:4,margin:"0 auto"}}/>;if(!price)return<span style={{color:"#CBD5E1",fontSize:10}}>-</span>;const cl=Math.max(price,min||0);const diff=cl-base;const pct=base>0?Math.round(diff/base*100):0;const c=diff>2?"#DC2626":diff<-2?"#059669":"#6B7280";const bg=diff>2?"#FEF2F2":diff<-2?"#ECFDF5":"#F9FAFB";return<div onClick={()=>upsertDP(utId,date,cl,"vorschlag").then(ok=>{if(ok){pr.savedPrices[utId+"_"+date]=cl;pForce();show(cl+" EUR gespeichert");setPlanDP(prev=>({...prev,[utId+"_"+date]:cl}))}})} title={"Klick = "+cl+" EUR speichern"} style={{background:bg,borderRadius:6,padding:"2px 4px",textAlign:"center",cursor:"pointer",border:"2px solid transparent"}}><div style={{fontSize:11,fontWeight:800,color:c}}>{cl}</div>{diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>0?"+":""}{pct}%</div>}</div>};
 
-      return res.status(200).send(successPage(
-        "Vielen Dank!",
-        "Ihre Reservierung wurde bestaetigt. Sie erhalten in Kuerze eine Reservierungsbestaetigung per E-Mail.",
-        guest.first_name
-      ));
+return<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+<div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+<Btn v="ghost" sz="sm" onClick={()=>goYear(-1)} style={{padding:"5px 6px",fontSize:11}}>&#171;</Btn>
+<Btn v="ghost" sz="sm" onClick={()=>goMonth(-1)} style={{padding:"5px 6px",fontSize:11}}>&#8249;Mo</Btn>
+<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))}><I n="cL" s={16}/></Btn>
+<Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn>
+<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))}><I n="cR" s={16}/></Btn>
+<Btn v="ghost" sz="sm" onClick={()=>goMonth(1)} style={{padding:"5px 6px",fontSize:11}}>Mo&#8250;</Btn>
+<Btn v="ghost" sz="sm" onClick={()=>goYear(1)} style={{padding:"5px 6px",fontSize:11}}>&#187;</Btn>
+<span style={{fontSize:14,fontWeight:600,marginLeft:4}}>{MONATE[ws.getMonth()]} {ws.getFullYear()}</span>
+</div>
+<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+<Btn sz="sm" onClick={()=>{setShowImport(true);setImportResult(null);setImportError("")}} style={{background:"#7C3AED",color:"#fff"}}><I n="mail" s={14} c="#fff"/> HRS Import</Btn>
+</div>
+</div>
+<div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>{Object.entries(SC).filter(([k])=>k!=="checkedout"&&k!=="abgelehnt"&&k!=="storniert").map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{width:10,height:10,borderRadius:3,background:v.bd}}/>{v.l}</span>)}</div>
+<div style={{overflowX:"auto",borderRadius:12,border:"1px solid #E5E7EB"}}>
+<table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
+<thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:130}}>Zimmer</th>{days.map((d,i)=>{const isT=toDS(d)===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;return<th key={i} style={{padding:"6px 4px",textAlign:"center",fontWeight:isT?800:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:52,color:isT?"#2563EB":"#6B7280"}}><div>{WTAG[d.getDay()]}</div><div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate()}</div></th>})}</tr></thead>
+<tbody>
+{uts.map(ut=>{const tR=aRms.filter(r=>r.unit_type_id==ut.id);if(!tR.length)return null;
+return<React.Fragment key={ut.id}>
+<tr style={{background:(ut.color||"#6366F1")+"18"}}><td style={{padding:"6px 12px",fontWeight:800,borderBottom:"1px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"18",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:6}}><CD color={ut.color} size={14}/><span style={{fontSize:13}}>{ut.name}</span><span style={{fontSize:10,color:"#9CA3AF"}}>({tR.length})</span></div></td>{days.map((d,i)=>{const o=getOcc(ut.id,d);return<td key={i} style={{textAlign:"center",borderBottom:"1px solid #E5E7EB",fontSize:10,fontWeight:700,color:o.pct>80?"#DC2626":o.pct>50?"#D97706":"#059669",background:(ut.color||"#6366F1")+"0A"}}>{o.oc}/{o.tot}</td>})}</tr>
+{tR.map(room=>{const rendered=new Set();return<tr key={room.id}><td style={{padding:"8px 12px",fontWeight:600,borderBottom:"1px solid #F3F4F6",position:"sticky",left:0,background:"#fff",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:6,marginLeft:12}}><CD color={ut.color} size={8}/><span>{room.name}</span></div></td>{days.map((d,di)=>{const ds=toDS(d);const isT=ds===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;const rs=ress.filter(r=>r.room_id===room.id&&ds>=r.check_in&&ds<r.check_out&&r.status!=="abgelehnt"&&r.status!=="checkedout"&&r.status!=="storniert");const hasR=rs.find(r=>!rendered.has(r.id));if(hasR){const vs=ds===hasR.check_in||ds===toDS(Math.max(new Date(ws),new Date(hasR.check_in)));if(vs){rendered.add(hasR.id);const eI=days.findIndex(dd=>toDS(dd)>=hasR.check_out);const sp=Math.min((eI===-1?14:eI)-di,14-di);if(sp>0){const sc=SC[hasR.status];const g=gMap[hasR.guest_id];return<td key={di} colSpan={sp} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}><div onClick={()=>setModal({type:"detail",res:hasR,room})} style={{background:sc.bg,border:"1px solid "+sc.bd,borderRadius:6,padding:"4px 8px",cursor:"pointer",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",fontSize:11,color:sc.tx,fontWeight:600,minHeight:28,display:"flex",alignItems:"center"}}>{g?g.first_name+" "+(g.last_name||"").charAt(0)+".":"..."}</div></td>}}}if(rs.length>0&&!hasR)return null;return<td key={di} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff",cursor:"pointer"}} onClick={()=>setModal({type:"new",room})}><div style={{height:28,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",opacity:.3}}><I n="plus" s={12} c="#9CA3AF"/></div></td>})}</tr>})}
+<tr style={{background:(ut.color||"#6366F1")+"0C"}}><td style={{padding:"6px 12px",fontWeight:800,fontSize:10,color:ut.color||"#6366F1",borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"12",zIndex:1}}>Tagespreis</td>{days.map((d,i)=><td key={i} style={{textAlign:"center",borderBottom:"2px solid #E5E7EB",padding:2}}><PBadge price={getP(ut.id,d)} base={ut.base_price} min={pr.minPrices[ut.id]} utId={ut.id} date={toDS(d)}/></td>)}</tr>
+</React.Fragment>})}
+<tr style={{background:"#F1F5F9"}}><td style={{padding:"8px 12px",fontWeight:800,fontSize:11,color:"#475569",position:"sticky",left:0,background:"#F1F5F9",zIndex:1}}>GESAMT</td>{days.map((d,i)=>{const o=totOcc(d);const bg=o.pct>85?"#FEE2E2":o.pct>60?"#FEF3C7":o.pct>30?"#D1FAE5":"#F1F5F9";return<td key={i} style={{textAlign:"center",padding:"6px 0",background:bg}}><div style={{fontSize:13,fontWeight:800,color:o.pct>85?"#DC2626":o.pct>60?"#D97706":"#059669"}}>{o.pct}%</div><div style={{fontSize:9,color:"#6B7280"}}>{o.oc}/{o.tot}</div></td>})}</tr>
+</tbody></table></div>
+{modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut2=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut2} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} hotelInfo={hi} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>})()}
+{modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} guests={guests} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
+{showImport&&<Modal title="HRS-Buchung importieren" onClose={()=>setShowImport(false)} width={620}>
+<p style={{fontSize:13,color:"#6B7280",marginBottom:12}}>HRS-Buchungsemail oeffnen, alles markieren (Ctrl+A), kopieren (Ctrl+C) und hier einfuegen (Ctrl+V).</p>
+<textarea value={emailText} onChange={e=>setEmailText(e.target.value)} placeholder="Buchungsemail hier einfuegen..." style={{width:"100%",minHeight:220,padding:12,border:"1px solid #D1D5DB",borderRadius:8,fontSize:11,fontFamily:"monospace",outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:12}}/>
+{importError&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:"#DC2626"}}>{importError}</div>}
+{importResult&&<div style={{background:"#D1FAE5",border:"1px solid #A7F3D0",borderRadius:8,padding:12,marginBottom:12,fontSize:13,color:"#065F46"}}>
+<div style={{fontWeight:700,marginBottom:6}}>Buchung importiert!</div>
+<div><strong>Gast:</strong> {importResult.reservation.guest}</div>
+<div><strong>Zimmer:</strong> {importResult.reservation.room} ({importResult.reservation.roomType})</div>
+<div><strong>Zeitraum:</strong> {importResult.reservation.checkIn} - {importResult.reservation.checkOut}</div>
+<div><strong>Preis:</strong> {importResult.reservation.price} EUR</div>
+<div><strong>HRS-Nr:</strong> {importResult.reservation.hrsNr}</div>
+</div>}
+<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+<Btn v="ghost" onClick={()=>setShowImport(false)}>Schliessen</Btn>
+<Btn onClick={doImport} disabled={importing||!emailText.trim()} style={{background:"#7C3AED"}}><I n="mail" s={14} c="#fff"/> {importing?"Importiere...":"Importieren"}</Btn>
+</div>
+</Modal>}
+</div>};
 
-    } else if (action === "decline") {
-      await sbFetch("reservations?id=eq." + reservation.id, "PATCH", {
-        status: "abgelehnt",
-        declined_at: new Date().toISOString()
-      });
+// =============================================
+// PREISE (Kalender + Basispreise kombiniert)
+// =============================================
+const PreiseView=()=>{
+const[dpData,setDpData]=useState({});
+const[editCell,setEditCell]=useState(null);
+const[editVal,setEditVal]=useState("");
+const[saving,setSaving]=useState(false);
+const[bulkModal,setBulkModal]=useState(null);
+const[bulkPrice,setBulkPrice]=useState("");
+const[bulkWd,setBulkWd]=useState("all");
+const[showBase,setShowBase]=useState(false);
+const[rateTick,setRateTick]=useState(0);
+useEffect(()=>{const iv=setInterval(()=>setRateTick(t=>t+1),1000);return()=>clearInterval(iv)},[]);
+const[basePr,setBasePr]=useState({});
 
-      return res.status(200).send(infoPage(
-        "Schade!",
-        "Wir bedauern, dass Sie das Angebot nicht annehmen moechten. Wir wuerden uns freuen, Sie ein anderes Mal bei uns begruessen zu duerfen!"
-      ));
+const days=Array.from({length:19},(_,i)=>addD(ws,i));
+const todayStr=toDS(new Date());
 
-    } else {
-      return res.status(400).send(errorPage("Ungueltige Aktion", "Bitte verwenden Sie die Links aus der E-Mail."));
-    }
+useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]={base:u.base_price||80,min:u.min_price||Math.round((u.base_price||80)*0.65),bk:u.booking_com_price||0}});setBasePr(m)},[uts]);
 
-  } catch (e) {
-    console.error("offer-response error:", e.message);
-    return res.status(500).send(errorPage("Fehler", "Ein technischer Fehler ist aufgetreten. Bitte kontaktieren Sie uns direkt unter " + HP + "."));
-  }
-}
+const loadDP=useCallback(async()=>{
+const from=toDS(days[0]);const to=toDS(days[days.length-1]);
+try{const data=await api.get("daily_prices","date=gte."+from+"&date=lte."+to+"&order=date");
+const m={};data.forEach(d=>{m[d.unit_type_id+"_"+d.date]=d});setDpData(m)}catch(e){show(e.message,"error")}
+},[ws]);
+useEffect(()=>{loadDP()},[ws]);
 
-function pageWrapper(icon, color, title, message, name) {
-  return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>' + title + ' - ' + HN + '</title></head><body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,sans-serif;"><div style="max-width:500px;margin:60px auto;padding:24px;"><div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08);text-align:center;">'
-    + '<div style="padding:40px 32px;">'
-    + '<div style="width:80px;height:80px;border-radius:40px;background:' + color + ';display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;"><span style="font-size:40px;color:#fff;">' + icon + '</span></div>'
-    + '<h1 style="font-size:24px;font-weight:bold;color:#111;margin:0 0 12px;">' + title + '</h1>'
-    + (name ? '<p style="font-size:16px;color:#6B7280;margin:0 0 8px;">Hallo ' + name + '!</p>' : '')
-    + '<p style="font-size:15px;color:#6B7280;line-height:1.6;margin:0;">' + message + '</p>'
-    + '</div>'
-    + '<div style="background:#ABA596;padding:16px 32px;"><p style="margin:0;color:#fff;font-size:13px;font-weight:bold;">' + HN + '</p><p style="margin:4px 0 0;color:rgba(255,255,255,0.8);font-size:12px;">' + HA + ', ' + HC + ' | Tel.: ' + HP + '</p></div>'
-    + '</div></div></body></html>';
-}
+const goMonth=n=>{const d=new Date(ws);d.setMonth(d.getMonth()+n);d.setDate(1);setWs(d)};
 
-function successPage(title, msg, name) { return pageWrapper("&#10003;", "#10B981", title, msg, name); }
-function infoPage(title, msg) { return pageWrapper("&#8505;", "#F59E0B", title, msg); }
-function errorPage(title, msg) { return pageWrapper("&#10007;", "#EF4444", title, msg); }
+const getDP=(utId,ds)=>{const e=dpData[utId+"_"+ds];return e?e.price:null};
+
+const saveEdit=async()=>{if(!editCell||!editVal)return;const price=parseFloat(editVal);if(isNaN(price)||price<=0)return;
+setSaving(true);if(await upsertDP(editCell.utId,editCell.ds,price)){show(price+" EUR gespeichert");loadDP()}else show("Fehler","error");setSaving(false);setEditCell(null)};
+
+const deleteDP=async(utId,ds)=>{try{await api.del("daily_prices","unit_type_id=eq."+utId+"&date=eq."+ds);show("Entfernt");loadDP()}catch(e){show(e.message,"error")}};
+
+const applyBulk=async()=>{if(!bulkModal||!bulkPrice)return;const price=parseFloat(bulkPrice);if(isNaN(price)||price<=0)return;
+setSaving(true);let count=0;
+for(const d of days){const ds=toDS(d);const wd=d.getDay();
+if(bulkWd==="wd"&&(wd===0||wd===6))continue;
+if(bulkWd==="we"&&wd!==0&&wd!==6)continue;
+if(await upsertDP(bulkModal,ds,price))count++}
+setSaving(false);show(count+" Preise gesetzt");setBulkModal(null);setBulkPrice("");loadDP()};
+
+const syncSugg=async()=>{const keys=Object.keys(pr.sugg);if(!keys.length){show("Erst Preise im Belegungsplan abrufen","error");return}
+setSaving(true);let count=0;
+for(const cid of keys){const arr=pr.sugg[cid];if(!Array.isArray(arr))continue;
+for(const item of arr){if(!item.price||!item.date)continue;const min=pr.minPrices[cid]||0;
+if(await upsertDP(cid,item.date,Math.max(item.price,min),"vorschlag"))count++}}
+setSaving(false);show(count+" Preise synchronisiert");loadDP()};
+
+const saveBase=async(tid)=>{const p=basePr[tid];if(!p)return;setSaving(true);
+try{await api.patch("unit_types",tid,{base_price:p.base,min_price:p.min,booking_com_price:p.bk});await load();show("Gespeichert")}catch(e){show(e.message,"error")}setSaving(false)};
+
+const LBL={padding:"8px 12px",fontWeight:600,fontSize:12,borderBottom:"1px solid #E5E7EB",position:"sticky",left:0,background:"#fff",zIndex:1,whiteSpace:"nowrap",minWidth:160};
+const CELL={textAlign:"center",borderBottom:"1px solid #E5E7EB",padding:"4px 2px",minWidth:54};
+
+return<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+<div style={{display:"flex",gap:4,alignItems:"center"}}>
+<Btn v="ghost" sz="sm" onClick={()=>goMonth(-1)}><I n="cL" s={16}/></Btn>
+<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))} style={{fontSize:11}}>-7</Btn>
+<Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn>
+<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))} style={{fontSize:11}}>+7</Btn>
+<Btn v="ghost" sz="sm" onClick={()=>goMonth(1)}><I n="cR" s={16}/></Btn>
+<span style={{fontSize:15,fontWeight:700,marginLeft:8}}>{MONATE[ws.getMonth()]} {ws.getFullYear()}</span>
+</div>
+<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+<select value={pr.period} onChange={e=>{pr.period=Number(e.target.value);pForce()}} style={{padding:"6px 10px",borderRadius:8,border:"1px solid #D1D5DB",fontSize:12,background:"#fff"}}>
+<option value={1}>Heute</option><option value={2}>Morgen</option><option value={7}>7 Tage</option><option value={14}>14 Tage</option><option value={30}>1 Monat</option><option value={90}>3 Monate</option><option value={-1}>Benutzerdefiniert</option>
+</select>
+{pr.period===-1&&<><input type="date" value={pr.customFrom} onChange={e=>{pr.customFrom=e.target.value;pForce()}} style={{padding:"4px 6px",borderRadius:6,border:"1px solid #D1D5DB",fontSize:11}}/><span style={{fontSize:11}}>bis</span><input type="date" value={pr.customTo} onChange={e=>{pr.customTo=e.target.value;pForce()}} style={{padding:"4px 6px",borderRadius:6,border:"1px solid #D1D5DB",fontSize:11}}/></>}
+<div style={{display:"flex",gap:2}}>{uts.map(ut=><label key={ut.id} style={{display:"flex",alignItems:"center",gap:3,cursor:"pointer",padding:"4px 10px",borderRadius:8,fontSize:12,fontWeight:700,background:pr.selCats[ut.id]?(ut.color||"#6366F1")+"20":"#F3F4F6",color:pr.selCats[ut.id]?ut.color||"#6366F1":"#9CA3AF",border:"1px solid "+(pr.selCats[ut.id]?(ut.color||"#6366F1")+"50":"#E5E7EB"),transition:"all .15s"}}><input type="checkbox" checked={!!pr.selCats[ut.id]} onChange={()=>{pr.selCats[ut.id]=!pr.selCats[ut.id];pForce()}} style={{width:13,height:13,accentColor:ut.color||"#6366F1"}}/>{ut.short_name||ut.name}</label>)}</div>
+{(()=>{const now=Date.now();const recent=(pr.reqLog||[]).filter(x=>x>now-60000).length;const left=14-recent;
+if(pr.cooldown>now){const w=Math.ceil((pr.cooldown-now)/1000);const m=Math.floor(w/60);const s=w%60;
+return<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:700,background:"#FEE2E2",color:"#DC2626",border:"1px solid #FECACA"}}><span style={{width:8,height:8,borderRadius:8,background:"#DC2626",animation:"spin 1s linear infinite"}}/> Limit - {m}:{String(s).padStart(2,"0")}</span>}
+const c=left>8?"#059669":left>3?"#D97706":"#DC2626";const bg=left>8?"#D1FAE5":left>3?"#FEF3C7":"#FEE2E2";
+return<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:700,background:bg,color:c}}><span style={{width:8,height:8,borderRadius:8,background:c}}/> {left}/14</span>})()}
+<Btn sz="sm" onClick={fetchPrices} disabled={pr.load||pr.cooldown>Date.now()||(pr.reqLog||[]).filter(x=>x>Date.now()-60000).length>=14} style={{background:(pr.load||pr.cooldown>Date.now())?"#94A3B8":"#1E40AF"}}><I n="dollar" s={14} c="#fff"/> {pr.load?"Lade...":"Preise abrufen"}</Btn>
+<Btn sz="sm" v="warning" onClick={syncSugg} disabled={saving}><I n="refresh" s={14}/> Synchronisieren</Btn>
+<Btn sz="sm" v="ghost" onClick={()=>setShowBase(!showBase)}><I n="settings" s={14}/> Basispreise</Btn>
+</div>
+</div>
+
+{pr.load&&<div style={{background:"#EFF6FF",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#1E40AF",display:"flex",alignItems:"center",gap:8}}><I n="clock" s={14} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/>Preise werden abgerufen...</div>}
+{pr.err&&<div style={{background:"#FEF2F2",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#DC2626"}}>{pr.err}</div>}
+{pr.lastUpd&&!pr.load&&<div style={{background:"#F0FDF4",borderRadius:8,padding:"6px 14px",marginBottom:12,fontSize:11,color:"#059669"}}>Letzte Aktualisierung: {pr.lastUpd.toLocaleTimeString("de-DE")} | {Object.keys(pr.sugg).length} Kategorien | {Object.values(pr.sugg).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0)} Tagespreise</div>}
+{showBase&&<div style={{display:"grid",gridTemplateColumns:"repeat("+Math.min(uts.length,4)+", 1fr)",gap:12,marginBottom:20}}>
+{uts.map(ut=>{const p=basePr[ut.id]||{base:0,min:0,bk:0};return<div key={ut.id} style={{background:"#fff",borderRadius:12,border:"2px solid "+(ut.color||"#ddd")+"40",padding:16}}>
+<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><CD color={ut.color} size={14}/><span style={{fontWeight:800}}>{ut.name}</span></div>
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+<div><label style={{fontSize:10,color:"#6B7280",fontWeight:600}}>Basis EUR</label><input type="number" min={0} value={p.base} onChange={e=>{const v=parseFloat(e.target.value)||0;setBasePr(prev=>({...prev,[ut.id]:{...prev[ut.id],base:v}}))}} style={{width:"100%",padding:"6px 8px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:14,fontWeight:800,textAlign:"center",color:"#1E40AF"}}/></div>
+<div><label style={{fontSize:10,color:"#6B7280",fontWeight:600}}>Min EUR</label><input type="number" min={0} value={p.min} onChange={e=>{const v=parseFloat(e.target.value)||0;setBasePr(prev=>({...prev,[ut.id]:{...prev[ut.id],min:v}}))}} style={{width:"100%",padding:"6px 8px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:14,fontWeight:800,textAlign:"center",color:"#DC2626"}}/></div>
+<div><label style={{fontSize:10,color:"#6B7280",fontWeight:600}}>Booking EUR</label><input type="number" min={0} value={p.bk} onChange={e=>{const v=parseFloat(e.target.value)||0;setBasePr(prev=>({...prev,[ut.id]:{...prev[ut.id],bk:v}}))}} style={{width:"100%",padding:"6px 8px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:14,fontWeight:800,textAlign:"center",color:"#D97706"}}/></div>
+</div>
+<Btn v="ghost" sz="sm" onClick={()=>saveBase(ut.id)} disabled={saving} style={{width:"100%",justifyContent:"center",marginTop:8}}><I n="save" s={12}/> Speichern</Btn>
+</div>})}
+</div>}
+
+<div style={{overflowX:"auto",borderRadius:12,border:"1px solid #E5E7EB",background:"#fff"}}>
+<table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1100}}>
+<thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:160}}>Kalender</th>
+{days.map((d,i)=>{const isT=toDS(d)===todayStr,isW=d.getDay()===0||d.getDay()===6;
+return<th key={i} style={{padding:"6px 2px",textAlign:"center",fontWeight:isT?800:isW?700:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:54,color:isT?"#2563EB":isW?"#92400E":"#6B7280",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>
+<div style={{fontSize:11}}>{WTAG[d.getDay()]}.</div><div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate().toString().padStart(2,"0")}</div></th>})}
+</tr></thead>
+<tbody>
+{uts.map(ut=>{const tR=aRms.filter(r=>r.unit_type_id==ut.id);if(!tR.length)return null;
+return<React.Fragment key={ut.id}>
+{/* Category Header */}
+<tr><td colSpan={days.length+1} style={{padding:"14px 12px 8px",fontWeight:800,fontSize:14,background:"#F9FAFB",borderBottom:"1px solid #E5E7EB",borderTop:"2px solid #D1D5DB"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+<div style={{display:"flex",alignItems:"center",gap:8}}><CD color={ut.color} size={16}/><span>{ut.name}</span><span style={{fontSize:11,color:"#9CA3AF",fontWeight:500}}>({tR.length} Zimmer)</span></div>
+<Btn sz="sm" onClick={()=>{setBulkModal(ut.id);setBulkPrice("");setBulkWd("all")}} style={{background:"#1E40AF",color:"#fff",fontSize:12,padding:"6px 16px"}}>Massenbearbeitung</Btn>
+</div></td></tr>
+{/* Zimmerstatus */}
+<tr><td style={{...LBL,fontSize:11,color:"#6B7280"}}>Zimmerstatus</td>
+{days.map((d,i)=><td key={i} style={{...CELL,padding:0,borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}><div style={{background:"#6EE7B7",height:24}}/></td>)}</tr>
+{/* Verfuegbarkeiten */}
+<tr><td style={{...LBL,color:"#059669",fontSize:11}}>Verfuegbarkeiten</td>
+{days.map((d,i)=>{const o=getOcc(ut.id,d);const avail=o.tot-o.oc;return<td key={i} style={{...CELL,fontSize:13,fontWeight:700,color:avail===0?"#DC2626":"#374151",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>{avail}</td>})}</tr>
+{/* Netto-Buchungen */}
+<tr><td style={{...LBL,color:"#6B7280",fontSize:11}}>Netto-Buchungen</td>
+{days.map((d,i)=>{const o=getOcc(ut.id,d);return<td key={i} style={{...CELL,borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>{o.oc>0?<span style={{display:"inline-block",background:"#9CA3AF",color:"#fff",borderRadius:10,padding:"2px 8px",fontSize:11,fontWeight:700,minWidth:20,textAlign:"center"}}>{o.oc}</span>:""}</td>})}</tr>
+{/* Preis */}
+<tr><td style={{...LBL}}><div style={{display:"flex",alignItems:"center",gap:4}}><span style={{color:"#1E40AF",fontWeight:700}}>Preis</span><span style={{fontSize:9,color:"#9CA3AF"}}>(Basis: {ut.base_price} EUR)</span></div></td>
+{days.map((d,i)=>{const ds=toDS(d);const dp=getDP(ut.id,ds);const price=dp||ut.base_price;const isCustom=dp!==null;const isEditing=editCell&&editCell.utId===ut.id&&editCell.ds===ds;
+return<td key={i} style={{...CELL,background:isCustom?"#EFF6FF":"#fff",cursor:"pointer",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}} onClick={()=>{if(!isEditing){setEditCell({utId:ut.id,ds,name:ut.name});setEditVal(String(price))}}}>
+{isEditing?<input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} autoFocus onKeyDown={e=>{if(e.key==="Enter")saveEdit();if(e.key==="Escape")setEditCell(null)}} onBlur={saveEdit} style={{width:48,padding:"3px 2px",border:"2px solid #3B82F6",borderRadius:4,fontSize:13,fontWeight:800,textAlign:"center",outline:"none"}}/>:
+<div><div style={{fontSize:10,color:"#6B7280"}}>EUR</div><div style={{fontSize:14,fontWeight:800,color:isCustom?"#1E40AF":"#374151"}}>{price}</div></div>}
+</td>})}</tr>
+{/* AI Vorschlag Zeile */}
+{Object.keys(pr.sugg).includes(String(ut.id))&&<tr><td style={{...LBL,background:"#FFFBEB"}}><div style={{display:"flex",alignItems:"center",gap:4}}><I n="chart" s={12} c="#D97706"/><span style={{fontSize:11,color:"#D97706",fontWeight:700}}>AI-Vorschlag</span></div></td>
+{days.map((d,i)=>{const ds=toDS(d);const p=getP(ut.id,d);const min=pr.minPrices[ut.id]||0;const cl=p?Math.max(p,min):null;
+return<td key={i} style={{...CELL,background:"#FFFBEB",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>
+{cl?<div onClick={()=>upsertDP(ut.id,ds,cl,"vorschlag").then(ok=>{if(ok){show(cl+" EUR gespeichert");loadDP()}})} style={{cursor:"pointer"}} title="Klick = uebernehmen"><div style={{fontSize:12,fontWeight:800,color:cl>ut.base_price?"#DC2626":cl<ut.base_price?"#059669":"#6B7280"}}>{cl}</div></div>:<span style={{color:"#CBD5E1",fontSize:10}}>-</span>}
+</td>})}</tr>}
+</React.Fragment>})}
+</tbody></table></div>
+
+{bulkModal&&<Modal title={"Massenbearbeitung: "+(uts.find(u=>u.id===bulkModal)||{}).name} onClose={()=>setBulkModal(null)} width={420}>
+<p style={{fontSize:13,color:"#6B7280",marginBottom:16}}>Preis fuer alle {days.length} sichtbaren Tage ({fd(toDS(days[0]))} - {fd(toDS(days[days.length-1]))}) setzen.</p>
+<Sel label="Tage" value={bulkWd} onChange={e=>setBulkWd(e.target.value)}><option value="all">Alle Tage</option><option value="wd">Nur Mo-Fr</option><option value="we">Nur Sa-So</option></Sel>
+<Inp label="Preis (EUR)" type="number" min={0} value={bulkPrice} onChange={e=>setBulkPrice(e.target.value)} autoFocus/>
+<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={()=>setBulkModal(null)}>Abbrechen</Btn><Btn disabled={!bulkPrice||saving} onClick={applyBulk}><I n="save" s={14}/> Anwenden</Btn></div>
+</Modal>}
+
+{editCell&&editCell.ds&&<div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",background:"#1E40AF",color:"#fff",padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,zIndex:999,boxShadow:"0 4px 12px rgba(0,0,0,.2)"}}>
+Bearbeite: {editCell.name} am {fd(editCell.ds)} | Enter = Speichern | Esc = Abbrechen
+</div>}
+</div>};
+
+// GAESTE
+const GuestsView=()=>{const[search,setSearch]=useState("");const[sel,setSel]=useState(null);const filtered=guests.filter(g=>{const s=search.toLowerCase();return!s||(g.first_name||"").toLowerCase().includes(s)||(g.last_name||"").toLowerCase().includes(s)||(g.email||"").toLowerCase().includes(s)});
+return<div><div style={{display:"flex",gap:8,marginBottom:16}}><div style={{flex:1,position:"relative"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Suchen..." style={{width:"100%",padding:"10px 12px 10px 36px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}}/><I n="search" s={16} c="#9CA3AF" st={{position:"absolute",left:12,top:12}}/></div></div>
+<div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#F9FAFB"}}>{["Name","E-Mail","Telefon","Ort",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead><tbody>{filtered.slice(0,50).map(g=><tr key={g.id} style={{cursor:"pointer",borderBottom:"1px solid #F3F4F6"}} onClick={()=>setSel(g)}><td style={{padding:"10px 12px",fontWeight:600}}>{g.salutation?g.salutation+" ":""}{g.first_name} {g.last_name}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.email}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.phone||"-"}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.city||"-"}</td><td style={{padding:"10px 12px"}}><button onClick={e=>{e.stopPropagation();if(confirm("Gast loeschen?"))delGuest(g.id)}} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></td></tr>)}</tbody></table></div>
+{sel&&<Modal title={sel.first_name+" "+sel.last_name} onClose={()=>{setSel(null);load()}}><div style={{fontSize:13,color:"#6B7280"}}><p>E-Mail: {sel.email}</p><p>Tel: {sel.phone}</p><p>Adresse: {sel.address}, {sel.zip} {sel.city}</p></div></Modal>}
+</div>};
+
+// EINSTELLUNGEN
+const SettingsView=()=>{const[tab,setTab]=useState("types");const[modal,setModal]=useState(null);const[exp,setExp]=useState({});const[hf,setHf]=useState(hi||{});const[sv,setSv]=useState(false);
+const rbt=useMemo(()=>{const m={};uts.forEach(u=>{m[u.id]=rms.filter(r=>r.unit_type_id===u.id)});return m},[uts,rms]);
+const tabs=[{id:"types",label:"Einheiten",icon:<I n="layers" s={16}/>},{id:"rooms",label:"Zimmer",icon:<I n="bed" s={16}/>},{id:"hotel",label:"Hoteldaten",icon:<I n="building" s={16}/>}];
+return<div><Tab tabs={tabs} active={tab} onChange={setTab}/>
+{tab==="types"&&<div><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><span style={{color:"#6B7280"}}>{uts.length} Einheiten</span><Btn sz="sm" onClick={()=>setModal({type:"addUT"})}><I n="plus" s={14}/> Neue Einheit</Btn></div>{uts.map(ut=>{const rs=rbt[ut.id]||[];return<div key={ut.id} style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",marginBottom:12}}><div onClick={()=>setExp(p=>({...p,[ut.id]:!p[ut.id]}))} style={{padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}><CD color={ut.color} size={16}/><div style={{fontWeight:700}}>{ut.name} ({ut.short_name})</div></div><div style={{display:"flex",alignItems:"center",gap:12}}><span style={{fontWeight:700}}>{rs.length} Zi.</span><button onClick={e=>{e.stopPropagation();setModal({type:"editUT",ut})}} style={{background:"none",border:"none",cursor:"pointer"}}><I n="edit" s={16} c="#6B7280"/></button><button onClick={e=>{e.stopPropagation();if(rs.length){show("Erst Zimmer entfernen!","error");return}delUT(ut.id)}} style={{background:"none",border:"none",cursor:"pointer"}}><I n="trash" s={16} c="#EF4444"/></button></div></div>{exp[ut.id]&&<div style={{padding:"12px 20px",borderTop:"1px solid #F3F4F6",background:"#FAFAFA"}}>{rs.map(r=><span key={r.id} style={{display:"inline-block",margin:4,padding:"6px 12px",background:"#fff",border:"1px solid #E5E7EB",borderRadius:8,fontSize:12}}>{r.name}</span>)}<div style={{marginTop:8}}><Btn sz="sm" v="ghost" onClick={()=>setModal({type:"addRoom",pre:ut.id})}><I n="plus" s={12}/> Zimmer</Btn></div></div>}</div>})}</div>}
+{tab==="rooms"&&<div><Btn sz="sm" onClick={()=>setModal({type:"addRoom"})} style={{marginBottom:16}}><I n="plus" s={14}/> Zimmer</Btn><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#F9FAFB"}}>{["Nr.","Einheit","Etage","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead><tbody>{rms.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(r=>{const ut=gUT(r,uts);return<tr key={r.id} style={{opacity:r.active?1:.5}}><td style={{padding:"10px 12px",fontWeight:700,borderBottom:"1px solid #F3F4F6"}}>{r.name}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><CD color={ut?.color}/> {ut?.name}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}>{r.floor}.OG</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6",color:r.active?"#059669":"#9CA3AF"}}>{r.active?"Aktiv":"Inaktiv"}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><button onClick={()=>setModal({type:"editRoom",room:r})} style={{background:"none",border:"none",cursor:"pointer",marginRight:4}}><I n="edit" s={15} c="#6B7280"/></button><button onClick={()=>delRoom(r.id)} style={{background:"none",border:"none",cursor:"pointer"}}><I n="trash" s={15} c="#EF4444"/></button></td></tr>})}</tbody></table></div></div>}
+{tab==="hotel"&&<div style={{background:"#fff",borderRadius:12,padding:20,border:"1px solid #E5E7EB",maxWidth:500}}><Inp label="Hotelname" value={hf.name||""} onChange={e=>setHf(p=>({...p,name:e.target.value}))}/><Inp label="Adresse" value={hf.address||""} onChange={e=>setHf(p=>({...p,address:e.target.value}))}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Telefon" value={hf.phone||""} onChange={e=>setHf(p=>({...p,phone:e.target.value}))}/><Inp label="E-Mail" value={hf.email||""} onChange={e=>setHf(p=>({...p,email:e.target.value}))}/></div><Btn disabled={sv} onClick={async()=>{setSv(true);try{await api.patch("hotel_info",hi.id,hf);setHi({...hi,...hf});show("Gespeichert")}catch(e){show("Fehler","error")}setSv(false)}}><I n="save" s={14}/> Speichern</Btn></div>}
+{modal?.type==="addUT"&&<UTEditor usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d);setModal(null)}}/>}
+{modal?.type==="editUT"&&<UTEditor ut={modal.ut} usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d,modal.ut.id);setModal(null)}}/>}
+{modal?.type==="addRoom"&&<RoomEditor unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom({...d,unit_type_id:modal.pre||d.unit_type_id});setModal(null)}}/>}
+{modal?.type==="editRoom"&&<RoomEditor room={modal.room} unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom(d,modal.room.id);setModal(null)}}/>}
+</div>};
+
+if(ld)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><I n="clock" s={32} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/></div>;
+const nav=[{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preise",l:"Preise",ic:"credit"},{id:"guests",l:"Gaeste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
+return<div style={{minHeight:"100vh"}}>
+<div style={{background:"#fff",borderBottom:"1px solid #E5E7EB",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+<div style={{display:"flex",alignItems:"center",gap:12}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center"}}><I n="home" s={20} c="#fff"/></div><div><div style={{fontWeight:800,fontSize:16}}>{hi?.name||"Hotel"}</div><div style={{fontSize:11,color:"#9CA3AF"}}>{aRms.length} Zimmer</div></div></div>
+<div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>{nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:8,border:"none",background:view===n.id?"#EFF6FF":"transparent",color:view===n.id?"#2563EB":"#6B7280",fontWeight:view===n.id?700:500,fontSize:13,cursor:"pointer"}}><I n={n.ic} s={18}/> {n.l}</button>)}<button onClick={load} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}}><I n="refresh" s={16}/></button><button onClick={onLogout} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}}><I n="logout" s={16}/></button></div>
+</div>
+<div style={{padding:20,maxWidth:1400,margin:"0 auto"}}>
+{view==="plan"&&<PlanView/>}
+{view==="preise"&&<PreiseView/>}
+{view==="guests"&&<GuestsView/>}
+{view==="settings"&&<SettingsView/>}
+</div>
+{toast&&<div style={{position:"fixed",bottom:24,right:24,background:toast.t==="success"?"#10B981":"#EF4444",color:"#fff",padding:"12px 20px",borderRadius:12,fontWeight:600,fontSize:14,boxShadow:"0 10px 25px rgba(0,0,0,.15)",zIndex:2000,animation:"slideIn .3s ease"}}>{toast.m}</div>}
+</div>}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
