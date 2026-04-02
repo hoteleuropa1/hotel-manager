@@ -1,497 +1,561 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>HotelManager</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Zimmer buchen - Hotel Europa</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F3F4F6;color:#111827}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
-input,select,textarea{font-family:inherit}
-table{border-spacing:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F3EF;color:#2C2C2C}
+.wrap{max-width:900px;margin:0 auto;padding:20px}
+h1{font-size:26px;font-weight:800;color:#58585A;margin-bottom:4px}
+h2{font-size:20px;font-weight:700;color:#58585A;margin-bottom:16px}
+.sub{font-size:14px;color:#7A7A7A;margin-bottom:24px}
+.steps{display:flex;gap:8px;margin-bottom:28px}
+.step{flex:1;padding:10px;border-radius:10px;text-align:center;font-size:13px;font-weight:600;background:#DDD9D2;color:#7A7A7A;transition:all .2s}
+.step.active{background:#58585A;color:#fff}
+.step.done{background:#8B7D6B;color:#fff}
+.card{background:#fff;border-radius:14px;border:1px solid #DDD9D2;overflow:hidden;margin-bottom:16px;transition:all .15s}
+.card:hover{border-color:#8B7D6B;box-shadow:0 4px 12px rgba(139,125,107,.15)}
+.card.selected{border:2px solid #8B7D6B;box-shadow:0 4px 16px rgba(139,125,107,.2)}
+.card-body{padding:20px}
+.cat-name{font-size:18px;font-weight:700;color:#2C2C2C;margin-bottom:4px}
+.cat-info{font-size:13px;color:#7A7A7A;margin-bottom:8px}
+.cat-price{font-size:22px;font-weight:800;color:#58585A}
+.cat-price span{font-size:14px;font-weight:500;color:#7A7A7A}
+.cat-img{width:100%;height:180px;object-fit:cover;background:#DDD9D2;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-size:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+label{display:block;font-size:12px;font-weight:600;color:#58585A;margin-bottom:4px}
+input,select{width:100%;padding:10px 14px;border:1px solid #CBC6BE;border-radius:10px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box;background:#fff}
+input:focus,select:focus{border-color:#8B7D6B;box-shadow:0 0 0 3px rgba(139,125,107,.15)}
+.field{margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;transition:all .15s;width:100%}
+.btn-primary{background:#8B7D6B;color:#fff}.btn-primary:hover{background:#74685A}
+.btn-ghost{background:#fff;color:#7A7A7A;border:1px solid #CBC6BE}.btn-ghost:hover{background:#F5F3EF}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.price-box{background:#EDEAE4;border-radius:12px;padding:20px;margin:16px 0}
+.price-total{font-size:28px;font-weight:800;color:#58585A}
+.price-detail{font-size:13px;color:#7A7A7A}
+.price-line{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:14px}
+.price-line.total{border-top:2px solid #CBC6BE;margin-top:8px;padding-top:10px}
+.avail{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.avail.yes{background:#D1FAE5;color:#059669}
+.avail.no{background:#FEE2E2;color:#DC2626}
+.success-box{text-align:center;padding:60px 20px}
+.success-icon{width:80px;height:80px;border-radius:40px;background:#8B7D6B;display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:40px;color:#fff}
+.footer{background:#ABA596;border-radius:12px;padding:20px;color:#fff;font-size:13px;margin-top:24px}
+.footer a{color:#fff}
+.not-avail{opacity:.5;pointer-events:none}
+.qty{display:inline-flex;align-items:center;gap:0;border:1px solid #CBC6BE;border-radius:10px;overflow:hidden}
+.qty button{width:38px;height:38px;border:none;background:#EDEAE4;font-size:20px;font-weight:700;cursor:pointer;color:#58585A;display:flex;align-items:center;justify-content:center}
+.qty button:hover{background:#DDD9D2}
+.qty button:disabled{opacity:.3;cursor:not-allowed}
+.qty .count{width:40px;text-align:center;font-size:16px;font-weight:700;background:#fff;height:38px;line-height:38px}
+.cap-bar{background:#EDEAE4;border-radius:10px;padding:14px 18px;margin:16px 0;font-size:14px;color:#58585A}
+.cap-bar.ok{background:#D1FAE5;color:#059669}
+.cap-bar.warn{background:#FEF3C7;color:#92400E}
+.agb-box{background:#fff;border:1px solid #CBC6BE;border-radius:12px;margin:16px 0;padding:18px;font-size:13px;color:#58585A;line-height:1.7}
+.agb-box h3{font-size:14px;font-weight:700;color:#58585A;margin:12px 0 6px}
+.agb-box h3:first-child{margin-top:0}
+.agb-box ul{margin:0 0 8px 18px}
+.agb-box li{margin-bottom:4px}
+.check-row{display:flex;align-items:flex-start;gap:10px;margin:14px 0 4px;padding:12px 16px;background:#EDEAE4;border-radius:10px}
+.check-row input[type=checkbox]{width:18px;height:18px;margin-top:2px;accent-color:#8B7D6B;flex-shrink:0}
+.check-row label{font-size:13px;font-weight:500;color:#58585A;margin-bottom:0;cursor:pointer}
+.breakfast-row{display:flex;align-items:flex-start;gap:10px;margin:10px 0;padding:12px 16px;background:#F5F3EF;border:1px solid #DDD9D2;border-radius:10px}
+.breakfast-row input[type=checkbox]{width:18px;height:18px;margin-top:2px;accent-color:#8B7D6B;flex-shrink:0}
+.breakfast-row label{font-size:14px;font-weight:500;color:#58585A;margin-bottom:0;cursor:pointer}
+.compare{background:#FEF9F0;border:1px solid #E8D5B0;border-radius:10px;padding:10px 14px;margin:10px 0 4px;font-size:13px}
+.compare .old{text-decoration:line-through;color:#DC2626;font-weight:600}
+.compare .new{color:#059669;font-weight:800;font-size:15px}
+.compare .save{background:#D1FAE5;color:#059669;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px}
+.loading-comp{font-size:12px;color:#7A7A7A;font-style:italic;margin-top:6px}
+@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}.wrap{padding:12px}}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const{useState,useMemo,useEffect,useCallback,useRef}=React;
-const P=({d,s=18,c="currentColor",st={}})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,...st}}>{Array.isArray(d)?d.map((p,i)=><path key={i} d={p}/>):<path d={d}/>}</svg>;
-const IC={home:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",logout:"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",plus:"M12 5v14 M5 12h14",x:"M18 6L6 18 M6 6l12 12",check:"M20 6L9 17l-5-5",edit:"M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",trash:"M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",save:"M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8",cal:"M16 2v4 M8 2v4 M3 10h18 M21 8v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",user:"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",mail:"M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6",phone:"M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72",send:"M22 2L11 13 M22 2l-7 20-4-9-9-4 20-7z",bed:"M2 4v16 M2 8h18a2 2 0 0 1 2 2v10 M2 17h20 M6 8v3",users:"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75",settings:"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",chart:"M18 20V10 M12 20V4 M6 20v-6",layers:"M12 2L2 7l10 5 10-5-10-5z M2 17l10 5 10-5 M2 12l10 5 10-5",credit:"M21 4H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z M1 10h22",building:"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2 M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2",refresh:"M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0 0 20.49 15",cL:"M15 18l-6-6 6-6",cR:"M9 18l6-6-6-6",cD:"M6 9l6 6 6-6",cU:"M18 15l-6-6-6 6",xc:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M15 9l-6 6 M9 9l6 6",eye:"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",dollar:"M12 1v22 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",file:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6",search:"M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.35-4.35",pkg:"M16.5 9.4l-9-5.19 M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01l8.73-5.05 M12 22.08V12",clock:"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 6v6l4 2"};
-const I=({n,s,c,st})=><P d={IC[n]||""} s={s} c={c} st={st}/>;
-const TCOLORS=["#6366F1","#3B82F6","#8B5CF6","#EC4899","#F59E0B","#10B981","#EF4444","#06B6D4","#84CC16","#F97316"];
-const SC={angebot:{bg:"#FEF3C7",bd:"#F59E0B",tx:"#92400E",l:"Angebot"},reservierung:{bg:"#DBEAFE",bd:"#3B82F6",tx:"#1E40AF",l:"Reservierung"},checkedin:{bg:"#D1FAE5",bd:"#10B981",tx:"#065F46",l:"Eingecheckt"},checkedout:{bg:"#E5E7EB",bd:"#6B7280",tx:"#374151",l:"Ausgecheckt"},abgelehnt:{bg:"#FEE2E2",bd:"#EF4444",tx:"#991B1B",l:"Abgelehnt"},storniert:{bg:"#FEE2E2",bd:"#EF4444",tx:"#991B1B",l:"Storniert"}};
-const SOURCES={telefon:"Telefon",laufgast:"Laufgast",booking:"Booking.com",hrs:"HRS",expedia:"Expedia",email:"E-Mail",website:"Website",sonstige:"Sonstige"};
-const PMETHODS={bar:"Bar",ec:"EC-Karte",mastercard:"Mastercard",visa:"Visa",amex:"American Express",rechnung:"Auf Rechnung",ueberweisung:"Ueberweisung",paypal:"PayPal",booking_online:"Booking Online Zahlung"};
-const SALUTATIONS=["","Herr","Frau","Firma"];
-const fd=d=>{const t=new Date(d);return t.getDate().toString().padStart(2,"0")+"."+(t.getMonth()+1).toString().padStart(2,"0")+"."+t.getFullYear()};
-const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
-const toDS=d=>{const t=new Date(d);return t.getFullYear()+"-"+(t.getMonth()+1).toString().padStart(2,"0")+"-"+t.getDate().toString().padStart(2,"0")};
-const dBet=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
-const gP=(r,uts)=>r.price_override!=null?r.price_override:(uts.find(u=>u.id===r.unit_type_id)||{}).base_price||0;
-const gUT=(r,uts)=>uts.find(u=>u.id===r.unit_type_id);
-const fmt=n=>parseFloat(n||0).toFixed(2);
-const MONATE=["Jan","Feb","Marz","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-const WTAG=["So","Mo","Di","Mi","Do","Fr","Sa"];
+<div class="wrap" id="app">Laden...</div>
+<script>
+var SB_URL="https://ztdtkncoyrkvdpytwuhy.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0ZHRrbmNveXJrdmRweXR3dWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDk4OTYsImV4cCI6MjA5MDA4NTg5Nn0.dS6lxpphLtzoKvYNkc5I_otoGSHu99o42gT9q0By61o";
 
-function useAPI(url,key,token){
-const h=useCallback(()=>{const hd={"Content-Type":"application/json",Prefer:"return=representation"};hd.apikey=key;hd.Authorization="Bearer "+(token||key);return hd},[key,token]);
-return useMemo(()=>({
-get:async(t,q="")=>{const r=await fetch(url+"/rest/v1/"+t+"?"+q,{headers:h()});if(!r.ok)throw new Error(r.status);return r.json()},
-post:async(t,d)=>{const r=await fetch(url+"/rest/v1/"+t,{method:"POST",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}return r.json()},
-patch:async(t,id,d)=>{const q=String(id).includes("=")?id:"id=eq."+id;const r=await fetch(url+"/rest/v1/"+t+"?"+q,{method:"PATCH",headers:h(),body:JSON.stringify(d)});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}return r.json()},
-del:async(t,id)=>{const q=String(id).includes("=")?id:"id=eq."+id;const r=await fetch(url+"/rest/v1/"+t+"?"+q,{method:"DELETE",headers:h()});if(!r.ok){const b=await r.text();throw new Error(r.status+" "+b.slice(0,300))}}
-}),[url,h])}
+var HN="Hotel Europa";
+var HA="Marktplatz 1, 65428 Ruesselsheim";
+var HP="015903081422";
+var HE="info@hotel-europa-ruesselsheim.de";
+var HW="www.hotel-europa-ruesselsheim.de";
+var LOGO="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";
+var BF_PRICE=14;
 
-const Badge=({s})=>{const c=SC[s];return c?<span style={{background:c.bg,color:c.tx,border:"1px solid "+c.bd,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{c.l}</span>:null};
-const Btn=({children,onClick,v="primary",sz="md",disabled:di,style:st={}})=>{const vs={primary:{background:"#3B82F6",color:"#fff"},success:{background:"#10B981",color:"#fff"},danger:{background:"#EF4444",color:"#fff"},warning:{background:"#F59E0B",color:"#fff"},ghost:{background:"transparent",color:"#6B7280",border:"1px solid #E5E7EB"}};const ss={sm:{padding:"5px 10px",fontSize:12},md:{padding:"8px 16px",fontSize:13}};return<button onClick={onClick} disabled={di} style={{border:"none",borderRadius:8,cursor:di?"not-allowed":"pointer",display:"inline-flex",alignItems:"center",gap:6,fontWeight:600,opacity:di?.5:1,...ss[sz],...vs[v],...st}}>{children}</button>};
-const Inp=({label:lb,textarea:ta,...p})=><div style={{marginBottom:12}}>{lb&&<label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{lb}</label>}{ta?<textarea {...p} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box",minHeight:60,resize:"vertical",...p.style}}/>:<input {...p} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box",...p.style}}/>}</div>;
-const Sel=({label:lb,children,...p})=><div style={{marginBottom:12}}>{lb&&<label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{lb}</label>}<select {...p} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,outline:"none",boxSizing:"border-box",background:"#fff"}}>{children}</select></div>;
-const Modal=({title,onClose,children,width:w=600})=><div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={onClose}><div style={{background:"#fff",borderRadius:16,width:w,maxWidth:"95vw",maxHeight:"92vh",overflow:"auto",boxShadow:"0 25px 50px rgba(0,0,0,.25)"}} onClick={e=>e.stopPropagation()}><div style={{padding:"16px 20px",borderBottom:"1px solid #E5E7EB",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#fff",zIndex:1,borderRadius:"16px 16px 0 0"}}><h3 style={{margin:0,fontSize:16,fontWeight:700}}>{title}</h3><button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><I n="x" s={18} c="#9CA3AF"/></button></div><div style={{padding:20}}>{children}</div></div></div>;
-const CD=({color:c,size:s=12})=><span style={{width:s,height:s,borderRadius:s,background:c,display:"inline-block",flexShrink:0}}/>;
-const Tab=({tabs,active,onChange})=><div style={{display:"flex",gap:2,marginBottom:20,borderBottom:"2px solid #E5E7EB"}}>{tabs.map(t=><button key={t.id} onClick={()=>onChange(t.id)} style={{padding:"10px 16px",fontSize:13,fontWeight:active===t.id?700:500,color:active===t.id?"#2563EB":"#6B7280",background:"none",border:"none",borderBottom:active===t.id?"2px solid #2563EB":"2px solid transparent",cursor:"pointer",marginBottom:-2,display:"flex",alignItems:"center",gap:6}}>{t.icon}{t.label}</button>)}</div>;
-const Card=({title,children,style:st={}})=><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"hidden",...st}}>{title&&<div style={{padding:"12px 16px",borderBottom:"1px solid #E5E7EB",fontWeight:700,fontSize:14}}>{title}</div>}<div style={{padding:16}}>{children}</div></div>;
+var state={step:1,cats:[],rooms:[],reservations:[],dailyPrices:{},selections:{},checkIn:"",checkOut:"",adults:1,children:0,breakfast:false,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",agbAccepted:false,loading:true,saving:false,error:"",resNumber:"",resNumbers:[],compPrices:[],compLoading:false};
 
-const COUNTRIES=[["AF","Afghanistan"],["EG","Aegypten"],["AL","Albanien"],["DZ","Algerien"],["AD","Andorra"],["AO","Angola"],["AR","Argentinien"],["AM","Armenien"],["AZ","Aserbaidschan"],["ET","Aethiopien"],["AU","Australien"],["BS","Bahamas"],["BH","Bahrain"],["BD","Bangladesch"],["BB","Barbados"],["BY","Belarus"],["BE","Belgien"],["BZ","Belize"],["BJ","Benin"],["BT","Bhutan"],["BO","Bolivien"],["BA","Bosnien-Herzegowina"],["BW","Botswana"],["BR","Brasilien"],["BN","Brunei"],["BG","Bulgarien"],["BF","Burkina Faso"],["BI","Burundi"],["CL","Chile"],["CN","China"],["CR","Costa Rica"],["DK","Daenemark"],["DE","Deutschland"],["DM","Dominica"],["DO","Dominikanische Republik"],["DJ","Dschibuti"],["EC","Ecuador"],["SV","El Salvador"],["CI","Elfenbeinkueste"],["ER","Eritrea"],["EE","Estland"],["SZ","Eswatini"],["FJ","Fidschi"],["FI","Finnland"],["FR","Frankreich"],["GA","Gabun"],["GM","Gambia"],["GE","Georgien"],["GH","Ghana"],["GD","Grenada"],["GR","Griechenland"],["GB","Grossbritannien"],["GT","Guatemala"],["GN","Guinea"],["GY","Guyana"],["HT","Haiti"],["HN","Honduras"],["IN","Indien"],["ID","Indonesien"],["IQ","Irak"],["IR","Iran"],["IE","Irland"],["IS","Island"],["IL","Israel"],["IT","Italien"],["JM","Jamaika"],["JP","Japan"],["YE","Jemen"],["JO","Jordanien"],["KH","Kambodscha"],["CM","Kamerun"],["CA","Kanada"],["QA","Katar"],["KZ","Kasachstan"],["KE","Kenia"],["KG","Kirgisistan"],["CO","Kolumbien"],["KM","Komoren"],["HR","Kroatien"],["CU","Kuba"],["KW","Kuwait"],["LA","Laos"],["LS","Lesotho"],["LV","Lettland"],["LB","Libanon"],["LR","Liberia"],["LY","Libyen"],["LI","Liechtenstein"],["LT","Litauen"],["LU","Luxemburg"],["MG","Madagaskar"],["MW","Malawi"],["MY","Malaysia"],["MV","Malediven"],["ML","Mali"],["MT","Malta"],["MA","Marokko"],["MR","Mauretanien"],["MU","Mauritius"],["MX","Mexiko"],["MD","Moldawien"],["MC","Monaco"],["MN","Mongolei"],["ME","Montenegro"],["MZ","Mosambik"],["MM","Myanmar"],["NA","Namibia"],["NP","Nepal"],["NZ","Neuseeland"],["NI","Nicaragua"],["NL","Niederlande"],["NE","Niger"],["NG","Nigeria"],["MK","Nordmazedonien"],["NO","Norwegen"],["OM","Oman"],["AT","Oesterreich"],["PK","Pakistan"],["PA","Panama"],["PG","Papua-Neuguinea"],["PY","Paraguay"],["PE","Peru"],["PH","Philippinen"],["PL","Polen"],["PT","Portugal"],["RW","Ruanda"],["RO","Rumaenien"],["RU","Russland"],["SA","Saudi-Arabien"],["SE","Schweden"],["CH","Schweiz"],["SN","Senegal"],["RS","Serbien"],["SL","Sierra Leone"],["ZW","Simbabwe"],["SG","Singapur"],["SK","Slowakei"],["SI","Slowenien"],["SO","Somalia"],["ES","Spanien"],["LK","Sri Lanka"],["ZA","Suedafrika"],["KR","Suedkorea"],["SD","Sudan"],["SR","Suriname"],["SY","Syrien"],["TJ","Tadschikistan"],["TW","Taiwan"],["TZ","Tansania"],["TH","Thailand"],["TG","Togo"],["TT","Trinidad und Tobago"],["TD","Tschad"],["CZ","Tschechien"],["TN","Tunesien"],["TR","Tuerkei"],["TM","Turkmenistan"],["UG","Uganda"],["UA","Ukraine"],["HU","Ungarn"],["UY","Uruguay"],["UZ","Usbekistan"],["VE","Venezuela"],["AE","Ver. Arabische Emirate"],["US","USA"],["VN","Vietnam"],["ZM","Sambia"]];
-const CountrySel=({value,onChange,label})=>{const[open,setOpen]=useState(false);const[q,setQ]=useState("");const ref=useRef(null);
-const display=COUNTRIES.find(c=>c[0]===value);
-const filtered=q?COUNTRIES.filter(c=>c[1].toLowerCase().indexOf(q.toLowerCase())>=0||c[0].toLowerCase().indexOf(q.toLowerCase())>=0):COUNTRIES;
-useEffect(()=>{const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false)};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h)},[]);
-return<div style={{marginBottom:12}} ref={ref}>{label&&<label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>{label}</label>}<div style={{position:"relative"}}><div onClick={()=>{setOpen(!open);setQ("")}} style={{width:"100%",padding:"8px 12px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:14,cursor:"pointer",background:"#fff",boxSizing:"border-box",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>{display?display[0]+" "+display[1]:(value||"Waehlen...")}</span><I n="cD" s={14} c="#9CA3AF"/></div>
-{open&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid #D1D5DB",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,.15)",zIndex:50,maxHeight:250,overflow:"auto"}}><div style={{position:"sticky",top:0,background:"#fff",padding:6,borderBottom:"1px solid #E5E7EB"}}><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Land suchen..." autoFocus style={{width:"100%",padding:"6px 10px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,outline:"none",boxSizing:"border-box"}}/></div>{filtered.map(c=><div key={c[0]} onClick={()=>{onChange(c[0]);setOpen(false);setQ("")}} style={{padding:"8px 12px",cursor:"pointer",fontSize:13,background:c[0]===value?"#EFF6FF":"#fff",fontWeight:c[0]===value?700:400}} onMouseOver={e=>e.currentTarget.style.background="#F0F9FF"} onMouseOut={e=>e.currentTarget.style.background=c[0]===value?"#EFF6FF":"#fff"}><span style={{fontWeight:700,marginRight:6}}>{c[0]}</span>{c[1]}</div>)}{filtered.length===0&&<div style={{padding:12,color:"#9CA3AF",fontSize:12}}>Kein Land gefunden</div>}</div>}
-</div></div>};
+function sb(path,method,body){
+  var opts={method:method||"GET",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}};
+  if(method==="POST"||method==="PATCH")opts.headers["Prefer"]="return=representation";
+  if(body)opts.body=JSON.stringify(body);
+  return fetch(SB_URL+"/rest/v1/"+path,opts).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()});
+}
 
-const AuthScreen=({sb,onAuth})=>{const[em,setEm]=useState("");const[pw,setPw]=useState("");const[err,setErr]=useState("");const[ld,setLd]=useState(false);const go=async()=>{if(!em||!pw){setErr("Bitte ausfuellen");return}setLd(true);setErr("");try{const r=await fetch(sb.url+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json",apikey:sb.key},body:JSON.stringify({email:em,password:pw})});const d=await r.json();if(d.error)throw new Error(d.error_description||d.error);onAuth(d.access_token,d.user)}catch(e){setErr(e.message)}setLd(false)};return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"#fff",borderRadius:20,padding:40,maxWidth:400,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,.1)"}}><div style={{textAlign:"center",marginBottom:32}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:16,width:56,height:56,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:16}}><I n="home" s={28} c="#fff"/></div><h1 style={{fontSize:22,fontWeight:800,marginBottom:4}}>HotelManager</h1></div><Inp label="E-Mail" value={em} onChange={e=>setEm(e.target.value)} type="email"/><div style={{marginBottom:20}}><label style={{display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4}}>Passwort</label><input value={pw} onChange={e=>setPw(e.target.value)} type="password" style={{width:"100%",padding:"10px 14px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}} onKeyDown={e=>e.key==="Enter"&&go()}/></div>{err&&<div style={{background:"#FEE2E2",color:"#DC2626",padding:"10px 14px",borderRadius:10,fontSize:13,marginBottom:16}}>{err}</div>}<button onClick={go} disabled={ld} style={{width:"100%",padding:12,background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:700,cursor:"pointer"}}>{ld?"...":"Anmelden"}</button></div></div>};
+function fd(d){var t=new Date(d);return t.getDate().toString().padStart(2,"0")+"."+(t.getMonth()+1).toString().padStart(2,"0")+"."+t.getFullYear()}
+function nights(){if(!state.checkIn||!state.checkOut)return 0;return Math.max(0,Math.round((new Date(state.checkOut)-new Date(state.checkIn))/864e5))}
+function esc(s){return(s||"").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
+function totalGuests(){return state.adults+state.children}
 
-const NewResForm=({room,ut,unitTypes,api,guests:allGuests,onClose,onRefresh,showToast})=>{const price=gP(room,unitTypes);const[fm,setFm]=useState({salutation:"Herr",first_name:"",last_name:"",company:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",check_in:toDS(new Date()),check_out:toDS(addD(new Date(),1)),adults:1,children:0,notes:"",source:"telefon"});const[existingGuestId,setExistingGuestId]=useState(null);const[guestSearch,setGuestSearch]=useState("");const[showGuestList,setShowGuestList]=useState(false);const nights=Math.max(1,dBet(fm.check_in,fm.check_out));const total=nights*price;const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);const isFirma=fm.salutation==="Firma";
-const filteredGuests=allGuests?allGuests.filter(g=>{const s=guestSearch.toLowerCase();return s.length>=2&&((g.first_name||"").toLowerCase().includes(s)||(g.last_name||"").toLowerCase().includes(s)||(g.email||"").toLowerCase().includes(s)||(g.company||"").toLowerCase().includes(s))}).slice(0,8):[];
-const selectGuest=(g)=>{setExistingGuestId(g.id);setFm(p=>({...p,salutation:g.salutation||"Herr",first_name:g.first_name||"",last_name:g.last_name||"",company:g.company||"",email:g.email||"",phone:g.phone||"",address:g.address||"",zip:g.zip||"",city:g.city||"",country:g.country||"DE"}));setGuestSearch("");setShowGuestList(false)};
-const clearGuest=()=>{setExistingGuestId(null);setFm(p=>({...p,salutation:"Herr",first_name:"",last_name:"",company:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE"}))};
-const save=async()=>{if(!fm.first_name||!fm.last_name)return;setSv(true);try{let gid=existingGuestId;if(!gid){const gd={salutation:fm.salutation,first_name:fm.first_name,last_name:fm.last_name,email:fm.email||"",phone:fm.phone||"",address:fm.address||"",zip:fm.zip||"",city:fm.city||"",country:fm.country||"DE"};if(isFirma)gd.company=fm.company||"";const[g]=await api.post("guests",gd);gid=g.id}const otoken="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==="x"?r:(r&0x3|0x8)).toString(16)});await api.post("reservations",{room_id:room.id,guest_id:gid,check_in:fm.check_in,check_out:fm.check_out,status:"angebot",adults:fm.adults,children:fm.children,total_price:total,notes:fm.notes||"",source:fm.source,offer_token:otoken});await onRefresh();showToast("Angebot erstellt");onClose()}catch(e){showToast(e.message,"error")}setSv(false)};
-return<Modal title={"Neu - "+(ut?.name||"")+" "+room.name} onClose={onClose} width={560}>
-<div style={{background:existingGuestId?"#D1FAE5":"#F0F9FF",borderRadius:10,padding:12,marginBottom:16}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-<span style={{fontSize:13,fontWeight:700,color:existingGuestId?"#065F46":"#1E40AF"}}>{existingGuestId?"Bestehender Gast ausgewaehlt":"Gast suchen oder neu anlegen"}</span>
-{existingGuestId&&<button onClick={clearGuest} style={{background:"none",border:"none",cursor:"pointer",color:"#DC2626",fontSize:12,fontWeight:600}}>Zuruecksetzen</button>}
-</div>
-{!existingGuestId&&<div style={{position:"relative"}}><input value={guestSearch} onChange={e=>{setGuestSearch(e.target.value);setShowGuestList(e.target.value.length>=2)}} placeholder="Name, E-Mail oder Firma eingeben..." style={{width:"100%",padding:"8px 12px 8px 32px",border:"1px solid #D1D5DB",borderRadius:8,fontSize:13,outline:"none",boxSizing:"border-box"}}/><I n="search" s={14} c="#9CA3AF" st={{position:"absolute",left:10,top:10}}/>
-{showGuestList&&filteredGuests.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid #D1D5DB",borderRadius:8,boxShadow:"0 8px 24px rgba(0,0,0,.12)",zIndex:50,maxHeight:240,overflow:"auto"}}>{filteredGuests.map(g=><div key={g.id} onClick={()=>selectGuest(g)} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #F3F4F6",fontSize:13}} onMouseOver={e=>e.currentTarget.style.background="#F0F9FF"} onMouseOut={e=>e.currentTarget.style.background="#fff"}><div style={{fontWeight:600}}>{g.salutation?g.salutation+" ":""}{g.first_name} {g.last_name}{g.company?" ("+g.company+")":""}</div><div style={{fontSize:11,color:"#6B7280"}}>{g.email||""}{g.phone?" | "+g.phone:""}{g.city?" | "+g.city:""}</div></div>)}</div>}
-{showGuestList&&filteredGuests.length===0&&guestSearch.length>=2&&<div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid #D1D5DB",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#9CA3AF"}}>Kein Gast gefunden</div>}
-</div>}
-{existingGuestId&&<div style={{fontSize:12,color:"#065F46"}}>{fm.salutation} {fm.first_name} {fm.last_name} | {fm.email||"keine E-Mail"}</div>}
-</div>
-<div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}><Sel label="Anrede *" value={fm.salutation} onChange={e=>u("salutation",e.target.value)}><option value="Herr">Herr</option><option value="Frau">Frau</option><option value="Firma">Firma</option></Sel><Inp label="Vorname *" value={fm.first_name} onChange={e=>{u("first_name",e.target.value);if(existingGuestId)setExistingGuestId(null)}}/><Inp label="Nachname *" value={fm.last_name} onChange={e=>{u("last_name",e.target.value);if(existingGuestId)setExistingGuestId(null)}}/></div>
-{isFirma&&<Inp label="Firmenname *" value={fm.company} onChange={e=>u("company",e.target.value)}/>}
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="E-Mail" type="email" value={fm.email} onChange={e=>u("email",e.target.value)}/><Inp label="Telefon" value={fm.phone} onChange={e=>u("phone",e.target.value)}/></div>
-<Inp label="Strasse und Hausnummer" value={fm.address} onChange={e=>u("address",e.target.value)}/>
-<div style={{display:"grid",gridTemplateColumns:"120px 1fr 120px",gap:12}}><Inp label="PLZ" value={fm.zip} onChange={e=>u("zip",e.target.value)}/><Inp label="Ort" value={fm.city} onChange={e=>u("city",e.target.value)}/><CountrySel label="Land" value={fm.country} onChange={v=>u("country",v)}/></div>
-<div style={{borderTop:"1px solid #E5E7EB",margin:"8px 0",paddingTop:12}}/>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Anreise" type="date" value={fm.check_in} onChange={e=>u("check_in",e.target.value)}/><Inp label="Abreise" type="date" value={fm.check_out} onChange={e=>u("check_out",e.target.value)}/></div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}><Inp label="Erwachsene" type="number" min={1} value={fm.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/><Inp label="Kinder" type="number" min={0} value={fm.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/><Sel label="Quelle" value={fm.source} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel></div>
-<Inp label="Anmerkungen" value={fm.notes} onChange={e=>u("notes",e.target.value)} textarea/>
-<div style={{background:"#F0F9FF",borderRadius:8,padding:12,margin:"4px 0 16px",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:13,color:"#1E40AF"}}>{nights} N. x {fmt(price)} EUR</span><span style={{fontSize:18,fontWeight:700,color:"#1E40AF"}}>{fmt(total)} EUR</span></div>
-<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.first_name||!fm.last_name||(isFirma&&!fm.company)||sv} onClick={save}>{sv?"...":"Angebot erstellen"}</Btn></div>
-</Modal>};
+function getPriceForDate(catId,dateStr){
+  var key=catId+"_"+dateStr;
+  if(state.dailyPrices[key])return state.dailyPrices[key];
+  var cat=state.cats.find(function(c){return c.id===catId});
+  return cat?cat.base_price:0;
+}
 
-const ResDetailModal=({res,room,ut,guest,api,allProducts,unitTypes,rooms,hotelInfo:hi,onClose,onRefresh,showToast})=>{const[tab,setTab]=useState("res");const[gf,setGf]=useState(guest||{});const[rf,setRf]=useState(res);const[items,setItems]=useState([]);const[payments,setPayments]=useState([]);const[saving,setSaving]=useState(false);const[addProduct,setAddProduct]=useState(false);const[addPayment,setAddPayment]=useState(false);const loadItems=useCallback(async()=>{try{const[it,py]=await Promise.all([api.get("reservation_items","reservation_id=eq."+res.id+"&order=created_at"),api.get("payments","reservation_id=eq."+res.id+"&order=created_at.desc")]);setItems(it);setPayments(py)}catch(e){showToast(e.message,"error")}},[res.id]);useEffect(()=>{loadItems()},[]);const nights=dBet(rf.check_in,rf.check_out);const roomPrice=gP(room,unitTypes);const roomTotal=nights*roomPrice;const itemsTotal=items.filter(i=>i.item_type==="product").reduce((s,i)=>s+parseFloat(i.total_price||0),0);const grandTotal=roomTotal+itemsTotal;const totalPaid=payments.filter(p=>p.status==="eingegangen").reduce((s,p)=>s+parseFloat(p.amount||0),0);const balance=grandTotal-totalPaid;const u=(k,v)=>setRf(p=>({...p,[k]:v}));const ug=(k,v)=>setGf(p=>({...p,[k]:v}));
-const saveRes=async()=>{setSaving(true);try{await api.patch("reservations",res.id,{status:rf.status,source:rf.source,check_in:rf.check_in,check_out:rf.check_out,adults:rf.adults,children:rf.children,notes:rf.notes,internal_notes:rf.internal_notes,total_price:grandTotal});await onRefresh();showToast("Gespeichert")}catch(e){showToast(e.message,"error")}setSaving(false)};
-const saveGuest=async()=>{setSaving(true);try{await api.patch("guests",guest.id,gf);showToast("Gast gespeichert")}catch(e){showToast(e.message,"error")}setSaving(false)};
-const updateStatus=async(s)=>{try{const x={status:s};if(s==="checkedin")x.checked_in_at=new Date().toISOString();if(s==="checkedout")x.checked_out_at=new Date().toISOString();await api.patch("reservations",res.id,x);setRf(p=>({...p,status:s}));await onRefresh();showToast("Status: "+(SC[s]||{}).l)}catch(e){showToast(e.message,"error")}};
-const LOGO="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg";const HN="Hotel Europa";const HA="Marktplatz 1";const HC="65428 Ruesselsheim";const HP="015903081422";const HE="info@hotel-europa-ruesselsheim.de";const HW="www.hotel-europa-ruesselsheim.de";
-const emailFooter='<table style="background-color:#ABA596;font-family:arial,sans-serif;font-size:13px;color:#ffffff;padding:10px;" width="575"><tr><td><b>'+HN+'</b><br>'+HA+'<br>'+HC+'<br>Tel.: '+HP+'<br>E-Mail: <a style="color:#ffffff;text-decoration:none;" href="mailto:'+HE+'">'+HE+'</a><br><a href="http://'+HW+'" target="_blank" style="color:#ffffff;text-decoration:none;">'+HW+'</a></td></tr></table>';
-const emailHeader='<table width="575" style="font-family:arial,sans-serif;font-size:14px;"><tr><td><img src="'+LOGO+'" width="575" style="width:100%;max-width:575px;"/></td></tr>';
-const sendEmail=(type)=>{const g=guest||{};const greet=(g.salutation||"Sehr geehrte/r")+" "+(g.last_name||"Gast");let subj="",html="";
-if(type==="angebot"){const baseUrl=window.location.origin;subj="Ihre Anfrage an "+HN;html=emailHeader+'<tr><td><br>'+greet+',<br><br>vielen Dank fuer Ihre Anfrage!<br><br><table width="100%" style="font-family:arial,sans-serif;font-size:14px;border:1px solid #ccc;padding:10px;"><tr><td width="50%">Zimmerkategorie:</td><td>'+(ut?.name||"")+'</td></tr><tr><td>Anreise:</td><td>'+fd(rf.check_in)+'</td></tr><tr><td>Abreise:</td><td>'+fd(rf.check_out)+'</td></tr><tr><td>Naechte:</td><td>'+nights+'</td></tr><tr><td>Erwachsene:</td><td>'+(rf.adults||1)+'</td></tr><tr><td><b>Gesamtpreis:</b></td><td><b>EUR '+fmt(grandTotal)+'</b> inkl. Steuern</td></tr></table><br><div style="text-align:center;margin:24px 0;"><a href="'+baseUrl+'/api/offer-response?token='+res.offer_token+'&action=accept" style="display:inline-block;background:#10B981;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:bold;font-size:16px;margin:8px;">Angebot annehmen</a> <a href="'+baseUrl+'/api/offer-response?token='+res.offer_token+'&action=decline" style="display:inline-block;background:#EF4444;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:bold;font-size:16px;margin:8px;">Ablehnen</a></div><br>Mit herzlichen Gruessen<br><b>'+HN+'</b></td></tr></table>'+emailFooter}
-if(type==="bestaetigung"){subj="Ihre Reservierungsbestaetigung - "+HN;html='<table width="100%" style="width:100%;max-width:650px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0"><tr><td><img src="'+LOGO+'" width="100%" style="width:100%"/></td></tr><tr><td height="20"></td></tr><tr><td><h1 style="font-size:24px;font-weight:bold;color:#58585a;">Ihre Reservierungsbestaetigung</h1></td></tr><tr><td style="border:1px solid #ccc;padding:10px;">'+greet+',<br><br>vielen Dank fuer Ihre Reservierung!<br>Wir freuen uns, Sie willkommen zu heissen.</td></tr><tr><td style="border:1px solid #ccc;padding:10px;background:#e7e7e7;text-align:center;">Gesamtpreis:<br><span style="font-size:24px;font-weight:bold;">EUR '+fmt(grandTotal)+'</span></td></tr><tr><td height="20"></td></tr><tr><td>'+emailFooter+'</td></tr></table>'}
-if(type==="storno"){subj="Stornierungsbestaetigung - "+HN;html=emailHeader+'<tr><td><br>'+greet+',<br><br>wir bestaetigen Ihnen hiermit Ihre Stornierung.<br><br>Reservierung: '+(ut?.name||"")+'<br>Zeitraum: '+fd(rf.check_in)+' - '+fd(rf.check_out)+'<br><br>Mit herzlichen Gruessen<br><b>'+HN+'</b></td></tr></table>'+emailFooter}
-if(!g.email){showToast("Keine E-Mail","error");return}
-fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:g.email,subject:subj,html,emailType:type})}).then(r=>r.json()).then(d=>{if(d.success){showToast(type+" gesendet!");if(type==="angebot")api.patch("reservations",res.id,{offer_sent_at:new Date().toISOString()});if(type==="bestaetigung")api.patch("reservations",res.id,{confirmation_sent_at:new Date().toISOString()})}else showToast("Fehler: "+(d.error||d.details),"error")}).catch(e=>showToast(e.message,"error"))};
-const[showStorno,setShowStorno]=useState(false);
-const doStorno=async(wi)=>{try{await api.patch("reservations",res.id,{status:"storniert",internal_notes:(rf.internal_notes||"")+" | STORNO "+(wi?"MIT RECHNUNG":"KOSTENLOS")+" "+fd(new Date())});if(wi&&guest?.email)sendEmail("storno");setRf(p=>({...p,status:"storniert"}));await onRefresh();showToast(wi?"Storniert mit Rechnung":"Kostenlos storniert");setShowStorno(false)}catch(e){showToast(e.message,"error")}};
-const doDelete=async()=>{try{await api.del("reservation_items","reservation_id=eq."+res.id);await api.del("payments","reservation_id=eq."+res.id)}catch(e){}try{await api.del("reservations",res.id);await onRefresh();showToast("Geloescht");onClose()}catch(e){showToast(e.message,"error")}};
-const addItem=async(prod)=>{try{let qty=1,up=parseFloat(prod.price);if(prod.unit==="pro Nacht")qty=nights;if(prod.unit==="pro Person/Nacht")qty=nights*(rf.adults||1);if(prod.unit==="pro Person")qty=rf.adults||1;await api.post("reservation_items",{reservation_id:res.id,item_type:"product",product_id:prod.id,description:prod.name,quantity:qty,unit_price:up,total_price:qty*up});await loadItems();setAddProduct(false);showToast("Hinzugefuegt")}catch(e){showToast(e.message,"error")}};
-const removeItem=async(id)=>{try{await api.del("reservation_items",id);await loadItems();showToast("Entfernt")}catch(e){showToast(e.message,"error")}};
-const addPay=async(pay)=>{try{await api.post("payments",{reservation_id:res.id,guest_id:guest?.id,...pay});await loadItems();showToast("Zahlung erfasst")}catch(e){showToast(e.message,"error")}};
-const tabs=[{id:"res",label:"Reservierung",icon:<I n="file" s={15}/>},{id:"guest",label:"Gast",icon:<I n="user" s={15}/>},{id:"payment",label:"Zahlung",icon:<I n="credit" s={15}/>},{id:"room",label:"Zimmer",icon:<I n="bed" s={15}/>}];
-return<Modal title={"RES / "+(res.reservation_number||"Neu")} onClose={onClose} width={780}>
-<div style={{display:"flex",gap:12,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}><Badge s={rf.status}/><span style={{fontSize:12,color:"#6B7280"}}>{SOURCES[rf.source]||rf.source}</span><div style={{marginLeft:"auto",display:"flex",gap:6}}>{rf.status==="angebot"&&<Btn v="success" sz="sm" onClick={()=>updateStatus("reservierung")}><I n="check" s={14}/> Reservierung</Btn>}{rf.status==="reservierung"&&<Btn v="success" sz="sm" onClick={()=>updateStatus("checkedin")}><I n="check" s={14}/> Check-in</Btn>}{rf.status==="checkedin"&&<Btn v="warning" sz="sm" onClick={()=>updateStatus("checkedout")}><I n="xc" s={14}/> Check-out</Btn>}<Btn v="danger" sz="sm" onClick={()=>setShowStorno(true)}><I n="trash" s={14}/></Btn></div></div>
-{showStorno&&<Modal title="Stornieren" onClose={()=>setShowStorno(false)} width={440}><div style={{display:"flex",flexDirection:"column",gap:10}}><button onClick={()=>doStorno(false)} style={{padding:"14px 20px",borderRadius:10,border:"2px solid #10B981",background:"#F0FDF4",cursor:"pointer",textAlign:"left"}}><div style={{fontWeight:700,color:"#059669"}}>Kostenlos stornieren</div></button><button onClick={()=>doStorno(true)} style={{padding:"14px 20px",borderRadius:10,border:"2px solid #F59E0B",background:"#FFFBEB",cursor:"pointer",textAlign:"left"}}><div style={{fontWeight:700,color:"#D97706"}}>Mit Rechnung stornieren</div></button><button onClick={()=>{if(confirm("ENDGUELTIG loeschen?"))doDelete()}} style={{padding:"14px 20px",borderRadius:10,border:"2px solid #EF4444",background:"#FEF2F2",cursor:"pointer",textAlign:"left"}}><div style={{fontWeight:700,color:"#DC2626"}}>Endgueltig loeschen</div></button></div></Modal>}
-<div style={{display:"flex",gap:8,marginBottom:16,padding:"12px 16px",background:"#F9FAFB",borderRadius:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:12,fontWeight:600}}>E-Mail:</span><Btn v="primary" sz="sm" onClick={()=>sendEmail("angebot")}>Angebot</Btn><Btn v="success" sz="sm" onClick={()=>sendEmail("bestaetigung")}>Bestaetigung</Btn><Btn v="danger" sz="sm" onClick={()=>sendEmail("storno")}>Storno</Btn></div>
-<Tab tabs={tabs} active={tab} onChange={setTab}/>
-{tab==="res"&&<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}><Sel label="Status" value={rf.status} onChange={e=>u("status",e.target.value)}>{Object.entries(SC).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</Sel><Sel label="Quelle" value={rf.source||""} onChange={e=>u("source",e.target.value)}>{Object.entries(SOURCES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Sel><div/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:20}}><Inp label="Anreise" type="date" value={rf.check_in} onChange={e=>u("check_in",e.target.value)}/><Inp label="Abreise" type="date" value={rf.check_out} onChange={e=>u("check_out",e.target.value)}/><Inp label="Erw." type="number" min={1} value={rf.adults} onChange={e=>u("adults",parseInt(e.target.value)||1)}/><Inp label="Kinder" type="number" min={0} value={rf.children} onChange={e=>u("children",parseInt(e.target.value)||0)}/></div>
-<Card title="Warenkorb" style={{marginBottom:16}}><table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}><tbody><tr style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"10px 12px"}}>1</td><td style={{padding:"10px 12px",fontWeight:600}}>{room.name}, {ut?.name} ({nights} N.)</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>EUR {fmt(roomTotal)}</td><td/></tr>{items.filter(i=>i.item_type==="product").map(it=><tr key={it.id} style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:"10px 12px"}}>{it.quantity}</td><td style={{padding:"10px 12px"}}>{it.description}</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:600}}>EUR {fmt(it.total_price)}</td><td style={{padding:"10px 12px"}}><button onClick={()=>removeItem(it.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></td></tr>)}<tr style={{background:"#F0FDF4"}}><td/><td style={{padding:"10px 12px",fontWeight:700}}>GESAMT</td><td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,fontSize:16,color:"#059669"}}>EUR {fmt(grandTotal)}</td><td/></tr></tbody></table><div style={{marginTop:12}}><Btn v="ghost" sz="sm" onClick={()=>setAddProduct(true)}><I n="plus" s={14}/> Produkt</Btn></div></Card>
-<Inp label="Anmerkungen" value={rf.notes||""} onChange={e=>u("notes",e.target.value)} textarea/><Inp label="Interne Notizen" value={rf.internal_notes||""} onChange={e=>u("internal_notes",e.target.value)} textarea/>
-<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn disabled={saving} onClick={saveRes}><I n="save" s={14}/> Speichern</Btn></div>
-{addProduct&&<Modal title="Produkt" onClose={()=>setAddProduct(false)} width={480}><div style={{display:"flex",flexDirection:"column",gap:8}}>{allProducts.filter(p=>p.active).map(p=><div key={p.id} onClick={()=>addItem(p)} style={{display:"flex",justifyContent:"space-between",padding:"12px 16px",borderRadius:8,border:"1px solid #E5E7EB",cursor:"pointer"}}><div><div style={{fontWeight:600}}>{p.name}</div><div style={{fontSize:12,color:"#6B7280"}}>{p.unit}</div></div><div style={{fontWeight:700,color:"#3B82F6"}}>{fmt(p.price)} EUR</div></div>)}</div></Modal>}</div>}
-{tab==="guest"&&<div><div style={{display:"grid",gridTemplateColumns:"120px 1fr 1fr",gap:12}}><Sel label="Anrede" value={gf.salutation||""} onChange={e=>ug("salutation",e.target.value)}>{SALUTATIONS.map(s=><option key={s} value={s}>{s||"-"}</option>)}</Sel><Inp label="Vorname" value={gf.first_name||""} onChange={e=>ug("first_name",e.target.value)}/><Inp label="Nachname" value={gf.last_name||""} onChange={e=>ug("last_name",e.target.value)}/></div><Inp label="Firma" value={gf.company||""} onChange={e=>ug("company",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="E-Mail" value={gf.email||""} onChange={e=>ug("email",e.target.value)}/><Inp label="Telefon" value={gf.phone||""} onChange={e=>ug("phone",e.target.value)}/></div><Inp label="Adresse" value={gf.address||""} onChange={e=>ug("address",e.target.value)}/><div style={{display:"grid",gridTemplateColumns:"120px 1fr 120px",gap:12}}><Inp label="PLZ" value={gf.zip||""} onChange={e=>ug("zip",e.target.value)}/><Inp label="Ort" value={gf.city||""} onChange={e=>ug("city",e.target.value)}/><CountrySel label="Land" value={gf.country||"DE"} onChange={v=>ug("country",v)}/></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn disabled={saving} onClick={saveGuest}><I n="save" s={14}/> Speichern</Btn></div></div>}
-{tab==="payment"&&<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}><Card><div style={{fontSize:12,color:"#6B7280"}}>Gesamt</div><div style={{fontSize:20,fontWeight:800}}>EUR {fmt(grandTotal)}</div></Card><Card><div style={{fontSize:12,color:"#6B7280"}}>Bezahlt</div><div style={{fontSize:20,fontWeight:800,color:"#059669"}}>EUR {fmt(totalPaid)}</div></Card><Card><div style={{fontSize:12,color:"#6B7280"}}>Offen</div><div style={{fontSize:20,fontWeight:800,color:balance>0?"#DC2626":"#059669"}}>EUR {fmt(balance)}</div></Card></div><Card title="Zahlungen">{payments.length===0?<div style={{color:"#9CA3AF",fontSize:13}}>Keine Zahlungen.</div>:<table style={{width:"100%",fontSize:13,borderCollapse:"collapse"}}><tbody>{payments.map(p=><tr key={p.id} style={{borderBottom:"1px solid #F3F4F6"}}><td style={{padding:8}}>{fd(p.paid_at||p.created_at)}</td><td style={{padding:8}}>{({bar:"Bar",ec:"EC-Karte",mastercard:"Mastercard",visa:"Visa"})[p.payment_method]||p.payment_method}</td><td style={{padding:8,textAlign:"right",fontWeight:600}}>EUR {fmt(p.amount)}</td><td style={{padding:8,fontSize:11,color:p.status==="eingegangen"?"#059669":"#F59E0B"}}>{p.status==="eingegangen"?"Eingegangen":"Ausstehend"}</td></tr>)}</tbody></table>}<div style={{marginTop:12}}><Btn v="ghost" sz="sm" onClick={()=>setAddPayment(true)}><I n="plus" s={14}/> Zahlung</Btn></div></Card>
-{addPayment&&<Modal title="Zahlung" onClose={()=>setAddPayment(false)} width={440}><PaymentFormInner onClose={()=>setAddPayment(false)} onSave={async d=>{await addPay(d);setAddPayment(false)}} balance={balance}/></Modal>}</div>}
-{tab==="room"&&<Card title="Zimmer"><div style={{display:"flex",alignItems:"center",gap:12,padding:8}}><CD color={ut?.color||"#999"} size={20}/><div><div style={{fontWeight:700,fontSize:18}}>Zimmer {room.name}</div><div style={{fontSize:13,color:"#6B7280"}}>{ut?.name} - max. {ut?.capacity} Pers.</div><div style={{fontSize:13,color:"#3B82F6",fontWeight:600}}>EUR {fmt(roomPrice)}/N. x {nights} = EUR {fmt(roomTotal)}</div></div></div></Card>}
-</Modal>};
+function catNightlyTotal(catId){
+  var t=0;var n=nights();
+  for(var i=0;i<n;i++){
+    var d=new Date(state.checkIn);d.setDate(d.getDate()+i);
+    var ds=d.getFullYear()+"-"+(d.getMonth()+1).toString().padStart(2,"0")+"-"+d.getDate().toString().padStart(2,"0");
+    t+=getPriceForDate(catId,ds);
+  }
+  return t;
+}
 
-const PaymentFormInner=({onClose,onSave,balance})=>{const[fm,setFm]=useState({amount:balance>0?balance:0,payment_method:"bar",status:"eingegangen"});const[sv,setSv]=useState(false);const u=(k,v)=>setFm(p=>({...p,[k]:v}));return<div><Inp label="Betrag EUR" type="number" min={0} step={.01} value={fm.amount} onChange={e=>u("amount",parseFloat(e.target.value)||0)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Sel label="Methode" value={fm.payment_method} onChange={e=>u("payment_method",e.target.value)}><option value="bar">Bar</option><option value="ec">EC-Karte</option><option value="mastercard">Mastercard</option><option value="visa">Visa</option><option value="ueberweisung">Ueberweisung</option><option value="paypal">PayPal</option></Sel><Sel label="Status" value={fm.status} onChange={e=>u("status",e.target.value)}><option value="eingegangen">Eingegangen</option><option value="ausstehend">Ausstehend</option></Sel></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.amount||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}>Erfassen</Btn></div></div>};
+function catAvgNight(catId){
+  var n=nights();
+  if(n<=0)return 0;
+  return Math.round(catNightlyTotal(catId)/n);
+}
 
-const UTEditor=({ut,usedColors,onSave,onClose})=>{const[fm,setFm]=useState(ut?{...ut}:{name:"",short_name:"",base_price:100,capacity:2,color:TCOLORS.find(c=>!usedColors.includes(c))||TCOLORS[0]});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);return<Modal title={ut?ut.name+" bearbeiten":"Neue Einheit"} onClose={onClose} width={440}><div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12}}><Inp label="Name *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Inp label="Kuerzel" value={fm.short_name} onChange={e=>u("short_name",e.target.value)}/></div><Inp label="Max. Personen" type="number" min={1} value={fm.capacity} onChange={e=>u("capacity",parseInt(e.target.value)||1)}/><div style={{marginBottom:16}}><label style={{display:"block",fontSize:12,fontWeight:600,marginBottom:8}}>Farbe</label><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{TCOLORS.map(c=><button key={c} onClick={()=>u("color",c)} style={{width:32,height:32,borderRadius:8,background:c,border:fm.color===c?"3px solid #111":"2px solid #E5E7EB",cursor:"pointer"}}/>)}</div></div><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {ut?"Speichern":"Anlegen"}</Btn></div></Modal>};
+function roomsPrice(){
+  var t=0;
+  Object.keys(state.selections).forEach(function(catId){
+    t+=catNightlyTotal(catId)*state.selections[catId];
+  });
+  return t;
+}
 
-const RoomEditor=({room,unitTypes:uts2,onSave,onClose})=>{const[fm,setFm]=useState(room?{...room}:{name:"",unit_type_id:uts2[0]?.id,floor:1,price_override:null,active:true});const u=(k,v)=>setFm(p=>({...p,[k]:v}));const[sv,setSv]=useState(false);return<Modal title={room?"Zimmer "+room.name:"Neues Zimmer"} onClose={onClose}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Nr. *" value={fm.name} onChange={e=>u("name",e.target.value)}/><Sel label="Einheit *" value={fm.unit_type_id||""} onChange={e=>u("unit_type_id",e.target.value)}>{uts2.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</Sel><Inp label="Etage" type="number" value={fm.floor} onChange={e=>u("floor",parseInt(e.target.value)||0)}/></div><label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer"}}><input type="checkbox" checked={fm.active} onChange={()=>u("active",!fm.active)}/><span style={{fontSize:13,fontWeight:600}}>Aktiv</span></label><div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={onClose}>Abbrechen</Btn><Btn disabled={!fm.name||sv} onClick={async()=>{setSv(true);await onSave(fm);setSv(false)}}><I n="save" s={14}/> {room?"Speichern":"Anlegen"}</Btn></div></Modal>};
+function breakfastTotal(){
+  if(!state.breakfast)return 0;
+  return totalGuests()*BF_PRICE*nights();
+}
 
-function App(){const[token,setToken]=useState(null);const sb={url:"https://ztdtkncoyrkvdpytwuhy.supabase.co",key:"sb_publishable_VvH5xJAh2eDdG4HYvvOjDQ_wixb2mRT"};if(!token)return<AuthScreen sb={sb} onAuth={(t,u)=>setToken(t)}/>;return<MainApp sb={sb} token={token} onLogout={()=>setToken(null)}/>}
+function totalPrice(){return roomsPrice()+breakfastTotal()}
 
-function MainApp({sb,token,onLogout}){
-const api=useAPI(sb.url,sb.key,token);
-const[view,setView]=useState("plan");
-const[ws,setWs]=useState(new Date(new Date().setHours(0,0,0,0)));
-const[toast,setToast]=useState(null);
-const show=(m,t="success")=>{setToast({m,t});setTimeout(()=>setToast(null),3000)};
-const[hi,setHi]=useState(null);const[uts,setUts]=useState([]);const[rms,setRms]=useState([]);
-const[ress,setRess]=useState([]);const[guests,setGuests]=useState([]);const[products,setProducts]=useState([]);
-const[ld,setLd]=useState(true);
+function totalCapacity(){
+  var c=0;
+  Object.keys(state.selections).forEach(function(catId){
+    var cat=state.cats.find(function(cc){return cc.id===catId});
+    if(cat)c+=cat.capacity*state.selections[catId];
+  });
+  return c;
+}
 
-const pRef=useRef({sugg:{},load:false,err:null,lastUpd:null,comps:null,showComp:false,debug:"",period:14,selCats:{},minPrices:{},customFrom:toDS(new Date()),customTo:toDS(addD(new Date(),14)),savedPrices:{},reqLog:[],cooldown:0});
-const[pTick,setPTick]=useState(0);
-const pForce=()=>setPTick(t=>t+1);
-const pr=pRef.current;
+function totalRoomsSelected(){
+  var c=0;Object.keys(state.selections).forEach(function(k){c+=state.selections[k]});return c;
+}
 
-const load=useCallback(async()=>{setLd(true);try{const[h,u,r,rv,g,p]=await Promise.all([api.get("hotel_info","limit=1"),api.get("unit_types","order=sort_order"),api.get("rooms","order=name"),api.get("reservations","order=created_at.desc"),api.get("guests","order=last_name"),api.get("products","order=sort_order")]);setHi(h[0]||{});setUts(u);setRms(r);setRess(rv);setGuests(g);setProducts(p)}catch(e){show("Ladefehler: "+e.message,"error")}setLd(false)},[api]);
-useEffect(()=>{load()},[]);
-useEffect(()=>{if(uts.length){const m={};const s={};uts.forEach(u=>{m[u.id]=u.min_price||Math.round((u.base_price||80)*0.65);s[u.id]=true});pr.minPrices=m;pr.selCats=s;pForce()}},[uts]);
+function availableRoomsForCat(catId){
+  if(!state.checkIn||!state.checkOut)return[];
+  var catRooms=state.rooms.filter(function(r){return r.unit_type_id===catId&&r.active});
+  return catRooms.filter(function(room){
+    return!state.reservations.some(function(res){
+      return res.room_id===room.id&&res.status!=="abgelehnt"&&res.status!=="storniert"&&res.status!=="checkedout"&&state.checkIn<res.check_out&&state.checkOut>res.check_in;
+    });
+  });
+}
 
-const saveUT=async(d,id)=>{try{if(id)await api.patch("unit_types",id,d);else await api.post("unit_types",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
-const delUT=async id=>{try{await api.del("unit_types",id);await load();show("Geloescht")}catch(e){show(e.message,"error")}};
-const saveRoom=async(d,id)=>{try{if(id)await api.patch("rooms",id,d);else await api.post("rooms",d);await load();show(id?"Aktualisiert":"Angelegt")}catch(e){show(e.message,"error")}};
-const delRoom=async id=>{try{await api.del("rooms",id);await load();show("Geloescht")}catch(e){show(e.message,"error")}};
-const delGuest=async id=>{try{await api.del("guests",id);await load();show("Gast geloescht")}catch(e){show("Loeschen fehlgeschlagen","error")}};
-const aRms=useMemo(()=>rms.filter(r=>r.active).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})),[rms]);
-const gMap=useMemo(()=>Object.fromEntries(guests.map(g=>[g.id,g])),[guests]);
+function matchCompPrice(catName){
+  if(!state.compPrices||!state.compPrices.length)return null;
+  var name=(catName||"").toLowerCase().replace(/[^a-z0-9äöü]/g,"");
+  var keywords={
+    einzel:["einzel","single","ez"],
+    doppel:["doppel","double","twin","dz"],
+    drei:["drei","triple","dreibett","dbz"],
+    vier:["vier","quad","vierbett","family","famili"]
+  };
+  var myGroup=null;
+  Object.keys(keywords).forEach(function(g){
+    keywords[g].forEach(function(kw){if(name.indexOf(kw)>=0)myGroup=g});
+  });
+  for(var i=0;i<state.compPrices.length;i++){
+    var cp=state.compPrices[i];
+    var cn=(cp.category_name||cp.category||"").toLowerCase().replace(/[^a-z0-9äöü]/g,"");
+    if(cn===name)return cp;
+    if(myGroup){
+      var match=false;
+      keywords[myGroup].forEach(function(kw){if(cn.indexOf(kw)>=0)match=true});
+      if(match)return cp;
+    }
+  }
+  return null;
+}
 
-const getOcc=(tid,date)=>{const ds=toDS(date);const tr=aRms.filter(r=>r.unit_type_id==tid);const oc=tr.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&rv.status!=="abgelehnt"&&rv.status!=="checkedout"&&rv.status!=="storniert")).length;return{oc,tot:tr.length,pct:tr.length?Math.round(oc/tr.length*100):0}};
-const totOcc=(date)=>{const ds=toDS(date);const oc=aRms.filter(r=>ress.some(rv=>rv.room_id===r.id&&ds>=rv.check_in&&ds<rv.check_out&&rv.status!=="abgelehnt"&&rv.status!=="checkedout"&&rv.status!=="storniert")).length;return{oc,tot:aRms.length,pct:aRms.length?Math.round(oc/aRms.length*100):0}};
+function fetchCompetitorPrices(){
+  state.compLoading=true;state.compPrices=[];render();
+  fetch("/api/competitor-prices?check_in="+state.checkIn+"&check_out="+state.checkOut)
+    .then(function(r){return r.json()})
+    .then(function(data){
+      state.compPrices=data.prices||[];
+      state.compLoading=false;render();
+    })
+    .catch(function(){
+      state.compLoading=false;render();
+    });
+}
 
-const fetchPrices=async()=>{pr.load=true;pr.err=null;pr.debug="";pForce();try{
-let startD=ws,numDays=pr.period;
-if(pr.period===-1){startD=new Date(pr.customFrom);numDays=Math.max(1,dBet(pr.customFrom,pr.customTo))}
-else if(pr.period===1){startD=new Date();startD.setHours(0,0,0,0);numDays=1}
-else if(pr.period===2){startD=new Date();startD.setHours(0,0,0,0);startD=addD(startD,1);numDays=1}
-const fetchDays=[];for(let i=0;i<numDays;i++)fetchDays.push(addD(startD,i));
-const activeCats=uts.filter(ut=>pr.selCats[ut.id]);
-if(!activeCats.length){pr.err="Bitte mind. eine Kategorie waehlen";pr.load=false;pForce();return}
-// Chunk into max 14-day batches to avoid Gemini truncation
-const CHUNK=14;const chunks=[];
-for(let i=0;i<fetchDays.length;i+=CHUNK)chunks.push(fetchDays.slice(i,i+CHUNK));
-let totalSugg=0;let chunkErrs=[];
-for(let ci=0;ci<chunks.length;ci++){
-// Rate limit check
-const now2=Date.now();pr.reqLog=(pr.reqLog||[]).filter(t=>t>now2-60000);
-if(pr.cooldown>now2){const ws2=Math.ceil((pr.cooldown-now2)/1000);chunkErrs.push("Rate-Limit aktiv, noch "+ws2+"s warten");break}
-if(pr.reqLog.length>=14){const ws2=Math.ceil((pr.reqLog[0]+60000-now2)/1000);chunkErrs.push("15 Anfragen/Min erreicht, "+ws2+"s warten");break}
-if(ci>0)await new Promise(r=>setTimeout(r,2500));
-const chunk=chunks[ci];
-const categories=activeCats.map(ut=>{const occ=chunk.map(d=>{const o=getOcc(ut.id,d);return{date:toDS(d),weekday:WTAG[d.getDay()],occupied:o.oc,total:o.tot,pct:o.pct}});return{id:String(ut.id),name:ut.name,base_price:ut.base_price,min_price:pr.minPrices[ut.id]||39,occupancy:occ}});
-try{
-pr.reqLog.push(Date.now());
-const resp=await fetch("/api/fetch-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({categories,dateFrom:toDS(chunk[0]),dateTo:toDS(chunk[chunk.length-1])})});
-if(resp.status===429){pr.cooldown=Date.now()+65000;chunkErrs.push("API Rate-Limit (429). 60s Pause.");pForce();break}
-const rawText=await resp.text();
-let result;try{result=JSON.parse(rawText)}catch(pe){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+" (Status "+resp.status+"): "+rawText.slice(0,300));continue}
-if(!resp.ok||!result.success){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+": "+(result.error||"Status "+resp.status));continue}
-const sugg=result.data?.suggestions||{};const sKeys=Object.keys(sugg);
-activeCats.forEach((cat,idx)=>{const cid=String(cat.id);
-const src=sugg[cid]||(idx<sKeys.length?sugg[sKeys[idx]]:null);
-if(src){
-const existing={};(pr.sugg[cid]||[]).forEach(item=>{if(item.date)existing[item.date]=item});
-const normed=(Array.isArray(src)?src:[]).map(item=>{if(item.date){const pp=item.date.split("-");if(pp.length===3)item.date=pp[0]+"-"+pp[1].padStart(2,"0")+"-"+pp[2].padStart(2,"0")}item.price=parseInt(item.price)||0;return item});
-normed.forEach(item=>{if(item.date&&item.price)existing[item.date]=item});
-pr.sugg[cid]=Object.values(existing);totalSugg+=normed.filter(i=>i.price).length}});
-if(!pr.comps&&result.data)pr.comps=result.data;
-}catch(ce){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+": "+ce.message)}
-pForce()}
-if(chunkErrs.length)pr.err=chunkErrs.join(" | ");
-pr.lastUpd=new Date();show(activeCats.length+" Kat., "+totalSugg+" Preise"+(chunks.length>1?" ("+chunks.length+" Abfragen)":""));
-}catch(e){pr.err=e.message}finally{pr.load=false;pForce()}};
+// === LOAD DAILY PRICES FOR SELECTED DATE RANGE ===
+function loadDailyPricesForRange(){
+  if(!state.checkIn||!state.checkOut)return;
+  sb("daily_prices?date=gte."+state.checkIn+"&date=lte."+state.checkOut+"&order=date","GET")
+    .then(function(data){
+      state.dailyPrices={};
+      (data||[]).forEach(function(d){
+        state.dailyPrices[d.unit_type_id+"_"+d.date]=d.price;
+      });
+      render();
+    })
+    .catch(function(){});
+}
 
-const getP=(tid,d)=>{const cid=String(tid);const a=pr.sugg[cid];if(!a)return null;const ds=toDS(d);return(a.find(e=>e&&e.date===ds)||{}).price||null};
+function saveStep3(){
+  if(state.step!==3)return;
+  var el;
+  el=document.getElementById("sal");if(el)state.salutation=el.value;
+  el=document.getElementById("fn");if(el)state.first_name=el.value;
+  el=document.getElementById("ln");if(el)state.last_name=el.value;
+  el=document.getElementById("em");if(el)state.email=el.value;
+  el=document.getElementById("ph");if(el)state.phone=el.value;
+  el=document.getElementById("addr");if(el)state.address=el.value;
+  el=document.getElementById("zip");if(el)state.zip=el.value;
+  el=document.getElementById("city");if(el)state.city=el.value;
+  el=document.getElementById("country");if(el)state.country=el.value;
+  el=document.getElementById("comp");if(el)state.company=el.value;
+}
 
-const upsertDP=async(utId,ds,price,src)=>{try{await api.post("daily_prices",{unit_type_id:utId,date:ds,price,source:src||"manuell"});return true}catch(e){if(e.message&&(e.message.includes("23505")||e.message.includes("409")||e.message.includes("duplicate"))){try{await api.patch("daily_prices","unit_type_id=eq."+utId+"&date=eq."+ds,{price,source:src||"manuell"});return true}catch(e2){return false}}return false}};
+function render(){
+  var app=document.getElementById("app");
+  var n=nights();
+  var tg=totalGuests();
+  var tc=totalCapacity();
+  var tr=totalRoomsSelected();
+  var tp=totalPrice();
+  var rp=roomsPrice();
+  var bp=breakfastTotal();
 
-// =============================================
-// BELEGUNGSPLAN
-// =============================================
-const PlanView=()=>{
-const days=Array.from({length:14},(_,i)=>addD(ws,i));
-const[modal,setModal]=useState(null);
-const[showImport,setShowImport]=useState(false);
-const[emailText,setEmailText]=useState("");
-const[importResult,setImportResult]=useState(null);
-const[importing,setImporting]=useState(false);
-const[importError,setImportError]=useState("");
+  var html='<div style="text-align:center;margin-bottom:20px"><img src="'+LOGO+'" style="max-width:300px;width:100%;margin-bottom:12px"/><h1>Zimmer buchen</h1><p class="sub">Direkt buchen &ndash; bester Preis garantiert!</p></div>';
 
-const doImport=async()=>{
-if(!emailText.trim()){setImportError("Bitte Email-Text einfuegen");return}
-setImporting(true);setImportError("");setImportResult(null);
-try{const resp=await fetch("/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:emailText.trim()})});
-const data=await resp.json();
-if(data.success){setImportResult(data);setEmailText("");await load()}
-else{setImportError(data.error||"Import fehlgeschlagen")}}
-catch(e){setImportError(e.message)}
-setImporting(false)};
+  html+='<div class="steps"><div class="step '+(state.step>=1?(state.step>1?"done":"active"):"")+'">1. Zeitraum</div><div class="step '+(state.step>=2?(state.step>2?"done":"active"):"")+'">2. Zimmer</div><div class="step '+(state.step>=3?(state.step>3?"done":"active"):"")+'">3. Ihre Daten</div><div class="step '+(state.step>=4?"active":"")+'">4. Fertig</div></div>';
 
-const goMonth=n=>{const d=new Date(ws);d.setMonth(d.getMonth()+n);d.setDate(1);setWs(d)};
-const goYear=n=>{const d=new Date(ws);d.setFullYear(d.getFullYear()+n);d.setDate(1);setWs(d)};
-const[planDP,setPlanDP]=useState({});
-useEffect(()=>{const from=toDS(days[0]);const to=toDS(days[days.length-1]);
-api.get("daily_prices","date=gte."+from+"&date=lte."+to+"&order=date").then(data=>{const m={};data.forEach(d=>{m[d.unit_type_id+"_"+d.date]=d.price});setPlanDP(m)}).catch(()=>{});},[ws]);
-const PBadge=({price,base,min,utId,date})=>{const dp=planDP[utId+"_"+date];
-if(dp!=null){const diff=dp-base;const pct=base>0?Math.round(diff/base*100):0;const c=diff>2?"#DC2626":diff<-2?"#059669":"#374151";
-return<div style={{background:"#EFF6FF",borderRadius:6,padding:"2px 4px",textAlign:"center",border:"2px solid #3B82F6"}}><div style={{fontSize:12,fontWeight:800,color:"#1E40AF"}}>{dp}</div>{diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>0?"+":""}{pct}%</div>}</div>}
-if(pr.load)return<div style={{width:28,height:14,background:"#E2E8F0",borderRadius:4,margin:"0 auto"}}/>;if(!price)return<span style={{color:"#CBD5E1",fontSize:10}}>-</span>;const cl=Math.max(price,min||0);const diff=cl-base;const pct=base>0?Math.round(diff/base*100):0;const c=diff>2?"#DC2626":diff<-2?"#059669":"#6B7280";const bg=diff>2?"#FEF2F2":diff<-2?"#ECFDF5":"#F9FAFB";return<div onClick={()=>upsertDP(utId,date,cl,"vorschlag").then(ok=>{if(ok){pr.savedPrices[utId+"_"+date]=cl;pForce();show(cl+" EUR gespeichert");setPlanDP(prev=>({...prev,[utId+"_"+date]:cl}))}})} title={"Klick = "+cl+" EUR speichern"} style={{background:bg,borderRadius:6,padding:"2px 4px",textAlign:"center",cursor:"pointer",border:"2px solid transparent"}}><div style={{fontSize:11,fontWeight:800,color:c}}>{cl}</div>{diff!==0&&<div style={{fontSize:8,color:c,fontWeight:700}}>{diff>0?"+":""}{pct}%</div>}</div>};
+  if(state.loading){html+='<div style="text-align:center;padding:40px;color:#7A7A7A">Laden...</div>';app.innerHTML=html;return}
 
-return<div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-<div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
-<Btn v="ghost" sz="sm" onClick={()=>goYear(-1)} style={{padding:"5px 6px",fontSize:11}}>&#171;</Btn>
-<Btn v="ghost" sz="sm" onClick={()=>goMonth(-1)} style={{padding:"5px 6px",fontSize:11}}>&#8249;Mo</Btn>
-<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))}><I n="cL" s={16}/></Btn>
-<Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn>
-<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))}><I n="cR" s={16}/></Btn>
-<Btn v="ghost" sz="sm" onClick={()=>goMonth(1)} style={{padding:"5px 6px",fontSize:11}}>Mo&#8250;</Btn>
-<Btn v="ghost" sz="sm" onClick={()=>goYear(1)} style={{padding:"5px 6px",fontSize:11}}>&#187;</Btn>
-<span style={{fontSize:14,fontWeight:600,marginLeft:4}}>{MONATE[ws.getMonth()]} {ws.getFullYear()}</span>
-</div>
-<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-<Btn sz="sm" onClick={()=>{setShowImport(true);setImportResult(null);setImportError("")}} style={{background:"#7C3AED",color:"#fff"}}><I n="mail" s={14} c="#fff"/> HRS Import</Btn>
-</div>
-</div>
-<div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>{Object.entries(SC).filter(([k])=>k!=="checkedout"&&k!=="abgelehnt"&&k!=="storniert").map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{width:10,height:10,borderRadius:3,background:v.bd}}/>{v.l}</span>)}</div>
-<div style={{overflowX:"auto",borderRadius:12,border:"1px solid #E5E7EB"}}>
-<table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:900}}>
-<thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:130}}>Zimmer</th>{days.map((d,i)=>{const isT=toDS(d)===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;return<th key={i} style={{padding:"6px 4px",textAlign:"center",fontWeight:isT?800:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:52,color:isT?"#2563EB":"#6B7280"}}><div>{WTAG[d.getDay()]}</div><div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate()}</div></th>})}</tr></thead>
-<tbody>
-{uts.map(ut=>{const tR=aRms.filter(r=>r.unit_type_id==ut.id);if(!tR.length)return null;
-return<React.Fragment key={ut.id}>
-<tr style={{background:(ut.color||"#6366F1")+"18"}}><td style={{padding:"6px 12px",fontWeight:800,borderBottom:"1px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"18",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:6}}><CD color={ut.color} size={14}/><span style={{fontSize:13}}>{ut.name}</span><span style={{fontSize:10,color:"#9CA3AF"}}>({tR.length})</span></div></td>{days.map((d,i)=>{const o=getOcc(ut.id,d);return<td key={i} style={{textAlign:"center",borderBottom:"1px solid #E5E7EB",fontSize:10,fontWeight:700,color:o.pct>80?"#DC2626":o.pct>50?"#D97706":"#059669",background:(ut.color||"#6366F1")+"0A"}}>{o.oc}/{o.tot}</td>})}</tr>
-{tR.map(room=>{const rendered=new Set();return<tr key={room.id}><td style={{padding:"8px 12px",fontWeight:600,borderBottom:"1px solid #F3F4F6",position:"sticky",left:0,background:"#fff",zIndex:1}}><div style={{display:"flex",alignItems:"center",gap:6,marginLeft:12}}><CD color={ut.color} size={8}/><span>{room.name}</span></div></td>{days.map((d,di)=>{const ds=toDS(d);const isT=ds===toDS(new Date()),isW=d.getDay()===0||d.getDay()===6;const rs=ress.filter(r=>r.room_id===room.id&&ds>=r.check_in&&ds<r.check_out&&r.status!=="abgelehnt"&&r.status!=="checkedout"&&r.status!=="storniert");const hasR=rs.find(r=>!rendered.has(r.id));if(hasR){const vs=ds===hasR.check_in||ds===toDS(Math.max(new Date(ws),new Date(hasR.check_in)));if(vs){rendered.add(hasR.id);const eI=days.findIndex(dd=>toDS(dd)>=hasR.check_out);const sp=Math.min((eI===-1?14:eI)-di,14-di);if(sp>0){const sc=SC[hasR.status];const g=gMap[hasR.guest_id];return<td key={di} colSpan={sp} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff"}}><div onClick={()=>setModal({type:"detail",res:hasR,room})} style={{background:sc.bg,border:"1px solid "+sc.bd,borderRadius:6,padding:"4px 8px",cursor:"pointer",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",fontSize:11,color:sc.tx,fontWeight:600,minHeight:28,display:"flex",alignItems:"center"}}>{g?g.first_name+" "+(g.last_name||"").charAt(0)+".":"..."}</div></td>}}}if(rs.length>0&&!hasR)return null;return<td key={di} style={{padding:2,borderBottom:"1px solid #F3F4F6",background:isT?"#F0F9FF":isW?"#FFFEF0":"#fff",cursor:"pointer"}} onClick={()=>setModal({type:"new",room})}><div style={{height:28,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",opacity:.3}}><I n="plus" s={12} c="#9CA3AF"/></div></td>})}</tr>})}
-<tr style={{background:(ut.color||"#6366F1")+"0C"}}><td style={{padding:"6px 12px",fontWeight:800,fontSize:10,color:ut.color||"#6366F1",borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:(ut.color||"#6366F1")+"12",zIndex:1}}>Tagespreis</td>{days.map((d,i)=><td key={i} style={{textAlign:"center",borderBottom:"2px solid #E5E7EB",padding:2}}><PBadge price={getP(ut.id,d)} base={ut.base_price} min={pr.minPrices[ut.id]} utId={ut.id} date={toDS(d)}/></td>)}</tr>
-</React.Fragment>})}
-<tr style={{background:"#F1F5F9"}}><td style={{padding:"8px 12px",fontWeight:800,fontSize:11,color:"#475569",position:"sticky",left:0,background:"#F1F5F9",zIndex:1}}>GESAMT</td>{days.map((d,i)=>{const o=totOcc(d);const bg=o.pct>85?"#FEE2E2":o.pct>60?"#FEF3C7":o.pct>30?"#D1FAE5":"#F1F5F9";return<td key={i} style={{textAlign:"center",padding:"6px 0",background:bg}}><div style={{fontSize:13,fontWeight:800,color:o.pct>85?"#DC2626":o.pct>60?"#D97706":"#059669"}}>{o.pct}%</div><div style={{fontSize:9,color:"#6B7280"}}>{o.oc}/{o.tot}</div></td>})}</tr>
-</tbody></table></div>
-{modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut2=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut2} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} hotelInfo={hi} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>})()}
-{modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} guests={guests} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
-{showImport&&<Modal title="HRS-Buchung importieren" onClose={()=>setShowImport(false)} width={620}>
-<p style={{fontSize:13,color:"#6B7280",marginBottom:12}}>HRS-Buchungsemail oeffnen, alles markieren (Ctrl+A), kopieren (Ctrl+C) und hier einfuegen (Ctrl+V).</p>
-<textarea value={emailText} onChange={e=>setEmailText(e.target.value)} placeholder="Buchungsemail hier einfuegen..." style={{width:"100%",minHeight:220,padding:12,border:"1px solid #D1D5DB",borderRadius:8,fontSize:11,fontFamily:"monospace",outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:12}}/>
-{importError&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:"#DC2626"}}>{importError}</div>}
-{importResult&&<div style={{background:"#D1FAE5",border:"1px solid #A7F3D0",borderRadius:8,padding:12,marginBottom:12,fontSize:13,color:"#065F46"}}>
-<div style={{fontWeight:700,marginBottom:6}}>Buchung importiert!</div>
-<div><strong>Gast:</strong> {importResult.reservation.guest}</div>
-<div><strong>Zimmer:</strong> {importResult.reservation.room} ({importResult.reservation.roomType})</div>
-<div><strong>Zeitraum:</strong> {importResult.reservation.checkIn} - {importResult.reservation.checkOut}</div>
-<div><strong>Preis:</strong> {importResult.reservation.price} EUR</div>
-<div><strong>HRS-Nr:</strong> {importResult.reservation.hrsNr}</div>
-</div>}
-<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-<Btn v="ghost" onClick={()=>setShowImport(false)}>Schliessen</Btn>
-<Btn onClick={doImport} disabled={importing||!emailText.trim()} style={{background:"#7C3AED"}}><I n="mail" s={14} c="#fff"/> {importing?"Importiere...":"Importieren"}</Btn>
-</div>
-</Modal>}
-</div>};
+  // === STEP 1 ===
+  if(state.step===1){
+    var today=new Date().toISOString().split("T")[0];
+    var tomorrow=new Date(Date.now()+864e5).toISOString().split("T")[0];
+    html+='<h2>Wann m&ouml;chten Sie reisen?</h2>';
+    html+='<div class="grid2"><div class="field"><label>Anreise</label><input type="date" id="ci" value="'+(state.checkIn||today)+'" min="'+today+'"/></div><div class="field"><label>Abreise</label><input type="date" id="co" value="'+(state.checkOut||tomorrow)+'" min="'+tomorrow+'"/></div></div>';
+    html+='<div class="grid2"><div class="field"><label>Erwachsene</label><select id="ad">';
+    for(var i=1;i<=8;i++)html+='<option value="'+i+'"'+(state.adults===i?" selected":"")+'>'+i+'</option>';
+    html+='</select></div><div class="field"><label>Kinder</label><select id="ch">';
+    for(var i=0;i<=6;i++)html+='<option value="'+i+'"'+(state.children===i?" selected":"")+'>'+i+'</option>';
+    html+='</select></div></div>';
+    html+='<button class="btn btn-primary" onclick="goStep2()">Verf&uuml;gbarkeit pr&uuml;fen</button>';
+  }
 
-// =============================================
-// PREISE (Kalender + Basispreise kombiniert)
-// =============================================
-const PreiseView=()=>{
-const[dpData,setDpData]=useState({});
-const[editCell,setEditCell]=useState(null);
-const[editVal,setEditVal]=useState("");
-const[saving,setSaving]=useState(false);
-const[bulkModal,setBulkModal]=useState(null);
-const[bulkPrice,setBulkPrice]=useState("");
-const[bulkWd,setBulkWd]=useState("all");
-const[showBase,setShowBase]=useState(false);
-const[rateTick,setRateTick]=useState(0);
-useEffect(()=>{const iv=setInterval(()=>setRateTick(t=>t+1),1000);return()=>clearInterval(iv)},[]);
-const[basePr,setBasePr]=useState({});
+  // === STEP 2 ===
+  if(state.step===2){
+    html+='<h2>Zimmer w&auml;hlen: '+fd(state.checkIn)+' &ndash; '+fd(state.checkOut)+' ('+n+' '+(n===1?"Nacht":"N&auml;chte")+')</h2>';
+    html+='<p style="font-size:14px;color:#58585A;margin-bottom:16px">'+tg+' '+(tg===1?"Gast":"G&auml;ste")+' &ndash; bitte w&auml;hlen Sie passende Zimmer:</p>';
 
-const days=Array.from({length:19},(_,i)=>addD(ws,i));
-const todayStr=toDS(new Date());
+    state.cats.forEach(function(cat){
+      var avail=availableRoomsForCat(cat.id);
+      var isAvail=avail.length>0;
+      var sel=state.selections[cat.id]||0;
+      var catTotal=catNightlyTotal(cat.id);
+      var avgNight=catAvgNight(cat.id);
+      var comp=matchCompPrice(cat.name);
 
-useEffect(()=>{const m={};uts.forEach(u=>{m[u.id]={base:u.base_price||80,min:u.min_price||Math.round((u.base_price||80)*0.65),bk:u.booking_com_price||0}});setBasePr(m)},[uts]);
+      html+='<div class="card'+(sel>0?" selected":"")+(isAvail?"":" not-avail")+'">';
+      html+='<div class="cat-img" style="'+(cat.image_url?"background-image:url("+cat.image_url+");background-size:cover;background-position:center":"")+'">'+(!cat.image_url?cat.name:"")+'</div>';
+      html+='<div class="card-body"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px"><div style="flex:1;min-width:200px"><div class="cat-name">'+cat.name+'</div><div class="cat-info">Max. '+cat.capacity+' '+(cat.capacity===1?"Person":"Personen")+' pro Zimmer</div>';
+      html+='<div style="margin-top:6px"><span class="avail '+(isAvail?"yes":"no")+'">'+(isAvail?avail.length+" verf&uuml;gbar":"Ausgebucht")+'</span></div>';
 
-const loadDP=useCallback(async()=>{
-const from=toDS(days[0]);const to=toDS(days[days.length-1]);
-try{const data=await api.get("daily_prices","date=gte."+from+"&date=lte."+to+"&order=date");
-const m={};data.forEach(d=>{m[d.unit_type_id+"_"+d.date]=d});setDpData(m)}catch(e){show(e.message,"error")}
-},[ws]);
-useEffect(()=>{loadDP()},[ws]);
+      // Competitor price comparison - compare against our average nightly rate
+      if(comp&&comp.price_per_night>0){
+        var directPrice=avgNight>0?avgNight:cat.base_price;
+        var bookingPrice=parseFloat(comp.price_per_night);
+        if(bookingPrice>directPrice){
+          var saving=Math.round(bookingPrice-directPrice);
+          var savePct=Math.round((saving/bookingPrice)*100);
+          html+='<div class="compare">';
+          html+='<span class="old">Booking.com: '+bookingPrice.toFixed(0)+' &euro;/Nacht</span><br>';
+          html+='<span class="new">Direktpreis: '+directPrice+' &euro;/Nacht</span>';
+          html+='<span class="save">&minus;'+saving+' &euro; ('+savePct+'%)</span>';
+          html+='</div>';
+        } else if(bookingPrice===directPrice){
+          html+='<div class="compare" style="background:#D1FAE5;border-color:#A7F3D0">Gleicher Preis wie Booking.com &ndash; ohne Umweg direkt buchen!</div>';
+        }
+      } else if(state.compLoading){
+        html+='<div class="loading-comp">Preisvergleich wird geladen...</div>';
+      }
 
-const goMonth=n=>{const d=new Date(ws);d.setMonth(d.getMonth()+n);d.setDate(1);setWs(d)};
+      html+='</div>';
+      html+='<div style="text-align:right">';
+      // Show average nightly price (uses daily_prices when available)
+      html+='<div class="cat-price">'+avgNight+' EUR <span>/ Nacht</span></div>';
+      if(avgNight!==cat.base_price)html+='<div style="font-size:11px;color:#7A7A7A;text-decoration:line-through">Basis: '+cat.base_price+' EUR</div>';
+      if(n>0)html+='<div style="font-size:13px;color:#7A7A7A;margin-top:2px">'+catTotal+' EUR / '+n+' '+(n===1?"Nacht":"N&auml;chte")+'</div>';
+      if(isAvail){
+        html+='<div style="margin-top:10px"><div class="qty">';
+        html+='<button onclick="addRoom(\''+cat.id+'\',-1)"'+(sel<=0?" disabled":"")+'>&#8722;</button>';
+        html+='<div class="count">'+sel+'</div>';
+        html+='<button onclick="addRoom(\''+cat.id+'\',1)"'+(sel>=avail.length?" disabled":"")+'>+</button>';
+        html+='</div></div>';
+      }
+      html+='</div></div></div></div>';
+    });
 
-const getDP=(utId,ds)=>{const e=dpData[utId+"_"+ds];return e?e.price:null};
+    if(tr>0){
+      var capOk=tc>=tg;
+      html+='<div class="cap-bar '+(capOk?"ok":"warn")+'">';
+      html+='<strong>'+tr+' Zimmer gew&auml;hlt</strong> &ndash; Kapazit&auml;t: '+tc+' '+(tc===1?"Platz":"Pl&auml;tze")+' f&uuml;r '+tg+' '+(tg===1?"Gast":"G&auml;ste");
+      if(!capOk)html+='<br><span style="font-size:12px">Bitte w&auml;hlen Sie weitere Zimmer &ndash; es fehlen noch '+(tg-tc)+' '+(tg-tc===1?"Platz":"Pl&auml;tze")+'.</span>';
+      if(capOk)html+=' &#10003;';
+      html+='</div>';
 
-const saveEdit=async()=>{if(!editCell||!editVal)return;const price=parseFloat(editVal);if(isNaN(price)||price<=0)return;
-setSaving(true);if(await upsertDP(editCell.utId,editCell.ds,price)){show(price+" EUR gespeichert");loadDP()}else show("Fehler","error");setSaving(false);setEditCell(null)};
+      html+='<div class="breakfast-row"><input type="checkbox" id="bf"'+(state.breakfast?" checked":"")+' onchange="toggleBreakfast()"/><label for="bf">Fr&uuml;hst&uuml;ck dazubuchen ('+BF_PRICE+' &euro; pro Person / Nacht)'+(state.breakfast?" &ndash; <strong>"+bp+" EUR</strong>":"")+'</label></div>';
 
-const deleteDP=async(utId,ds)=>{try{await api.del("daily_prices","unit_type_id=eq."+utId+"&date=eq."+ds);show("Entfernt");loadDP()}catch(e){show(e.message,"error")}};
+      html+='<div class="price-box">';
+      html+='<div class="price-line"><span>'+tr+' Zimmer &times; '+n+' '+(n===1?"Nacht":"N&auml;chte")+'</span><span><strong>'+rp+' EUR</strong></span></div>';
+      if(state.breakfast)html+='<div class="price-line"><span>Fr&uuml;hst&uuml;ck ('+tg+' Pers. &times; '+n+' '+(n===1?"Tag":"Tage")+')</span><span><strong>'+bp+' EUR</strong></span></div>';
+      html+='<div class="price-line total"><span>Gesamtpreis</span><span class="price-total">'+tp+' EUR</span></div>';
+      html+='</div>';
+    }
 
-const applyBulk=async()=>{if(!bulkModal||!bulkPrice)return;const price=parseFloat(bulkPrice);if(isNaN(price)||price<=0)return;
-setSaving(true);let count=0;
-for(const d of days){const ds=toDS(d);const wd=d.getDay();
-if(bulkWd==="wd"&&(wd===0||wd===6))continue;
-if(bulkWd==="we"&&wd!==0&&wd!==6)continue;
-if(await upsertDP(bulkModal,ds,price))count++}
-setSaving(false);show(count+" Preise gesetzt");setBulkModal(null);setBulkPrice("");loadDP()};
+    var canProceed=tr>0&&tc>=tg;
+    html+='<div style="display:flex;gap:12px;margin-top:16px"><button class="btn btn-ghost" onclick="goBack(1)">Zur&uuml;ck</button><button class="btn btn-primary"'+(canProceed?"":" disabled")+' onclick="goStep3()">Weiter</button></div>';
+  }
 
-const syncSugg=async()=>{const keys=Object.keys(pr.sugg);if(!keys.length){show("Erst Preise im Belegungsplan abrufen","error");return}
-setSaving(true);let count=0;
-for(const cid of keys){const arr=pr.sugg[cid];if(!Array.isArray(arr))continue;
-for(const item of arr){if(!item.price||!item.date)continue;const min=pr.minPrices[cid]||0;
-if(await upsertDP(cid,item.date,Math.max(item.price,min),"vorschlag"))count++}}
-setSaving(false);show(count+" Preise synchronisiert");loadDP()};
+  // === STEP 3 ===
+  if(state.step===3){
+    html+='<h2>Ihre Daten</h2>';
 
-const saveBase=async(tid)=>{const p=basePr[tid];if(!p)return;setSaving(true);
-try{await api.patch("unit_types",tid,{base_price:p.base,min_price:p.min,booking_com_price:p.bk});await load();show("Gespeichert")}catch(e){show(e.message,"error")}setSaving(false)};
+    html+='<div class="price-box">';
+    var selCats=[];
+    Object.keys(state.selections).forEach(function(catId){
+      var cnt=state.selections[catId];if(cnt<=0)return;
+      var cat=state.cats.find(function(c){return c.id===catId});
+      if(cat)selCats.push({cat:cat,count:cnt});
+    });
+    selCats.forEach(function(sc){
+      html+='<div class="price-line"><span>'+sc.count+'&times; '+sc.cat.name+'</span><span>'+catNightlyTotal(sc.cat.id)*sc.count+' EUR</span></div>';
+    });
+    if(state.breakfast)html+='<div class="price-line"><span>Fr&uuml;hst&uuml;ck ('+tg+' Pers.)</span><span>'+bp+' EUR</span></div>';
+    html+='<div class="price-line"><span style="color:#7A7A7A">'+fd(state.checkIn)+' &ndash; '+fd(state.checkOut)+' | '+n+' '+(n===1?"Nacht":"N&auml;chte")+' | '+state.adults+' Erw.'+(state.children>0?", "+state.children+" Kind.":"")+'</span></div>';
+    html+='<div class="price-line total"><span>Gesamtpreis</span><span class="price-total">'+tp+' EUR</span></div>';
+    html+='</div>';
 
-const LBL={padding:"8px 12px",fontWeight:600,fontSize:12,borderBottom:"1px solid #E5E7EB",position:"sticky",left:0,background:"#fff",zIndex:1,whiteSpace:"nowrap",minWidth:160};
-const CELL={textAlign:"center",borderBottom:"1px solid #E5E7EB",padding:"4px 2px",minWidth:54};
+    html+='<div class="grid2"><div class="field"><label>Anrede *</label><select id="sal" oninput="saveStep3()"><option value="Herr"'+(state.salutation==="Herr"?" selected":"")+'>Herr</option><option value="Frau"'+(state.salutation==="Frau"?" selected":"")+'>Frau</option></select></div><div class="field"><label>Firma (optional)</label><input id="comp" value="'+esc(state.company)+'" placeholder="Firmenname" oninput="saveStep3()"/></div></div>';
+    html+='<div class="grid2"><div class="field"><label>Vorname *</label><input id="fn" value="'+esc(state.first_name)+'" placeholder="Max" oninput="saveStep3()"/></div><div class="field"><label>Nachname *</label><input id="ln" value="'+esc(state.last_name)+'" placeholder="Mustermann" oninput="saveStep3()"/></div></div>';
+    html+='<div class="grid2"><div class="field"><label>E-Mail *</label><input type="email" id="em" value="'+esc(state.email)+'" placeholder="max@beispiel.de" oninput="saveStep3()"/></div><div class="field"><label>Telefon</label><input id="ph" value="'+esc(state.phone)+'" placeholder="+49 ..." oninput="saveStep3()"/></div></div>';
+    html+='<div class="field"><label>Stra&szlig;e und Hausnummer</label><input id="addr" value="'+esc(state.address)+'" oninput="saveStep3()"/></div>';
+    html+='<div class="grid3"><div class="field"><label>PLZ</label><input id="zip" value="'+esc(state.zip)+'" oninput="saveStep3()"/></div><div class="field"><label>Ort</label><input id="city" value="'+esc(state.city)+'" oninput="saveStep3()"/></div><div class="field"><label>Land</label><input id="country" value="'+esc(state.country||"DE")+'" oninput="saveStep3()"/></div></div>';
 
-return<div>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-<div style={{display:"flex",gap:4,alignItems:"center"}}>
-<Btn v="ghost" sz="sm" onClick={()=>goMonth(-1)}><I n="cL" s={16}/></Btn>
-<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,-7))} style={{fontSize:11}}>-7</Btn>
-<Btn v="ghost" sz="sm" onClick={()=>setWs(new Date(new Date().setHours(0,0,0,0)))} style={{fontSize:12}}>Heute</Btn>
-<Btn v="ghost" sz="sm" onClick={()=>setWs(addD(ws,7))} style={{fontSize:11}}>+7</Btn>
-<Btn v="ghost" sz="sm" onClick={()=>goMonth(1)}><I n="cR" s={16}/></Btn>
-<span style={{fontSize:15,fontWeight:700,marginLeft:8}}>{MONATE[ws.getMonth()]} {ws.getFullYear()}</span>
-</div>
-<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-<select value={pr.period} onChange={e=>{pr.period=Number(e.target.value);pForce()}} style={{padding:"6px 10px",borderRadius:8,border:"1px solid #D1D5DB",fontSize:12,background:"#fff"}}>
-<option value={1}>Heute</option><option value={2}>Morgen</option><option value={7}>7 Tage</option><option value={14}>14 Tage</option><option value={30}>1 Monat</option><option value={90}>3 Monate</option><option value={-1}>Benutzerdefiniert</option>
-</select>
-{pr.period===-1&&<><input type="date" value={pr.customFrom} onChange={e=>{pr.customFrom=e.target.value;pForce()}} style={{padding:"4px 6px",borderRadius:6,border:"1px solid #D1D5DB",fontSize:11}}/><span style={{fontSize:11}}>bis</span><input type="date" value={pr.customTo} onChange={e=>{pr.customTo=e.target.value;pForce()}} style={{padding:"4px 6px",borderRadius:6,border:"1px solid #D1D5DB",fontSize:11}}/></>}
-<div style={{display:"flex",gap:2}}>{uts.map(ut=><label key={ut.id} style={{display:"flex",alignItems:"center",gap:3,cursor:"pointer",padding:"4px 10px",borderRadius:8,fontSize:12,fontWeight:700,background:pr.selCats[ut.id]?(ut.color||"#6366F1")+"20":"#F3F4F6",color:pr.selCats[ut.id]?ut.color||"#6366F1":"#9CA3AF",border:"1px solid "+(pr.selCats[ut.id]?(ut.color||"#6366F1")+"50":"#E5E7EB"),transition:"all .15s"}}><input type="checkbox" checked={!!pr.selCats[ut.id]} onChange={()=>{pr.selCats[ut.id]=!pr.selCats[ut.id];pForce()}} style={{width:13,height:13,accentColor:ut.color||"#6366F1"}}/>{ut.short_name||ut.name}</label>)}</div>
-{(()=>{const now=Date.now();const recent=(pr.reqLog||[]).filter(x=>x>now-60000).length;const left=14-recent;
-if(pr.cooldown>now){const w=Math.ceil((pr.cooldown-now)/1000);const m=Math.floor(w/60);const s=w%60;
-return<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:700,background:"#FEE2E2",color:"#DC2626",border:"1px solid #FECACA"}}><span style={{width:8,height:8,borderRadius:8,background:"#DC2626",animation:"spin 1s linear infinite"}}/> Limit - {m}:{String(s).padStart(2,"0")}</span>}
-const c=left>8?"#059669":left>3?"#D97706":"#DC2626";const bg=left>8?"#D1FAE5":left>3?"#FEF3C7":"#FEE2E2";
-return<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:700,background:bg,color:c}}><span style={{width:8,height:8,borderRadius:8,background:c}}/> {left}/14</span>})()}
-<Btn sz="sm" onClick={fetchPrices} disabled={pr.load||pr.cooldown>Date.now()||(pr.reqLog||[]).filter(x=>x>Date.now()-60000).length>=14} style={{background:(pr.load||pr.cooldown>Date.now())?"#94A3B8":"#1E40AF"}}><I n="dollar" s={14} c="#fff"/> {pr.load?"Lade...":"Preise abrufen"}</Btn>
-<Btn sz="sm" v="warning" onClick={syncSugg} disabled={saving}><I n="refresh" s={14}/> Synchronisieren</Btn>
-<Btn sz="sm" v="ghost" onClick={()=>setShowBase(!showBase)}><I n="settings" s={14}/> Basispreise</Btn>
-</div>
-</div>
+    html+='<div class="agb-box">';
+    html+='<h3>Stornierung &amp; No-Show</h3><ul>';
+    html+='<li>Stornierungen bitten wir schriftlich mitzuteilen.</li>';
+    html+='<li>Bis 7 Tage vor Anreise: Stornierung m&ouml;glich gegen eine Geb&uuml;hr von 80&nbsp;% des Gesamtpreises.</li>';
+    html+='<li>Ab 3 Tagen vor Anreise: Eine Stornierung ist leider nicht mehr m&ouml;glich &ndash; es wird der volle Preis berechnet.</li>';
+    html+='<li>Bei Nichtanreise (No-Show) wird ebenfalls der volle Preis f&auml;llig.</li>';
+    html+='<li>Bei vorzeitiger Abreise ist keine Erstattung m&ouml;glich.</li></ul>';
+    html+='<h3>An- &amp; Abreise</h3><ul>';
+    html+='<li>Check-in ab 15:00 Uhr</li>';
+    html+='<li>Check-out bis 11:00 Uhr &ndash; bei sp&auml;terer R&auml;umung k&ouml;nnen zus&auml;tzliche Kosten anfallen.</li></ul>';
+    html+='<h3>Rauchverbot</h3><ul>';
+    html+='<li>Im gesamten Hotelgeb&auml;ude gilt ein striktes Rauchverbot. Bei Versto&szlig; wird eine Reinigungspauschale von 300&nbsp;&euro; berechnet.</li></ul>';
+    html+='</div>';
 
-{pr.load&&<div style={{background:"#EFF6FF",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#1E40AF",display:"flex",alignItems:"center",gap:8}}><I n="clock" s={14} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/>Preise werden abgerufen...</div>}
-{pr.err&&<div style={{background:"#FEF2F2",borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#DC2626"}}>{pr.err}</div>}
-{pr.lastUpd&&!pr.load&&<div style={{background:"#F0FDF4",borderRadius:8,padding:"6px 14px",marginBottom:12,fontSize:11,color:"#059669"}}>Letzte Aktualisierung: {pr.lastUpd.toLocaleTimeString("de-DE")} | {Object.keys(pr.sugg).length} Kategorien | {Object.values(pr.sugg).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0)} Tagespreise</div>}
-{showBase&&<div style={{display:"grid",gridTemplateColumns:"repeat("+Math.min(uts.length,4)+", 1fr)",gap:12,marginBottom:20}}>
-{uts.map(ut=>{const p=basePr[ut.id]||{base:0,min:0,bk:0};return<div key={ut.id} style={{background:"#fff",borderRadius:12,border:"2px solid "+(ut.color||"#ddd")+"40",padding:16}}>
-<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><CD color={ut.color} size={14}/><span style={{fontWeight:800}}>{ut.name}</span></div>
-<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-<div><label style={{fontSize:10,color:"#6B7280",fontWeight:600}}>Basis EUR</label><input type="number" min={0} value={p.base} onChange={e=>{const v=parseFloat(e.target.value)||0;setBasePr(prev=>({...prev,[ut.id]:{...prev[ut.id],base:v}}))}} style={{width:"100%",padding:"6px 8px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:14,fontWeight:800,textAlign:"center",color:"#1E40AF"}}/></div>
-<div><label style={{fontSize:10,color:"#6B7280",fontWeight:600}}>Min EUR</label><input type="number" min={0} value={p.min} onChange={e=>{const v=parseFloat(e.target.value)||0;setBasePr(prev=>({...prev,[ut.id]:{...prev[ut.id],min:v}}))}} style={{width:"100%",padding:"6px 8px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:14,fontWeight:800,textAlign:"center",color:"#DC2626"}}/></div>
-<div><label style={{fontSize:10,color:"#6B7280",fontWeight:600}}>Booking EUR</label><input type="number" min={0} value={p.bk} onChange={e=>{const v=parseFloat(e.target.value)||0;setBasePr(prev=>({...prev,[ut.id]:{...prev[ut.id],bk:v}}))}} style={{width:"100%",padding:"6px 8px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:14,fontWeight:800,textAlign:"center",color:"#D97706"}}/></div>
-</div>
-<Btn v="ghost" sz="sm" onClick={()=>saveBase(ut.id)} disabled={saving} style={{width:"100%",justifyContent:"center",marginTop:8}}><I n="save" s={12}/> Speichern</Btn>
-</div>})}
-</div>}
+    html+='<div class="check-row"><input type="checkbox" id="agbcheck"'+(state.agbAccepted?" checked":"")+' onchange="state.agbAccepted=this.checked"/><label for="agbcheck">Ich habe die Buchungsbedingungen gelesen und akzeptiere diese.</label></div>';
 
-<div style={{overflowX:"auto",borderRadius:12,border:"1px solid #E5E7EB",background:"#fff"}}>
-<table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:1100}}>
-<thead><tr style={{background:"#F9FAFB"}}><th style={{padding:"10px 12px",textAlign:"left",fontWeight:700,borderBottom:"2px solid #E5E7EB",position:"sticky",left:0,background:"#F9FAFB",zIndex:2,minWidth:160}}>Kalender</th>
-{days.map((d,i)=>{const isT=toDS(d)===todayStr,isW=d.getDay()===0||d.getDay()===6;
-return<th key={i} style={{padding:"6px 2px",textAlign:"center",fontWeight:isT?800:isW?700:500,borderBottom:"2px solid #E5E7EB",background:isT?"#EFF6FF":isW?"#FEFCE8":"#F9FAFB",minWidth:54,color:isT?"#2563EB":isW?"#92400E":"#6B7280",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>
-<div style={{fontSize:11}}>{WTAG[d.getDay()]}.</div><div style={{fontSize:14,fontWeight:700,color:isT?"#2563EB":"#111"}}>{d.getDate().toString().padStart(2,"0")}</div></th>})}
-</tr></thead>
-<tbody>
-{uts.map(ut=>{const tR=aRms.filter(r=>r.unit_type_id==ut.id);if(!tR.length)return null;
-return<React.Fragment key={ut.id}>
-{/* Category Header */}
-<tr><td colSpan={days.length+1} style={{padding:"14px 12px 8px",fontWeight:800,fontSize:14,background:"#F9FAFB",borderBottom:"1px solid #E5E7EB",borderTop:"2px solid #D1D5DB"}}>
-<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-<div style={{display:"flex",alignItems:"center",gap:8}}><CD color={ut.color} size={16}/><span>{ut.name}</span><span style={{fontSize:11,color:"#9CA3AF",fontWeight:500}}>({tR.length} Zimmer)</span></div>
-<Btn sz="sm" onClick={()=>{setBulkModal(ut.id);setBulkPrice("");setBulkWd("all")}} style={{background:"#1E40AF",color:"#fff",fontSize:12,padding:"6px 16px"}}>Massenbearbeitung</Btn>
-</div></td></tr>
-{/* Zimmerstatus */}
-<tr><td style={{...LBL,fontSize:11,color:"#6B7280"}}>Zimmerstatus</td>
-{days.map((d,i)=><td key={i} style={{...CELL,padding:0,borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}><div style={{background:"#6EE7B7",height:24}}/></td>)}</tr>
-{/* Verfuegbarkeiten */}
-<tr><td style={{...LBL,color:"#059669",fontSize:11}}>Verfuegbarkeiten</td>
-{days.map((d,i)=>{const o=getOcc(ut.id,d);const avail=o.tot-o.oc;return<td key={i} style={{...CELL,fontSize:13,fontWeight:700,color:avail===0?"#DC2626":"#374151",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>{avail}</td>})}</tr>
-{/* Netto-Buchungen */}
-<tr><td style={{...LBL,color:"#6B7280",fontSize:11}}>Netto-Buchungen</td>
-{days.map((d,i)=>{const o=getOcc(ut.id,d);return<td key={i} style={{...CELL,borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>{o.oc>0?<span style={{display:"inline-block",background:"#9CA3AF",color:"#fff",borderRadius:10,padding:"2px 8px",fontSize:11,fontWeight:700,minWidth:20,textAlign:"center"}}>{o.oc}</span>:""}</td>})}</tr>
-{/* Preis */}
-<tr><td style={{...LBL}}><div style={{display:"flex",alignItems:"center",gap:4}}><span style={{color:"#1E40AF",fontWeight:700}}>Preis</span><span style={{fontSize:9,color:"#9CA3AF"}}>(Basis: {ut.base_price} EUR)</span></div></td>
-{days.map((d,i)=>{const ds=toDS(d);const dp=getDP(ut.id,ds);const price=dp||ut.base_price;const isCustom=dp!==null;const isEditing=editCell&&editCell.utId===ut.id&&editCell.ds===ds;
-return<td key={i} style={{...CELL,background:isCustom?"#EFF6FF":"#fff",cursor:"pointer",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}} onClick={()=>{if(!isEditing){setEditCell({utId:ut.id,ds,name:ut.name});setEditVal(String(price))}}}>
-{isEditing?<input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} autoFocus onKeyDown={e=>{if(e.key==="Enter")saveEdit();if(e.key==="Escape")setEditCell(null)}} onBlur={saveEdit} style={{width:48,padding:"3px 2px",border:"2px solid #3B82F6",borderRadius:4,fontSize:13,fontWeight:800,textAlign:"center",outline:"none"}}/>:
-<div><div style={{fontSize:10,color:"#6B7280"}}>EUR</div><div style={{fontSize:14,fontWeight:800,color:isCustom?"#1E40AF":"#374151"}}>{price}</div></div>}
-</td>})}</tr>
-{/* AI Vorschlag Zeile */}
-{Object.keys(pr.sugg).includes(String(ut.id))&&<tr><td style={{...LBL,background:"#FFFBEB"}}><div style={{display:"flex",alignItems:"center",gap:4}}><I n="chart" s={12} c="#D97706"/><span style={{fontSize:11,color:"#D97706",fontWeight:700}}>AI-Vorschlag</span></div></td>
-{days.map((d,i)=>{const ds=toDS(d);const p=getP(ut.id,d);const min=pr.minPrices[ut.id]||0;const cl=p?Math.max(p,min):null;
-return<td key={i} style={{...CELL,background:"#FFFBEB",borderLeft:d.getDay()===1?"2px solid #D1D5DB":"none"}}>
-{cl?<div onClick={()=>upsertDP(ut.id,ds,cl,"vorschlag").then(ok=>{if(ok){show(cl+" EUR gespeichert");loadDP()}})} style={{cursor:"pointer"}} title="Klick = uebernehmen"><div style={{fontSize:12,fontWeight:800,color:cl>ut.base_price?"#DC2626":cl<ut.base_price?"#059669":"#6B7280"}}>{cl}</div></div>:<span style={{color:"#CBD5E1",fontSize:10}}>-</span>}
-</td>})}</tr>}
-</React.Fragment>})}
-</tbody></table></div>
+    if(state.error)html+='<div style="background:#FEE2E2;color:#DC2626;padding:10px 14px;border-radius:10px;font-size:13px;margin:12px 0">'+state.error+'</div>';
+    html+='<div style="display:flex;gap:12px;margin-top:12px"><button class="btn btn-ghost" onclick="saveStep3();goBack(2)">Zur&uuml;ck</button><button class="btn btn-primary" id="bookbtn"'+(state.saving?" disabled":"")+' onclick="doBook()">'+(state.saving?"Buchung wird verarbeitet...":"Jetzt verbindlich buchen")+'</button></div>';
+  }
 
-{bulkModal&&<Modal title={"Massenbearbeitung: "+(uts.find(u=>u.id===bulkModal)||{}).name} onClose={()=>setBulkModal(null)} width={420}>
-<p style={{fontSize:13,color:"#6B7280",marginBottom:16}}>Preis fuer alle {days.length} sichtbaren Tage ({fd(toDS(days[0]))} - {fd(toDS(days[days.length-1]))}) setzen.</p>
-<Sel label="Tage" value={bulkWd} onChange={e=>setBulkWd(e.target.value)}><option value="all">Alle Tage</option><option value="wd">Nur Mo-Fr</option><option value="we">Nur Sa-So</option></Sel>
-<Inp label="Preis (EUR)" type="number" min={0} value={bulkPrice} onChange={e=>setBulkPrice(e.target.value)} autoFocus/>
-<div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><Btn v="ghost" onClick={()=>setBulkModal(null)}>Abbrechen</Btn><Btn disabled={!bulkPrice||saving} onClick={applyBulk}><I n="save" s={14}/> Anwenden</Btn></div>
-</Modal>}
+  // === STEP 4 ===
+  if(state.step===4){
+    html+='<div class="success-box"><div class="success-icon">&#10003;</div><h2 style="margin-bottom:8px">Vielen Dank f&uuml;r Ihre Buchung!</h2><p style="font-size:15px;color:#7A7A7A;margin-bottom:20px">'+state.salutation+' '+state.last_name+', Ihre Reservierung wurde erfolgreich erstellt.</p>';
+    html+='<div style="background:#fff;border-radius:12px;border:1px solid #DDD9D2;padding:20px;text-align:left;max-width:450px;margin:0 auto">';
+    html+='<table style="width:100%;font-size:14px">';
+    html+='<tr><td style="padding:4px 0;color:#7A7A7A">Buchungsnr.:</td><td style="padding:4px 0;font-weight:700">'+state.resNumbers.join(", ")+'</td></tr>';
+    var selCats2=[];
+    Object.keys(state.selections).forEach(function(catId){
+      var cnt=state.selections[catId];if(cnt<=0)return;
+      var cat=state.cats.find(function(c){return c.id===catId});
+      if(cat)selCats2.push(cnt+"x "+cat.name);
+    });
+    html+='<tr><td style="padding:4px 0;color:#7A7A7A">Zimmer:</td><td style="padding:4px 0;font-weight:600">'+selCats2.join(", ")+'</td></tr>';
+    if(state.breakfast)html+='<tr><td style="padding:4px 0;color:#7A7A7A">Fr&uuml;hst&uuml;ck:</td><td style="padding:4px 0">Ja ('+tg+' Personen)</td></tr>';
+    html+='<tr><td style="padding:4px 0;color:#7A7A7A">Anreise:</td><td style="padding:4px 0">'+fd(state.checkIn)+'</td></tr>';
+    html+='<tr><td style="padding:4px 0;color:#7A7A7A">Abreise:</td><td style="padding:4px 0">'+fd(state.checkOut)+'</td></tr>';
+    html+='<tr><td style="padding:4px 0;color:#7A7A7A">N&auml;chte:</td><td style="padding:4px 0">'+n+'</td></tr>';
+    html+='<tr><td style="padding:4px 0;color:#7A7A7A">Gesamt:</td><td style="padding:4px 0;font-size:18px;font-weight:800;color:#58585A">'+tp+' EUR</td></tr></table></div>';
 
-{editCell&&editCell.ds&&<div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",background:"#1E40AF",color:"#fff",padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:600,zIndex:999,boxShadow:"0 4px 12px rgba(0,0,0,.2)"}}>
-Bearbeite: {editCell.name} am {fd(editCell.ds)} | Enter = Speichern | Esc = Abbrechen
-</div>}
-</div>};
+    html+='<div style="background:#EDEAE4;border-radius:10px;padding:14px 18px;margin:16px auto;max-width:450px;text-align:left;font-size:12px;color:#58585A;line-height:1.6">';
+    html+='<strong>Wichtige Hinweise:</strong><br>';
+    html+='Check-in ab 15:00 Uhr | Check-out bis 11:00 Uhr<br>';
+    html+='Stornierung bis 7 Tage vor Anreise: 80&nbsp;% Geb&uuml;hr<br>';
+    html+='Ab 3 Tagen vor Anreise / No-Show: voller Preis</div>';
+    html+='<p style="font-size:13px;color:#7A7A7A;margin-top:16px">Eine Best&auml;tigung wurde an <strong>'+esc(state.email)+'</strong> gesendet.</p>';
+    html+='<button class="btn btn-ghost" style="max-width:300px;margin:20px auto 0" onclick="resetBooking()">Neue Buchung</button></div>';
+  }
 
-// GAESTE
-const GuestsView=()=>{const[search,setSearch]=useState("");const[sel,setSel]=useState(null);const filtered=guests.filter(g=>{const s=search.toLowerCase();return!s||(g.first_name||"").toLowerCase().includes(s)||(g.last_name||"").toLowerCase().includes(s)||(g.email||"").toLowerCase().includes(s)});
-return<div><div style={{display:"flex",gap:8,marginBottom:16}}><div style={{flex:1,position:"relative"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Suchen..." style={{width:"100%",padding:"10px 12px 10px 36px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}}/><I n="search" s={16} c="#9CA3AF" st={{position:"absolute",left:12,top:12}}/></div></div>
-<div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#F9FAFB"}}>{["Name","E-Mail","Telefon","Ort",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead><tbody>{filtered.slice(0,50).map(g=><tr key={g.id} style={{cursor:"pointer",borderBottom:"1px solid #F3F4F6"}} onClick={()=>setSel(g)}><td style={{padding:"10px 12px",fontWeight:600}}>{g.salutation?g.salutation+" ":""}{g.first_name} {g.last_name}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.email}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.phone||"-"}</td><td style={{padding:"10px 12px",color:"#6B7280"}}>{g.city||"-"}</td><td style={{padding:"10px 12px"}}><button onClick={e=>{e.stopPropagation();if(confirm("Gast loeschen?"))delGuest(g.id)}} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444"}}><I n="trash" s={14}/></button></td></tr>)}</tbody></table></div>
-{sel&&<Modal title={sel.first_name+" "+sel.last_name} onClose={()=>{setSel(null);load()}}><div style={{fontSize:13,color:"#6B7280"}}><p>E-Mail: {sel.email}</p><p>Tel: {sel.phone}</p><p>Adresse: {sel.address}, {sel.zip} {sel.city}</p></div></Modal>}
-</div>};
+  html+='<div class="footer"><strong>'+HN+'</strong><br>'+HA+'<br>Tel.: '+HP+' | E-Mail: <a href="mailto:'+HE+'">'+HE+'</a><br><a href="http://'+HW+'" target="_blank">'+HW+'</a></div>';
+  app.innerHTML=html;
+}
 
-// EINSTELLUNGEN
-const SettingsView=()=>{const[tab,setTab]=useState("types");const[modal,setModal]=useState(null);const[exp,setExp]=useState({});const[hf,setHf]=useState(hi||{});const[sv,setSv]=useState(false);
-const rbt=useMemo(()=>{const m={};uts.forEach(u=>{m[u.id]=rms.filter(r=>r.unit_type_id===u.id)});return m},[uts,rms]);
-const tabs=[{id:"types",label:"Einheiten",icon:<I n="layers" s={16}/>},{id:"rooms",label:"Zimmer",icon:<I n="bed" s={16}/>},{id:"hotel",label:"Hoteldaten",icon:<I n="building" s={16}/>}];
-return<div><Tab tabs={tabs} active={tab} onChange={setTab}/>
-{tab==="types"&&<div><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><span style={{color:"#6B7280"}}>{uts.length} Einheiten</span><Btn sz="sm" onClick={()=>setModal({type:"addUT"})}><I n="plus" s={14}/> Neue Einheit</Btn></div>{uts.map(ut=>{const rs=rbt[ut.id]||[];return<div key={ut.id} style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",marginBottom:12}}><div onClick={()=>setExp(p=>({...p,[ut.id]:!p[ut.id]}))} style={{padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}><CD color={ut.color} size={16}/><div style={{fontWeight:700}}>{ut.name} ({ut.short_name})</div></div><div style={{display:"flex",alignItems:"center",gap:12}}><span style={{fontWeight:700}}>{rs.length} Zi.</span><button onClick={e=>{e.stopPropagation();setModal({type:"editUT",ut})}} style={{background:"none",border:"none",cursor:"pointer"}}><I n="edit" s={16} c="#6B7280"/></button><button onClick={e=>{e.stopPropagation();if(rs.length){show("Erst Zimmer entfernen!","error");return}delUT(ut.id)}} style={{background:"none",border:"none",cursor:"pointer"}}><I n="trash" s={16} c="#EF4444"/></button></div></div>{exp[ut.id]&&<div style={{padding:"12px 20px",borderTop:"1px solid #F3F4F6",background:"#FAFAFA"}}>{rs.map(r=><span key={r.id} style={{display:"inline-block",margin:4,padding:"6px 12px",background:"#fff",border:"1px solid #E5E7EB",borderRadius:8,fontSize:12}}>{r.name}</span>)}<div style={{marginTop:8}}><Btn sz="sm" v="ghost" onClick={()=>setModal({type:"addRoom",pre:ut.id})}><I n="plus" s={12}/> Zimmer</Btn></div></div>}</div>})}</div>}
-{tab==="rooms"&&<div><Btn sz="sm" onClick={()=>setModal({type:"addRoom"})} style={{marginBottom:16}}><I n="plus" s={14}/> Zimmer</Btn><div style={{background:"#fff",borderRadius:12,border:"1px solid #E5E7EB",overflow:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#F9FAFB"}}>{["Nr.","Einheit","Etage","Status",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:600,fontSize:11,color:"#6B7280",borderBottom:"1px solid #E5E7EB"}}>{h}</th>)}</tr></thead><tbody>{rms.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(r=>{const ut=gUT(r,uts);return<tr key={r.id} style={{opacity:r.active?1:.5}}><td style={{padding:"10px 12px",fontWeight:700,borderBottom:"1px solid #F3F4F6"}}>{r.name}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><CD color={ut?.color}/> {ut?.name}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}>{r.floor}.OG</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6",color:r.active?"#059669":"#9CA3AF"}}>{r.active?"Aktiv":"Inaktiv"}</td><td style={{padding:"10px 12px",borderBottom:"1px solid #F3F4F6"}}><button onClick={()=>setModal({type:"editRoom",room:r})} style={{background:"none",border:"none",cursor:"pointer",marginRight:4}}><I n="edit" s={15} c="#6B7280"/></button><button onClick={()=>delRoom(r.id)} style={{background:"none",border:"none",cursor:"pointer"}}><I n="trash" s={15} c="#EF4444"/></button></td></tr>})}</tbody></table></div></div>}
-{tab==="hotel"&&<div style={{background:"#fff",borderRadius:12,padding:20,border:"1px solid #E5E7EB",maxWidth:500}}><Inp label="Hotelname" value={hf.name||""} onChange={e=>setHf(p=>({...p,name:e.target.value}))}/><Inp label="Adresse" value={hf.address||""} onChange={e=>setHf(p=>({...p,address:e.target.value}))}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Telefon" value={hf.phone||""} onChange={e=>setHf(p=>({...p,phone:e.target.value}))}/><Inp label="E-Mail" value={hf.email||""} onChange={e=>setHf(p=>({...p,email:e.target.value}))}/></div><Btn disabled={sv} onClick={async()=>{setSv(true);try{await api.patch("hotel_info",hi.id,hf);setHi({...hi,...hf});show("Gespeichert")}catch(e){show("Fehler","error")}setSv(false)}}><I n="save" s={14}/> Speichern</Btn></div>}
-{modal?.type==="addUT"&&<UTEditor usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d);setModal(null)}}/>}
-{modal?.type==="editUT"&&<UTEditor ut={modal.ut} usedColors={uts.map(u=>u.color)} onClose={()=>setModal(null)} onSave={async d=>{await saveUT(d,modal.ut.id);setModal(null)}}/>}
-{modal?.type==="addRoom"&&<RoomEditor unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom({...d,unit_type_id:modal.pre||d.unit_type_id});setModal(null)}}/>}
-{modal?.type==="editRoom"&&<RoomEditor room={modal.room} unitTypes={uts} onClose={()=>setModal(null)} onSave={async d=>{await saveRoom(d,modal.room.id);setModal(null)}}/>}
-</div>};
+function addRoom(catId,delta){
+  var cur=state.selections[catId]||0;
+  var avail=availableRoomsForCat(catId);
+  var next=Math.max(0,Math.min(avail.length,cur+delta));
+  if(next===0){delete state.selections[catId]}else{state.selections[catId]=next}
+  render();
+}
 
-if(ld)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><I n="clock" s={32} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/></div>;
-const nav=[{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preise",l:"Preise",ic:"credit"},{id:"guests",l:"Gaeste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
-return<div style={{minHeight:"100vh"}}>
-<div style={{background:"#fff",borderBottom:"1px solid #E5E7EB",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-<div style={{display:"flex",alignItems:"center",gap:12}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center"}}><I n="home" s={20} c="#fff"/></div><div><div style={{fontWeight:800,fontSize:16}}>{hi?.name||"Hotel"}</div><div style={{fontSize:11,color:"#9CA3AF"}}>{aRms.length} Zimmer</div></div></div>
-<div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>{nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:8,border:"none",background:view===n.id?"#EFF6FF":"transparent",color:view===n.id?"#2563EB":"#6B7280",fontWeight:view===n.id?700:500,fontSize:13,cursor:"pointer"}}><I n={n.ic} s={18}/> {n.l}</button>)}<button onClick={load} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}}><I n="refresh" s={16}/></button><button onClick={onLogout} style={{background:"none",border:"none",cursor:"pointer",padding:8,color:"#9CA3AF"}}><I n="logout" s={16}/></button></div>
-</div>
-<div style={{padding:20,maxWidth:1400,margin:"0 auto"}}>
-{view==="plan"&&<PlanView/>}
-{view==="preise"&&<PreiseView/>}
-{view==="guests"&&<GuestsView/>}
-{view==="settings"&&<SettingsView/>}
-</div>
-{toast&&<div style={{position:"fixed",bottom:24,right:24,background:toast.t==="success"?"#10B981":"#EF4444",color:"#fff",padding:"12px 20px",borderRadius:12,fontWeight:600,fontSize:14,boxShadow:"0 10px 25px rgba(0,0,0,.15)",zIndex:2000,animation:"slideIn .3s ease"}}>{toast.m}</div>}
-</div>}
+function toggleBreakfast(){state.breakfast=!state.breakfast;render()}
 
-ReactDOM.render(<App/>,document.getElementById("root"));
+function goStep2(){
+  state.checkIn=document.getElementById("ci").value;
+  state.checkOut=document.getElementById("co").value;
+  state.adults=parseInt(document.getElementById("ad").value)||1;
+  state.children=parseInt(document.getElementById("ch").value)||0;
+  if(!state.checkIn||!state.checkOut||state.checkIn>=state.checkOut){alert("Bitte gueltigen Zeitraum waehlen");return}
+  state.step=2;state.selections={};state.breakfast=false;
+  // Load daily prices for the selected date range
+  loadDailyPricesForRange();
+  render();
+  fetchCompetitorPrices();
+}
+
+function goStep3(){
+  if(totalRoomsSelected()<=0||totalCapacity()<totalGuests())return;
+  state.step=3;state.error="";render();
+}
+
+function goBack(step){state.step=step;state.error="";render()}
+
+function doBook(){
+  saveStep3();
+  state.agbAccepted=document.getElementById("agbcheck").checked;
+
+  if(!state.agbAccepted){state.error="Bitte akzeptieren Sie die Buchungsbedingungen.";render();return}
+  if(!state.first_name.trim()||!state.last_name.trim()){state.error="Bitte Vor- und Nachname eingeben.";render();return}
+  if(!state.email.trim()||!state.email.includes("@")){state.error="Bitte g&uuml;ltige E-Mail-Adresse eingeben.";render();return}
+
+  var roomsToBook=[];
+  Object.keys(state.selections).forEach(function(catId){
+    var cnt=state.selections[catId];
+    var avail=availableRoomsForCat(catId);
+    for(var i=0;i<cnt&&i<avail.length;i++){
+      var cat=state.cats.find(function(c){return c.id===catId});
+      roomsToBook.push({room:avail[i],cat:cat,price:catNightlyTotal(catId)});
+    }
+  });
+
+  if(roomsToBook.length===0){state.error="Keine verf&uuml;gbaren Zimmer im gew&auml;hlten Zeitraum.";render();return}
+
+  state.saving=true;state.error="";render();
+
+  var guestData={salutation:state.salutation,first_name:state.first_name.trim(),last_name:state.last_name.trim(),email:state.email.trim(),phone:state.phone.trim(),address:state.address.trim(),zip:state.zip.trim(),city:state.city.trim(),country:state.country.trim()||"DE"};
+  if(state.company.trim())guestData.company=state.company.trim();
+
+  sb("guests","POST",guestData).then(function(gs){
+    var guest=gs[0];
+    var bfNote=state.breakfast?" | Fruehstueck: Ja ("+totalGuests()+" Pers.)":"";
+    var groupNote=roomsToBook.length>1?" | Gruppenbuchung ("+roomsToBook.length+" Zimmer)":"";
+
+    var promises=roomsToBook.map(function(rb,idx){
+      var token="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16)});
+      return sb("reservations","POST",{
+        room_id:rb.room.id,guest_id:guest.id,check_in:state.checkIn,check_out:state.checkOut,
+        status:"reservierung",adults:idx===0?state.adults:0,children:idx===0?state.children:0,
+        total_price:rb.price+(idx===0?breakfastTotal():0),source:"website",offer_token:token,
+        notes:"Online-Direktbuchung"+bfNote+groupNote
+      });
+    });
+
+    return Promise.all(promises).then(function(results){
+      state.resNumbers=results.map(function(rs){return rs[0].reservation_number||rs[0].id.toString().slice(0,8).toUpperCase()});
+      state.resNumber=state.resNumbers[0];
+      return fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        to:state.email.trim(),subject:"Ihre Reservierungsbestaetigung - "+HN,
+        html:buildConfirmationHtml(guest),emailType:"bestaetigung"
+      })}).catch(function(){});
+    });
+  }).then(function(){
+    state.saving=false;state.step=4;render();
+  }).catch(function(e){
+    state.saving=false;state.error="Buchungsfehler: "+e.message;render();
+  });
+}
+
+function buildConfirmationHtml(guest){
+  var n=nights();var tg=totalGuests();var tp=totalPrice();var rp=roomsPrice();var bp=breakfastTotal();
+  var greet=(state.salutation||"Sehr geehrte/r")+" "+state.last_name.trim();
+  var selCats=[];
+  Object.keys(state.selections).forEach(function(catId){
+    var cnt=state.selections[catId];if(cnt<=0)return;
+    var cat=state.cats.find(function(c){return c.id===catId});
+    if(cat)selCats.push({cat:cat,count:cnt});
+  });
+  var h='<table width="100%" style="width:100%;max-width:650px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0">';
+  h+='<tr><td><img src="'+LOGO+'" width="100%" style="width:100%"/></td></tr>';
+  h+='<tr><td height="20"></td></tr>';
+  h+='<tr><td><h1 style="font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#58585a;margin:0;">Ihre Reservierungsbestaetigung</h1></td></tr>';
+  h+='<tr><td style="border:1px solid #ccc;padding:15px;font-size:14px;">'+greet+',<br><br>vielen Dank fuer Ihre Reservierung ueber unsere Website!<br><br>Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr>';
+  h+='<tr><td height="10"></td></tr>';
+  h+='<tr><td style="border:1px solid #ccc;padding:15px;background:#EDEAE4;text-align:center;font-size:14px;">Gesamtpreis:<br><span style="font-size:24px;font-weight:bold;color:#58585A;">EUR '+tp.toFixed(2)+'</span><br>inkl. Steuern</td></tr>';
+  h+='<tr><td height="15"></td></tr>';
+  h+='<tr><td><h2 style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#58585a;">Ihre Buchung</h2></td></tr>';
+  h+='<tr><td style="border:1px solid #ccc;padding:15px;font-size:14px;"><table width="100%">';
+  selCats.forEach(function(sc){h+='<tr><td>Zimmer:</td><td><strong>'+sc.count+'x '+sc.cat.name+'</strong></td></tr>'});
+  if(state.breakfast)h+='<tr><td>Fruehstueck:</td><td>Ja ('+tg+' Personen, '+bp+' EUR)</td></tr>';
+  h+='<tr><td>Anreise:</td><td>'+fd(state.checkIn)+'</td></tr>';
+  h+='<tr><td>Abreise:</td><td>'+fd(state.checkOut)+'</td></tr>';
+  h+='<tr><td>Naechte:</td><td>'+n+'</td></tr>';
+  h+='<tr><td>Erwachsene:</td><td>'+state.adults+'</td></tr>';
+  if(state.children>0)h+='<tr><td>Kinder:</td><td>'+state.children+'</td></tr>';
+  h+='</table></td></tr>';
+  h+='<tr><td height="10"></td></tr>';
+  h+='<tr><td style="border:1px solid #ccc;padding:15px;background:#F5F3EF;font-size:12px;color:#58585A;line-height:1.6;">';
+  h+='<strong>Wichtige Hinweise</strong><br>';
+  h+='Check-in ab 15:00 Uhr | Check-out bis 11:00 Uhr<br>';
+  h+='Stornierung bis 7 Tage vor Anreise: 80% Gebuehr. Ab 3 Tagen vor Anreise / No-Show: voller Preis.<br>';
+  h+='Im gesamten Hotelgebaeude gilt striktes Rauchverbot (Reinigungspauschale 300 EUR).<br>';
+  h+='Bei vorzeitiger Abreise ist keine Erstattung moeglich.</td></tr>';
+  h+='<tr><td height="15"></td></tr>';
+  h+='<tr><td style="background-color:#ABA596;padding:15px;color:#fff;font-size:13px;"><strong>'+HN+'</strong><br>'+HA+'<br>Tel.: '+HP+'<br>E-Mail: '+HE+'<br>'+HW+'</td></tr></table>';
+  return h;
+}
+
+function resetBooking(){
+  state={step:1,cats:state.cats,rooms:state.rooms,reservations:state.reservations,dailyPrices:{},selections:{},checkIn:"",checkOut:"",adults:1,children:0,breakfast:false,salutation:"Herr",first_name:"",last_name:"",email:"",phone:"",address:"",zip:"",city:"",country:"DE",company:"",agbAccepted:false,loading:false,saving:false,error:"",resNumber:"",resNumbers:[],compPrices:[],compLoading:false};
+  loadData();
+}
+
+function loadData(){
+  state.loading=true;render();
+  Promise.all([
+    sb("unit_types?order=sort_order","GET"),
+    sb("rooms?active=eq.true&order=name","GET"),
+    sb("reservations?status=neq.storniert&status=neq.abgelehnt&status=neq.checkedout&select=id,room_id,check_in,check_out,status","GET")
+  ]).then(function(results){
+    state.cats=results[0];state.rooms=results[1];state.reservations=results[2];
+    state.loading=false;render();
+  }).catch(function(e){
+    state.loading=false;state.error="Laden fehlgeschlagen: "+e.message;render();
+  });
+}
+
+loadData();
 </script>
 </body>
 </html>
