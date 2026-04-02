@@ -210,13 +210,15 @@ function parseHRSEmail(text) {
     guaranteed: false
   };
 
-  // Gastname: "NACHNAME, Vorname" Format
+  // Gastname: "NACHNAME, Vorname" Format - auch mehrteilige Nachnamen wie "DE FILIPPO"
   var nameMatch = t.match(/Anreisende\s*G[aä]ste[:\s]*([A-Z\u00C0-\u00FF][A-Z\u00C0-\u00FF\s'-]+),\s*([A-Za-z\u00C0-\u00FF\s'-]+)/);
   if (nameMatch) {
-    result.lastName = nameMatch[1].trim();
+    var rawLast = nameMatch[1].trim();
     result.firstName = nameMatch[2].trim();
-    // Ersten Buchstaben gross, Rest klein fuer Nachname
-    result.lastName = result.lastName.charAt(0).toUpperCase() + result.lastName.slice(1).toLowerCase();
+    // Title Case fuer Nachname: "DE FILIPPO" -> "De Filippo"
+    result.lastName = rawLast.split(/\s+/).map(function(w) {
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(" ");
   }
 
   // An-/Abreise: "Di. 14.04.2026 - Mi. 15.04.2026"
