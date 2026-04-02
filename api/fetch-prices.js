@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       var n = (name || "").toLowerCase();
       if (n.indexOf("einzel") >= 0 || n.indexOf("single") >= 0 || n.indexOf("ez") >= 0) return 1;
       if (n.indexOf("drei") >= 0 || n.indexOf("triple") >= 0 || n.indexOf("3b") >= 0) return 3;
-      if (n.indexOf("famili") >= 0 || n.indexOf("family") >= 0) return 4;
+      if (n.indexOf("vier") >= 0 || n.indexOf("famili") >= 0 || n.indexOf("family") >= 0) return 4;
       return 2;
     }
 
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
 
     console.log("fetch-prices: sending to Gemini, cats=" + categories.length + ", period=" + dateFrom + " to " + dateTo);
 
-    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
 
     var geminiResp = await fetch(geminiUrl, {
       method: "POST",
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         tools: [{ google_search: {} }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
       })
     });
 
@@ -122,37 +122,73 @@ export default async function handler(req, res) {
 
     var data = await geminiResp.json();
 
-    // Text extrahieren
+    // Text extrahieren - WICHTIG: Thinking-Parts von Gemini 2.5 filtern
     var fullText = "";
     if (data.candidates && data.candidates[0] && data.candidates[0].content) {
       var parts = data.candidates[0].content.parts || [];
       for (var i = 0; i < parts.length; i++) {
+        // Skip thinking parts (Gemini 2.5 Flash)
+        if (parts[i].thought) continue;
         if (parts[i].text) fullText += parts[i].text;
       }
     }
 
-    console.log("fetch-prices: got text length=" + fullText.length);
+    console.log("fetch-prices: got text length=" + fullText.length + ", first 200: " + fullText.slice(0, 200));
 
     if (!fullText) {
-      return res.status(500).json({ error: "Keine Antwort von Gemini", raw: JSON.stringify(data).slice(0, 300) });
+      // Prüfe ob es ein Blockierungsgrund gibt
+      var blockReason = "";
+      if (data.candidates && data.candidates[0]) {
+        blockReason = data.candidates[0].finishReason || "";
+      }
+      if (data.promptFeedback && data.promptFeedback.blockReason) {
+        blockReason = data.promptFeedback.blockReason;
+      }
+      return res.status(500).json({
+        error: "Keine Antwort von Gemini" + (blockReason ? " (Grund: " + blockReason + ")" : ""),
+        raw: JSON.stringify(data).slice(0, 500)
+      });
     }
 
-    // JSON finden
+    // JSON finden - robuste Methode mit Klammer-Matching
     var clean = fullText.replace(/```json/g, "").replace(/```/g, "").trim();
-    var match = clean.match(/\{[\s\S]*"suggestions"[\s\S]*\}/);
 
-    if (!match) {
+    // Finde die erste { die zu einem vollstaendigen JSON-Objekt gehoert
+    var jsonStr = null;
+    var startIdx = clean.indexOf("{");
+    if (startIdx >= 0) {
+      var depth = 0;
+      var endIdx = -1;
+      var inString = false;
+      var escape = false;
+      for (var i = startIdx; i < clean.length; i++) {
+        var ch = clean[i];
+        if (escape) { escape = false; continue; }
+        if (ch === "\\") { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === "{") depth++;
+        if (ch === "}") {
+          depth--;
+          if (depth === 0) { endIdx = i; break; }
+        }
+      }
+      if (endIdx > startIdx) {
+        jsonStr = clean.substring(startIdx, endIdx + 1);
+      }
+    }
+
+    if (!jsonStr || jsonStr.indexOf("suggestions") === -1) {
       console.error("fetch-prices: no JSON found in: " + clean.slice(0, 500));
       return res.status(500).json({ error: "Kein JSON in Antwort", raw: clean.slice(0, 500) });
     }
 
     // JSON bereinigen und parsen - 3 Versuche
     var parsed = null;
-    var jsonRaw = match[0];
 
     // Versuch 1: Bereinigen
     try {
-      var s = jsonRaw;
+      var s = jsonStr;
       s = s.replace(/[\x00-\x1F\x7F]/g, " ");
       s = s.replace(/\\n/g, " ");
       s = s.replace(/\n/g, " ");
@@ -167,40 +203,40 @@ export default async function handler(req, res) {
       console.log("fetch-prices: attempt 1 failed: " + e1.message);
       // Versuch 2: nur ASCII
       try {
-        var s2 = jsonRaw.replace(/[^\x20-\x7E]/g, " ").replace(/\s+/g, " ");
+        var s2 = jsonStr.replace(/[^\x20-\x7E]/g, " ").replace(/\s+/g, " ");
         s2 = s2.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
         parsed = JSON.parse(s2);
         console.log("fetch-prices: parsed on attempt 2");
       } catch (e2) {
-        console.log("fetch-prices: attempt 2 failed: " + e2.message);
+        console.log("fetch-prices: attempt 2 failed: " + e2.message + ", json preview: " + jsonStr.slice(0, 300));
         // Versuch 3: Regex-Extraktion
         try {
           var suggestions = {};
           for (var ci = 0; ci < categories.length; ci++) {
-            var cid = String(categories[ci].id);
+            var sid = simpleIds[categories[ci].id];
+            // Suche den Abschnitt fuer diese ID
+            var secRx = new RegExp('"' + sid + '"\\s*:\\s*\\[([\\s\\S]*?)\\]');
+            var secMatch = jsonStr.match(secRx);
+            var searchIn = secMatch ? secMatch[1] : jsonStr;
+
             var items = [];
-            // Suche nach date/price Paaren
-            var dateRx = /\"date\"\s*:\s*\"(\d{4}-\d{1,2}-\d{1,2})\"\s*,\s*\"price\"\s*:\s*(\d+)/g;
+            var dateRx = /"date"\s*:\s*"(\d{4}-\d{1,2}-\d{1,2})"\s*,\s*"price"\s*:\s*(\d+)/g;
             var dm;
-            while ((dm = dateRx.exec(jsonRaw)) !== null) {
+            while ((dm = dateRx.exec(searchIn)) !== null) {
               items.push({ date: dm[1], price: parseInt(dm[2]), reason: "" });
             }
             if (items.length > 0) {
-              // Teile items gleichmaessig auf Kategorien auf
-              var perCat = Math.ceil(items.length / categories.length);
-              var start = ci * perCat;
-              var end = Math.min(start + perCat, items.length);
-              suggestions[cid] = items.slice(start, end);
+              suggestions[categories[ci].id] = items;
             }
           }
           if (Object.keys(suggestions).length > 0) {
             parsed = { suggestions: suggestions, competitors: [], marketSummary: "Daten extrahiert (Fallback)" };
-            console.log("fetch-prices: parsed on attempt 3 (regex)");
+            console.log("fetch-prices: parsed on attempt 3 (regex), keys=" + Object.keys(suggestions).join(","));
           } else {
-            return res.status(500).json({ error: "JSON nicht parsebar nach 3 Versuchen", raw: jsonRaw.slice(0, 500) });
+            return res.status(500).json({ error: "JSON nicht parsebar nach 3 Versuchen", raw: jsonStr.slice(0, 500) });
           }
         } catch (e3) {
-          return res.status(500).json({ error: "Parse-Fehler: " + e3.message, raw: jsonRaw.slice(0, 500) });
+          return res.status(500).json({ error: "Parse-Fehler: " + e3.message, raw: jsonStr.slice(0, 500) });
         }
       }
     }
@@ -214,17 +250,14 @@ export default async function handler(req, res) {
       var sKey = suggKeys[i];
       var realId = reverseIds[sKey];
       if (realId) {
-        // Direkt-Match ueber simple ID
         mappedSugg[realId] = parsed.suggestions[sKey];
-        console.log("fetch-prices: mapped " + sKey + " -> " + realId + " (" + parsed.suggestions[sKey].length + " days)");
+        console.log("fetch-prices: mapped " + sKey + " -> " + realId + " (" + (parsed.suggestions[sKey] || []).length + " days)");
       } else if (i < categories.length) {
-        // Fallback: Position
         mappedSugg[categories[i].id] = parsed.suggestions[sKey];
         console.log("fetch-prices: position-mapped " + sKey + " -> " + categories[i].id);
       }
     }
 
-    // Falls weniger Keys als Kategorien: auch per Position zuordnen
     if (suggKeys.length < categories.length && suggKeys.length > 0) {
       for (var i = 0; i < categories.length; i++) {
         if (!mappedSugg[categories[i].id] && i < suggKeys.length) {
@@ -250,7 +283,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, data: parsed });
 
   } catch (err) {
-    console.error("fetch-prices: exception: " + err.message);
+    console.error("fetch-prices: exception: " + err.message + " stack: " + (err.stack || "").slice(0, 300));
     return res.status(500).json({ error: err.message });
   }
 }
