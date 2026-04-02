@@ -117,7 +117,9 @@ export default async function handler(req, res) {
     if (!geminiResp.ok) {
       var errBody = await geminiResp.text();
       console.error("Gemini error " + geminiResp.status + ": " + errBody.slice(0, 300));
-      return res.status(500).json({ error: "Gemini API " + geminiResp.status + ": " + errBody.slice(0, 200) });
+      // 429 durchreichen damit Client Rate-Limit-Countdown anzeigt
+      var passStatus = geminiResp.status === 429 ? 429 : 500;
+      return res.status(passStatus).json({ error: "Gemini API " + geminiResp.status + ": " + errBody.slice(0, 200) });
     }
 
     var data = await geminiResp.json();
