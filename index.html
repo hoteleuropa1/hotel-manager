@@ -188,7 +188,8 @@ try{
 pr.reqLog.push(Date.now());
 const resp=await fetch("/api/fetch-prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({categories,dateFrom:toDS(chunk[0]),dateTo:toDS(chunk[chunk.length-1])})});
 if(resp.status===429){pr.cooldown=Date.now()+65000;chunkErrs.push("API Rate-Limit (429). 60s Pause.");pForce();break}
-let result;try{result=await resp.json()}catch(pe){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+": Kein JSON (Status "+resp.status+")");continue}
+const rawText=await resp.text();
+let result;try{result=JSON.parse(rawText)}catch(pe){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+" (Status "+resp.status+"): "+rawText.slice(0,300));continue}
 if(!resp.ok||!result.success){chunkErrs.push("Chunk "+(ci+1)+"/"+chunks.length+": "+(result.error||"Status "+resp.status));continue}
 const sugg=result.data?.suggestions||{};const sKeys=Object.keys(sugg);
 activeCats.forEach((cat,idx)=>{const cid=String(cat.id);
