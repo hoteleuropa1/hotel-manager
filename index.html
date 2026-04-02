@@ -411,6 +411,100 @@ Bearbeite: {editCell.name} am {fd(editCell.ds)} | Enter = Speichern | Esc = Abbr
 </div>}
 </div>};
 
+// IMPORT (HRS, Booking etc.)
+const ImportView=()=>{
+const[emailText,setEmailText]=useState("");
+const[result,setResult]=useState(null);
+const[importing,setImporting]=useState(false);
+const[error,setError]=useState("");
+const[history,setHistory]=useState([]);
+
+const doImport=async(source)=>{
+if(!emailText.trim()){setError("Bitte Email-Text einfuegen");return}
+setImporting(true);setError("");setResult(null);
+try{
+const resp=await fetch("/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:emailText.trim()})});
+const data=await resp.json();
+if(data.success){setResult(data);setHistory(prev=>[{...data.reservation,time:new Date().toLocaleTimeString("de-DE"),source},...prev]);setEmailText("");await load()}
+else{setError(data.error||"Import fehlgeschlagen")}
+}catch(e){setError(e.message)}
+setImporting(false)};
+
+return<div>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+<div><h2 style={{fontSize:18,fontWeight:800,margin:"0 0 4px"}}>Buchungs-Import</h2>
+<p style={{color:"#6B7280",fontSize:13,margin:0}}>HRS-, Booking.com- oder Expedia-Buchungsemails einfuegen und automatisch importieren.</p></div>
+</div>
+
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+<div>
+<Card title="Email-Text einfuegen" style={{marginBottom:16}}>
+<textarea value={emailText} onChange={e=>setEmailText(e.target.value)} placeholder={"Buchungsemail hier komplett einfuegen...\n\nEinfach die HRS-Email oeffnen, Ctrl+A (alles markieren), Ctrl+C (kopieren), dann hier Ctrl+V (einfuegen)."} style={{width:"100%",minHeight:350,padding:12,border:"1px solid #D1D5DB",borderRadius:8,fontSize:12,fontFamily:"monospace",outline:"none",resize:"vertical",boxSizing:"border-box"}}/>
+<div style={{display:"flex",gap:8,marginTop:12}}>
+<Btn onClick={()=>doImport("hrs")} disabled={importing||!emailText.trim()} style={{flex:1,justifyContent:"center",background:"#1E40AF"}}>
+<I n="mail" s={16} c="#fff"/> {importing?"Importiere...":"HRS importieren"}
+</Btn>
+<Btn v="ghost" onClick={()=>{setEmailText("");setResult(null);setError("")}} disabled={importing}>Leeren</Btn>
+</div>
+</Card>
+
+{error&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:10,padding:14,marginBottom:12}}>
+<div style={{fontWeight:700,color:"#DC2626",fontSize:13,marginBottom:4}}>Fehler beim Import</div>
+<div style={{fontSize:12,color:"#991B1B"}}>{error}</div>
+</div>}
+
+{result&&<div style={{background:"#D1FAE5",border:"1px solid #A7F3D0",borderRadius:10,padding:14,marginBottom:12}}>
+<div style={{fontWeight:700,color:"#059669",fontSize:14,marginBottom:8}}>Buchung erfolgreich importiert!</div>
+<div style={{fontSize:13,color:"#065F46",lineHeight:1.8}}>
+<div><strong>Gast:</strong> {result.reservation.guest}</div>
+<div><strong>Zimmer:</strong> {result.reservation.room} ({result.reservation.roomType})</div>
+<div><strong>Zeitraum:</strong> {result.reservation.checkIn} bis {result.reservation.checkOut}</div>
+<div><strong>Preis:</strong> {result.reservation.price} EUR</div>
+<div><strong>HRS-Nr:</strong> {result.reservation.hrsNr}</div>
+</div>
+</div>}
+</div>
+
+<div>
+<Card title="So funktioniert es" style={{marginBottom:16}}>
+<div style={{fontSize:13,color:"#374151",lineHeight:1.8}}>
+<div style={{display:"flex",gap:10,marginBottom:12,alignItems:"flex-start"}}>
+<span style={{background:"#3B82F6",color:"#fff",borderRadius:20,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,flexShrink:0}}>1</span>
+<span>HRS-Buchungsemail oeffnen (die mit "Buchung" im Betreff)</span>
+</div>
+<div style={{display:"flex",gap:10,marginBottom:12,alignItems:"flex-start"}}>
+<span style={{background:"#3B82F6",color:"#fff",borderRadius:20,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,flexShrink:0}}>2</span>
+<span>Gesamten Text markieren (Ctrl+A) und kopieren (Ctrl+C)</span>
+</div>
+<div style={{display:"flex",gap:10,marginBottom:12,alignItems:"flex-start"}}>
+<span style={{background:"#3B82F6",color:"#fff",borderRadius:20,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,flexShrink:0}}>3</span>
+<span>Hier einfuegen (Ctrl+V) und "HRS importieren" klicken</span>
+</div>
+<div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+<span style={{background:"#10B981",color:"#fff",borderRadius:20,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,flexShrink:0}}>&#10003;</span>
+<span>Gast, Zimmer und Reservierung werden automatisch angelegt</span>
+</div>
+</div>
+</Card>
+
+<Card title="Erkannte Quellen">
+<div style={{fontSize:12,color:"#6B7280"}}>
+<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid #F3F4F6"}}><span style={{background:"#1E40AF",color:"#fff",padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>HRS</span> Vollstaendig unterstuetzt</div>
+<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid #F3F4F6"}}><span style={{background:"#9CA3AF",color:"#fff",padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>Booking</span> In Planung</div>
+<div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}><span style={{background:"#9CA3AF",color:"#fff",padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:700}}>Expedia</span> In Planung</div>
+</div>
+</Card>
+
+{history.length>0&&<Card title="Heutige Imports" style={{marginTop:16}}>
+<div style={{fontSize:12}}>{history.map((h,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #F3F4F6"}}>
+<div><span style={{fontWeight:700}}>{h.guest}</span> - {h.roomType} ({h.room})</div>
+<div style={{color:"#6B7280"}}>{h.checkIn} | {h.price} EUR | {h.time}</div>
+</div>)}</div>
+</Card>}
+</div>
+</div>
+</div>};
+
 // GAESTE
 const GuestsView=()=>{const[search,setSearch]=useState("");const[sel,setSel]=useState(null);const filtered=guests.filter(g=>{const s=search.toLowerCase();return!s||(g.first_name||"").toLowerCase().includes(s)||(g.last_name||"").toLowerCase().includes(s)||(g.email||"").toLowerCase().includes(s)});
 return<div><div style={{display:"flex",gap:8,marginBottom:16}}><div style={{flex:1,position:"relative"}}><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Suchen..." style={{width:"100%",padding:"10px 12px 10px 36px",border:"1px solid #D1D5DB",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"}}/><I n="search" s={16} c="#9CA3AF" st={{position:"absolute",left:12,top:12}}/></div></div>
@@ -433,7 +527,7 @@ return<div><Tab tabs={tabs} active={tab} onChange={setTab}/>
 </div>};
 
 if(ld)return<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><I n="clock" s={32} c="#3B82F6" st={{animation:"spin 1s linear infinite"}}/></div>;
-const nav=[{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preise",l:"Preise",ic:"credit"},{id:"guests",l:"Gaeste",ic:"users"},{id:"settings",l:"Einstellungen",ic:"settings"}];
+const nav=[{id:"plan",l:"Belegungsplan",ic:"cal"},{id:"preise",l:"Preise",ic:"credit"},{id:"guests",l:"Gaeste",ic:"users"},{id:"import",l:"Import",ic:"mail"},{id:"settings",l:"Einstellungen",ic:"settings"}];
 return<div style={{minHeight:"100vh"}}>
 <div style={{background:"#fff",borderBottom:"1px solid #E5E7EB",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
 <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center"}}><I n="home" s={20} c="#fff"/></div><div><div style={{fontWeight:800,fontSize:16}}>{hi?.name||"Hotel"}</div><div style={{fontSize:11,color:"#9CA3AF"}}>{aRms.length} Zimmer</div></div></div>
@@ -443,6 +537,7 @@ return<div style={{minHeight:"100vh"}}>
 {view==="plan"&&<PlanView/>}
 {view==="preise"&&<PreiseView/>}
 {view==="guests"&&<GuestsView/>}
+{view==="import"&&<ImportView/>}
 {view==="settings"&&<SettingsView/>}
 </div>
 {toast&&<div style={{position:"fixed",bottom:24,right:24,background:toast.t==="success"?"#10B981":"#EF4444",color:"#fff",padding:"12px 20px",borderRadius:12,fontWeight:600,fontSize:14,boxShadow:"0 10px 25px rgba(0,0,0,.15)",zIndex:2000,animation:"slideIn .3s ease"}}>{toast.m}</div>}
