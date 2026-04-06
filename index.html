@@ -319,7 +319,7 @@ return<React.Fragment key={ut.id}>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#ABA596"}}>{hoverRes.res.adults} Erw.{hoverRes.res.children>0?", "+hoverRes.res.children+" Kind.":""}</span><span style={{fontWeight:700,color:"#D4940E"}}>{fmt(hoverRes.res.total_price)} EUR</span></div>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#ABA596"}}>{SOURCES[hoverRes.res.source]||hoverRes.res.source}</span><Badge s={hoverRes.res.status}/></div>
 </div></div>}
-{modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} guests={guests} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
+{modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} guests={guests} allRooms={aRms} reservations={ress} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
 {showImport&&<Modal title={(importSource==="booking"?"Booking.com":"HRS")+" Buchung importieren"} onClose={()=>setShowImport(false)} width={620}>
 <p style={{fontSize:13,color:"#6B7280",marginBottom:12}}>{importSource==="booking"?"Booking.com":"HRS"}-Buchung oeffnen, alles markieren (Ctrl+A), kopieren (Ctrl+C) und hier einfuegen (Ctrl+V).</p>
 <textarea value={emailText} onChange={e=>setEmailText(e.target.value)} placeholder="Buchungsdaten hier einfuegen..." style={{width:"100%",minHeight:220,padding:12,border:"1px solid #D1D5DB",borderRadius:8,fontSize:11,fontFamily:"monospace",outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:12}}/>
