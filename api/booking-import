@@ -1,0 +1,312 @@
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  "https://ztdtkncoyrkvdpytwuhy.supabase.co",
+  process.env.SUPABASE_SERVICE_KEY
+);
+
+const MONTHS = {
+  jan:1,feb:2,"mär":3,"märz":3,marz:3,mar:3,apr:4,mai:5,jun:6,
+  jul:7,aug:8,sep:9,okt:10,nov:11,dez:12
+};
+
+function parseDate(str) {
+  // "Mo., 6. Apr. 2026" or "Fr., 6. März 2026"
+  const c = str.replace(/\./g,"").replace(/,/g,"").trim();
+  const p = c.split(/\s+/);
+  let day, month, year;
+  for (const w of p) {
+    const n = parseInt(w);
+    if (!isNaN(n) && n >= 1 && n <= 31 && !day) day = n;
+    else if (!isNaN(n) && n >= 2020) year = n;
+    else {
+      const ml = w.toLowerCase();
+      if (MONTHS[ml]) month = MONTHS[ml];
+      else if (MONTHS[ml.substring(0,3)]) month = MONTHS[ml.substring(0,3)];
+    }
+  }
+  if (!day || !month || !year) return null;
+  return `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+}
+
+function val(lines, label) {
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith(label)) {
+      const after = lines[i].substring(label.length).trim();
+      if (after) return after;
+      if (i + 1 < lines.length) return lines[i + 1];
+    }
+  }
+  return "";
+}
+
+function parsePrice(str) {
+  const m = str.match(/€\s*([\d.,]+)/);
+  if (!m) return 0;
+  return parseFloat(m[1].replace(".", "").replace(",", ".")) || parseFloat(m[1].replace(",", ".")) || 0;
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  try {
+    const { emailText } = req.body;
+    if (!emailText) return res.status(400).json({ success: false, error: "Kein Text" });
+
+    const lines = emailText.split("\n").map(l => l.trim()).filter(Boolean);
+
+    // === CHECK-IN / CHECK-OUT ===
+    let checkIn, checkOut;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i] === "Check-in" && i + 1 < lines.length) checkIn = parseDate(lines[i + 1]);
+      if (lines[i] === "Check-out" && i + 1 < lines.length) checkOut = parseDate(lines[i + 1]);
+    }
+    if (!checkIn || !checkOut) return res.status(400).json({ success: false, error: "Check-in/Check-out nicht erkannt" });
+
+    // === GUEST NAME ===
+    let guestName = "";
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].match(/^Name des Gast/)) {
+        const colon = lines[i].indexOf(":");
+        const after = colon >= 0 ? lines[i].substring(colon + 1).trim() : "";
+        guestName = after || (i + 1 < lines.length ? lines[i + 1] : "");
+        break;
+      }
+    }
+    if (!guestName) return res.status(400).json({ success: false, error: "Gastname nicht erkannt" });
+
+    const nameParts = guestName.split(/\s+/);
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    // === COUNTRY CODE (line after name, 2 chars like "de") ===
+    let country = "DE";
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i] === guestName && i + 1 < lines.length) {
+        const next = lines[i + 1].trim();
+        if (next.length === 2 && /^[a-z]{2}$/i.test(next)) {
+          country = next.toUpperCase();
+        }
+        break;
+      }
+    }
+
+    // === EMAIL ===
+    let email = "";
+    for (const l of lines) {
+      if (l.includes("@guest.booking.com") || (l.includes("@") && l.includes("booking"))) {
+        email = l.trim();
+        break;
+      }
+    }
+
+    // === ADDRESS (after "Telefonnummer anzeigen") ===
+    let address = "", city = "", zip = "";
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i] === "Telefonnummer anzeigen" && i + 1 < lines.length) {
+        const addrLine = lines[i + 1];
+        if (addrLine && !addrLine.startsWith("Bevorzugte") && !addrLine.startsWith("Kanal")) {
+          const plzMatch = addrLine.match(/\b(\d{4,5})\b/);
+          if (plzMatch) {
+            zip = plzMatch[1];
+            const idx = addrLine.indexOf(zip);
+            const before = addrLine.substring(0, idx).trim();
+            const after = addrLine.substring(idx + zip.length).trim();
+            if (after) { city = after; address = before; }
+            else {
+              const words = before.split(/\s+/);
+              if (words.length >= 3) { city = words.pop(); address = words.join(" "); }
+              else address = before;
+            }
+          } else {
+            address = addrLine;
+          }
+        }
+        break;
+      }
+    }
+
+    // === BOOKING NUMBER ===
+    let bookingNr = "";
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith("Buchungsnummer:")) {
+        bookingNr = lines[i].replace("Buchungsnummer:", "").trim();
+        if (!bookingNr && i + 1 < lines.length) bookingNr = lines[i + 1];
+        break;
+      }
+    }
+
+    // === TOTAL ADULTS ===
+    let totalAdults = 1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].match(/Gesamtanzahl G(ä|a)ste/)) {
+        const next = i + 1 < lines.length ? lines[i + 1] : lines[i];
+        const am = next.match(/(\d+)\s*Erwachsene/i) || next.match(/(\d+)\s*Erwachsener/i);
+        if (am) totalAdults = parseInt(am[1]);
+        break;
+      }
+    }
+
+    // === PARSE ROOMS ===
+    // Pattern: "* [N] [Standard] Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer"
+    // Next line: "€ XX" (room price)
+    const roomDefs = [];
+    for (let i = 0; i < lines.length; i++) {
+      const rm = lines[i].match(/^\*\s*(\d*)\s*(Standard\s+)?(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i);
+      if (rm) {
+        const roomType = rm[3];
+        // Price: check same line first, then next line
+        let roomPrice = parsePrice(lines[i]);
+        if (!roomPrice && i + 1 < lines.length) roomPrice = parsePrice(lines[i + 1]);
+
+        // Per-night prices: scan forward for "DD - DD Month" patterns
+        const nightPrices = [];
+        for (let j = i + 1; j < Math.min(i + 40, lines.length); j++) {
+          if (j > i + 2 && lines[j].match(/^\*\s/)) break; // next room
+          if (lines[j].match(/Zwischensumme/i)) break;
+          const dateRange = lines[j].match(/(\d{2})\s*-\s*(\d{2})\s+(\w+)/);
+          if (dateRange) {
+            for (let k = j + 1; k < Math.min(j + 4, lines.length); k++) {
+              const np = parsePrice(lines[k]);
+              if (np) {
+                nightPrices.push({ range: lines[j].trim(), price: np });
+                break;
+              }
+            }
+          }
+        }
+
+        roomDefs.push({ roomType, price: roomPrice, nightPrices });
+      }
+    }
+
+    if (roomDefs.length === 0) {
+      return res.status(400).json({ success: false, error: "Keine Zimmer erkannt. Erwartet: * Standard Einzelzimmer / Doppelzimmer / etc." });
+    }
+
+    // === DUPLICATE CHECK ===
+    if (bookingNr) {
+      const { data: dup } = await supabase
+        .from("reservations")
+        .select("id")
+        .like("notes", `%Booking.com #${bookingNr}%`)
+        .limit(1);
+      if (dup && dup.length > 0) {
+        return res.status(400).json({ success: false, error: `Buchung ${bookingNr} bereits importiert` });
+      }
+    }
+
+    // === CREATE/FIND GUEST ===
+    let guestId;
+    if (email) {
+      const { data: eg } = await supabase.from("guests").select("id").eq("email", email).limit(1);
+      if (eg && eg.length) guestId = eg[0].id;
+    }
+    if (!guestId && lastName) {
+      const { data: eg2 } = await supabase
+        .from("guests").select("id")
+        .ilike("last_name", lastName).ilike("first_name", firstName).limit(1);
+      if (eg2 && eg2.length) guestId = eg2[0].id;
+    }
+    if (!guestId) {
+      const { data: ng, error: ge } = await supabase.from("guests").insert({
+        first_name: firstName, last_name: lastName, email, address, zip, city, country
+      }).select();
+      if (ge) throw new Error("Gast: " + ge.message);
+      guestId = ng[0].id;
+    }
+
+    // === LOAD ROOMS + RESERVATIONS FOR AVAILABILITY ===
+    const { data: unitTypes } = await supabase.from("unit_types").select("*");
+    const { data: allRooms } = await supabase.from("rooms").select("*").eq("active", true).order("name");
+    const { data: allRes } = await supabase
+      .from("reservations")
+      .select("room_id,check_in,check_out,status")
+      .not("status", "in", "(storniert,abgelehnt,checkedout)");
+
+    const usedRoomIds = new Set();
+    const created = [];
+
+    for (const rd of roomDefs) {
+      // Match unit type
+      const ut = unitTypes.find(u => u.name.toLowerCase() === rd.roomType.toLowerCase());
+      if (!ut) {
+        return res.status(400).json({
+          success: false,
+          error: `Kategorie "${rd.roomType}" nicht gefunden. Vorhanden: ${unitTypes.map(u => u.name).join(", ")}`
+        });
+      }
+
+      // Find free room
+      const candidates = allRooms.filter(r => r.unit_type_id === ut.id);
+      const free = candidates.find(r => {
+        if (usedRoomIds.has(r.id)) return false;
+        return !allRes.some(rv =>
+          rv.room_id === r.id && checkIn < rv.check_out && checkOut > rv.check_in
+        );
+      });
+
+      if (!free) {
+        return res.status(400).json({
+          success: false,
+          error: `Kein freies ${rd.roomType} fuer ${checkIn} - ${checkOut}`
+        });
+      }
+
+      // Adults default by room type
+      const adultsByType = { einzelzimmer: 1, doppelzimmer: 2, zweibettzimmer: 2, dreibettzimmer: 3 };
+      const adults = adultsByType[rd.roomType.toLowerCase()] || 1;
+
+      // Build notes
+      let notes = "Booking.com #" + bookingNr;
+      if (rd.nightPrices.length > 0) {
+        notes += " | " + rd.nightPrices.map(np => np.range + ": " + np.price + " EUR").join(", ");
+      }
+
+      // Generate token
+      const token = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+
+      const { data: nr, error: re } = await supabase.from("reservations").insert({
+        room_id: free.id,
+        guest_id: guestId,
+        check_in: checkIn,
+        check_out: checkOut,
+        status: "reservierung",
+        adults,
+        children: 0,
+        total_price: rd.price,
+        source: "booking",
+        notes,
+        offer_token: token
+      }).select();
+
+      if (re) throw new Error("Reservierung: " + re.message);
+
+      usedRoomIds.add(free.id);
+      created.push({
+        id: nr[0].id,
+        room: free.name,
+        roomType: ut.name,
+        price: rd.price
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      reservation: {
+        guest: guestName,
+        bookingNr,
+        checkIn,
+        checkOut,
+        totalPrice: roomDefs.reduce((s, r) => s + r.price, 0),
+        rooms: created
+      }
+    });
+
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+}
