@@ -506,42 +506,54 @@ function doBook(){
 
 function buildConfirmationHtml(guest){
   var n=nights();var tg=totalGuests();var tp=totalPrice();var rp=roomsPrice();var bp=breakfastTotal();
-  var greet=(state.salutation||"Sehr geehrte/r")+" "+state.last_name.trim();
+  var greet=(state.salutation==="Frau"?"Sehr geehrte Frau":state.salutation==="Herr"?"Sehr geehrter Herr":"Sehr geehrte/r")+" "+state.last_name.trim();
   var selCats=[];
   Object.keys(state.selections).forEach(function(catId){
     var cnt=state.selections[catId];if(cnt<=0)return;
     var cat=state.cats.find(function(c){return c.id===catId});
     if(cat)selCats.push({cat:cat,count:cnt});
   });
-  var h='<table width="100%" style="width:100%;max-width:650px;font-family:arial,sans-serif;font-size:14px;" cellspacing="0">';
-  h+='<tr><td><img src="'+LOGO+'" width="100%" style="width:100%"/></td></tr>';
-  h+='<tr><td height="20"></td></tr>';
-  h+='<tr><td><h1 style="font-family:Arial,sans-serif;font-size:24px;font-weight:bold;color:#58585a;margin:0;">Ihre Reservierungsbestaetigung</h1></td></tr>';
-  h+='<tr><td style="border:1px solid #ccc;padding:15px;font-size:14px;">'+greet+',<br><br>vielen Dank fuer Ihre Reservierung ueber unsere Website!<br><br>Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr>';
-  h+='<tr><td height="10"></td></tr>';
-  h+='<tr><td style="border:1px solid #ccc;padding:15px;background:#EDEAE4;text-align:center;font-size:14px;">Gesamtpreis:<br><span style="font-size:24px;font-weight:bold;color:#58585A;">EUR '+tp.toFixed(2)+'</span><br>inkl. Steuern</td></tr>';
-  h+='<tr><td height="15"></td></tr>';
-  h+='<tr><td><h2 style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#58585a;">Ihre Buchung</h2></td></tr>';
-  h+='<tr><td style="border:1px solid #ccc;padding:15px;font-size:14px;"><table width="100%">';
-  selCats.forEach(function(sc){h+='<tr><td>Zimmer:</td><td><strong>'+sc.count+'x '+sc.cat.name+'</strong></td></tr>'});
-  if(state.breakfast)h+='<tr><td>Fruehstueck:</td><td>Ja ('+tg+' Personen, '+bp+' EUR)</td></tr>';
-  h+='<tr><td>Anreise:</td><td>'+fd(state.checkIn)+'</td></tr>';
-  h+='<tr><td>Abreise:</td><td>'+fd(state.checkOut)+'</td></tr>';
-  h+='<tr><td>Naechte:</td><td>'+n+'</td></tr>';
-  h+='<tr><td>Erwachsene:</td><td>'+state.adults+'</td></tr>';
-  if(state.children>0)h+='<tr><td>Kinder:</td><td>'+state.children+'</td></tr>';
-  h+='</table></td></tr>';
-  h+='<tr><td height="10"></td></tr>';
-  h+='<tr><td style="border:1px solid #ccc;padding:15px;background:#F5F3EF;font-size:12px;color:#58585A;line-height:1.6;">';
-  h+='<strong>Wichtige Hinweise</strong><br>';
-  h+='Check-in ab 15:00 Uhr | Check-out bis 11:00 Uhr<br>';
-  h+='Stornierung bis 7 Tage vor Anreise: 80% Gebuehr. Ab 3 Tagen vor Anreise / No-Show: voller Preis.<br>';
-  h+='Im gesamten Hotelgebaeude gilt striktes Rauchverbot (Reinigungspauschale 300 EUR).<br>';
-  h+='Bei vorzeitiger Abreise ist keine Erstattung moeglich.</td></tr>';
-  h+='<tr><td height="15"></td></tr>';
-  h+='<tr><td style="background-color:#ABA596;padding:15px;color:#fff;font-size:13px;"><strong>'+HN+'</strong><br>'+HA+'<br>Tel.: '+HP+'<br>E-Mail: '+HE+'<br>'+HW+'</td></tr></table>';
+
+  var roomRows="";
+  selCats.forEach(function(sc){
+    roomRows+='<tr><td style="padding:6px 0;padding-left:12px;">'+sc.count+'x '+sc.cat.name+'</td><td style="padding:6px 0;text-align:right;font-weight:600;">'+catNightlyTotal(sc.cat.id)*sc.count+' EUR</td></tr>';
+  });
+  if(state.breakfast){
+    roomRows+='<tr><td style="padding:6px 0;padding-left:12px;">Fruehstueck ('+tg+' Pers. x '+n+' Tage)</td><td style="padding:6px 0;text-align:right;font-weight:600;">'+bp+' EUR</td></tr>';
+  }
+
+  var detailTable='<table width="100%" cellspacing="0" style="font-size:14px;color:#58585A;">'
+    +'<tr><td style="padding:6px 0;font-weight:600;width:45%;">Anreise:</td><td style="padding:6px 0;">'+fd(state.checkIn)+'</td></tr>'
+    +'<tr><td style="padding:6px 0;font-weight:600;">Abreise:</td><td style="padding:6px 0;">'+fd(state.checkOut)+'</td></tr>'
+    +'<tr><td style="padding:6px 0;font-weight:600;">Naechte:</td><td style="padding:6px 0;">'+n+'</td></tr>'
+    +'<tr><td style="padding:6px 0;font-weight:600;">Erwachsene:</td><td style="padding:6px 0;">'+state.adults+'</td></tr>'
+    +(state.children>0?'<tr><td style="padding:6px 0;font-weight:600;">Kinder:</td><td style="padding:6px 0;">'+state.children+'</td></tr>':'')
+    +'<tr><td colspan="2" style="padding:10px 0 4px;font-weight:700;border-top:1px solid #DDD9D2;">Zimmer:</td></tr>'
+    +roomRows
+    +'<tr><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">Gesamtpreis:</td><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;text-align:right;">'+tp.toFixed(2)+' EUR</td></tr>'
+    +'</table>';
+
+  var h='<table width="100%" cellspacing="0" cellpadding="0" style="background-color:#F5F3EF;font-family:Arial,sans-serif;"><tr><td align="center" style="padding:20px 10px;">'
+    +'<table width="580" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
+    +'<tr><td style="background:#58585A;padding:20px 30px;text-align:center;border-bottom:3px solid #D4940E"><img src="'+LOGO+'" width="320" style="width:100%;max-width:320px;"/></td></tr>'
+    +'<tr><td style="padding:30px 30px 10px;"><h1 style="font-size:22px;color:#58585A;margin:0 0 6px;">Reservierungsbestaetigung</h1><div style="width:60px;height:3px;background:#8B7D6B;border-radius:2px;margin-bottom:20px;"></div></td></tr>'
+    +'<tr><td style="padding:0 30px;font-size:15px;color:#58585A;line-height:1.7;">'+greet+',<br><br>vielen Dank fuer Ihre Reservierung ueber unsere Website! Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr>'
+    +'<tr><td style="padding:20px 30px;"><div style="background:#F5F3EF;border-radius:10px;padding:18px;">'+detailTable+'</div></td></tr>'
+    +'<tr><td style="padding:10px 30px;"><div style="background:#F5F3EF;border-radius:10px;padding:16px;font-size:12px;color:#58585A;line-height:1.7;">'
+    +'<strong>Wichtige Hinweise</strong><br>'
+    +'Check-in ab 15:00 Uhr | Check-out bis 11:00 Uhr<br>'
+    +'Stornierung bis 7 Tage vor Anreise: 80% Gebuehr. Ab 3 Tagen / No-Show: voller Preis.<br>'
+    +'Im gesamten Hotel gilt striktes Rauchverbot (Reinigungspauschale 300 EUR).'
+    +'</div></td></tr>'
+    +'<tr><td style="padding:20px 30px 24px;font-size:14px;color:#58585A;">Wir wuenschen Ihnen eine angenehme Anreise!<br><br>Mit herzlichen Gruessen<br><strong>'+HN+'</strong></td></tr>'
+    +'<tr><td style="background:#ABA596;padding:18px 30px;color:#ffffff;font-size:12px;line-height:1.6;text-align:center;">'
+    +'<strong>'+HN+'</strong><br>'+HA+'<br>Tel.: '+HP+'<br>'
+    +'E-Mail: <a style="color:#ffffff;" href="mailto:'+HE+'">'+HE+'</a><br>'
+    +'<a style="color:#ffffff;" href="http://'+HW+'">'+HW+'</a>'
+    +'</td></tr></table></td></tr></table>';
   return h;
 }
+
 
 function buildHotelNotificationHtml(guest){
   var n=nights();var tg=totalGuests();var tp=totalPrice();var rp=roomsPrice();var bp=breakfastTotal();
