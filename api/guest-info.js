@@ -126,6 +126,7 @@ ${rt ? '<div class="info-grid"><div class="info-card"><div class="label">Ihr Zim
 <h2>Golden Masala</h2>
 <div class="restaurant-card">
 <div class="restaurant-header">
+<img src="https://pms.hotel-europa-ruesselsheim.de/golden-masala-logo.png" style="height:70px;border-radius:8px;flex-shrink:0" alt="Golden Masala" onerror="this.style.display='none'"/>
 <div>
 <h3>Golden Masala</h3>
 <p>Indian Restaurant &ndash; im Hotel Europa</p>
@@ -140,7 +141,7 @@ ${rt ? '<div class="info-grid"><div class="info-card"><div class="label">Ihr Zim
 <dt>Zum Mitnehmen</dt><dd>Alle Gerichte!</dd>
 </dl>
 <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap">
-<button class="btn" onclick="document.getElementById('menuOverlay').classList.add('active')">Speisekarte ansehen</button>
+<button class="btn" onclick="openMenu()">Speisekarte ansehen</button>
 <a href="tel:+4915903081422" class="btn btn-outline">Tisch reservieren</a>
 </div>
 </div></div>
@@ -169,14 +170,14 @@ ${rt ? '<div class="info-grid"><div class="info-card"><div class="label">Ihr Zim
 </div>
 </div>
 
-<!-- SPEISEKARTEN VIEWER -->
+<!-- SPEISEKARTEN VIEWER (PDF) -->
 <div class="menu-overlay" id="menuOverlay">
-<button class="menu-close" onclick="document.getElementById('menuOverlay').classList.remove('active')">&times;</button>
-<div class="menu-content" id="menuContent"></div>
+<button class="menu-close" onclick="closeMenu()">&times;</button>
+<div class="menu-canvas-wrap"><canvas id="menuCanvas"></canvas></div>
 <div class="menu-nav">
-<button onclick="menuGo(-1)">&larr;</button>
-<span class="menu-page-num" id="menuPageNum">1 / 10</span>
-<button onclick="menuGo(1)">&rarr;</button>
+<button onclick="menuGo(-1)" id="menuPrev">&larr;</button>
+<span class="menu-page-num" id="menuPageNum">Laden...</span>
+<button onclick="menuGo(1)" id="menuNext">&rarr;</button>
 </div>
 </div>
 
@@ -187,31 +188,64 @@ Tel.: <a href="tel:+4915903081422">015903081422</a> &middot; <a href="mailto:inf
 <a href="http://www.hotel-europa-ruesselsheim.de">www.hotel-europa-ruesselsheim.de</a>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-var menuPages=[
-{title:"Willkommen",items:[{t:"",d:"Sehr verehrter Gast, wir heissen Sie herzlich willkommen bei uns im Indischen Spezialitaeten Restaurant Golden Masala!\\n\\nWir bieten fuer Sie 7 spezielle indische Kocharten zur Auswahl. Alle Varianten koennen mit Gemuese, Fleisch, Fisch oder hausgemachtem Kaese zubereitet werden. Natuerlich auch als Vegan.\\n\\nBitte geben Sie bei Ihrer Bestellung an, ob Sie Ihr Gericht scharf, mittelscharf oder mild zubereitet haben moechten.\\n\\nAlle Gerichte auch zum Mitnehmen!\\n\\nIhr Golden Masala Team"}]},
-{title:"Alkoholfreie Getraenke",items:[{t:"Coca-Cola, Zero, Fanta, Mezzo Mix, Sprite",p:"3,20 EUR",d:"0,33l"},{t:"Bitter Lemon / Tonic Water / Ginger Ale",p:"2,20 EUR",d:"0,2l"},{t:"Apfelsaft oder Orangensaft",p:"2,20 / 3,50 EUR",d:"0,2l / 0,4l"},{t:"Trauben-, Mango-, Guava- oder Litschi Saft",p:"2,20 / 4,90 EUR"},{t:"Fachingen Edelwasser Medium/Naturell",p:"2,50 / 5,90 EUR",d:"0,25l / 0,75l"}],extra:"Indische Getraenke",items2:[{t:"Lassi suess oder sauer",p:"1,30 / 3,30 EUR"},{t:"Lassi Mango, Banane oder Kokos",p:"1,60 / 4,80 EUR"},{t:"Indischer Eistee",p:"5,90 EUR",d:"Zitrone, Mango, Guava, Granatapfel oder Litschi"},{t:"Indischer Volkstee Chai",p:"4,90 EUR",d:"gekocht mit Milch, Kardamom, Zimt und Nelken"},{t:"Kashmiri Tee",p:"4,20 EUR"},{t:"Kaffee/Espresso",p:"2,90 EUR"},{t:"Cappuccino",p:"3,10 EUR"}]},
-{title:"Offene Weine",items:[{t:"W10 Riesling halbtrocken",p:"4,70 EUR"},{t:"W11 Chardonnay trocken",p:"4,80 EUR"},{t:"W13 Riesling trocken",p:"4,90 EUR"},{t:"W14 Sauvignon blanc trocken",p:"4,90 EUR"},{t:"W16 Indischer Weisswein",p:"5,70 EUR"}],extra:"Rotweine",items2:[{t:"W21 Dornfelder trocken",p:"4,90 EUR"},{t:"W22 Portugieser lieblich",p:"4,90 EUR"},{t:"W24 Innamorati Fruchtiger Rotwein",p:"5,40 EUR"},{t:"W25 Cabernet Sauvignon",p:"5,40 EUR"},{t:"W27 Indischer Rotwein",p:"5,70 EUR"}]},
-{title:"Biere & Cocktails",items:[{t:"Kingfisher Premium indisches Lagerbier",p:"3,90 EUR",d:"0,33l"},{t:"Krombacher Pils vom Fass",p:"3,50 / 4,90 EUR",d:"0,3l / 0,5l"},{t:"Krombacher Weizen vom Fass",p:"3,50 / 4,90 EUR"}],extra:"Cocktails",items2:[{t:"Blue Angel",p:"5,10 EUR"},{t:"Kir Royal",p:"5,10 EUR"},{t:"Anarkali",p:"8,90 EUR",d:"Kokosmilch, Ananassaft und Campari"},{t:"Fontana",p:"8,90 EUR",d:"Campari, Grand Marnier, Cointreau, Orangensaft, Sekt"},{t:"Mango-Cocktail",p:"8,90 EUR",d:"Mangosaft, Grandmarnier, Cointreau und Kokosmilch"}]},
-{title:"Suppen & Vorspeisen",items:[{t:"20 Shorba Atlas (Linsensuppe)",p:"4,50 EUR",d:"Delikate Linsensuppe nach suedindischer Art"},{t:"21 Coconut Murgh Shorba",p:"4,90 EUR",d:"Huehnersuppe nordindischer Art mit Knoblauch, Ingwer, Zimt, Kokos"},{t:"22 Tamatar Adrak Shorba",p:"4,50 EUR",d:"Tomatensuppe mit feinsten Kraeutern und Ingwer"}],extra:"Indische Vorspeisen",items2:[{t:"25 Samosa (Gemuese)",p:"3,90 EUR",d:"Teigtaschen mit Gemuese, Kartoffeln und Gewuerzen"},{t:"26 Samosa (Hackfleisch)",p:"5,50 EUR"},{t:"28a Pakorasa Vegetarische Mix",p:"7,90 EUR"},{t:"28c Pakorasa Haehnchen",p:"5,50 EUR"},{t:"28d Onion Bhaji",p:"4,20 EUR",d:"Zwiebelringe"}]},
-{title:"Currys",desc:"7 Kocharten, je mit Gemuese, Paneer, Vegan, Chicken, Lamm, Jhinga oder Fisch",vars:[{n:"Gemuese",p:"12,90"},{n:"Paneer",p:"13,90"},{n:"Vegan",p:"13,90"},{n:"Chicken",p:"14,90"},{n:"Lamm",p:"17,90"},{n:"Jhinga",p:"18,90"},{n:"Fisch",p:"14,90"}],items:[{t:"",d:"Zubereitet mit frischen Tomaten, Knoblauch, Zwiebeln, Ingwer, Joghurt und indischen Gewuerzen. Alle Gerichte mit Basmati-Reis.\\n\\nSpezial auch mit: Mango, Spinat oder Kichererbsen (+2,90 EUR)"}]},
-{title:"Karahi",desc:"Gusseiserne Pfanne mit Tomaten, Knoblauch, Zwiebel und Ingwer",vars:[{n:"Gemuese",p:"14,90"},{n:"Paneer",p:"15,90"},{n:"Vegan",p:"16,90"},{n:"Chicken",p:"20,90"},{n:"Lamm",p:"17,90"},{n:"Jhinga",p:"19,90"},{n:"Fisch",p:"16,90"}],items:[]},
-{title:"Tandoori",desc:"Mariniert in Knoblauch-Joghurt-Sauce, im Tandoor gegrillt",vars:[{n:"Gemuese",p:"17,90"},{n:"Paneer",p:"18,90"},{n:"Vegan",p:"18,90"},{n:"Chicken",p:"19,90"},{n:"Lamm",p:"20,90"},{n:"Jhinga",p:"21,90"},{n:"Fisch",p:"18,90"}],items:[{t:"130 Garlic Mixed Tandoori Platte",p:"24,90 / 49,90 EUR",d:"Fuer 1 oder 2 Personen. Haehnchen, Lamm und Fisch, 24h mariniert."}]},
-{title:"Korma & Bhuna & Vindaloo",desc:"Drei weitere Kocharten",items:[{t:"Korma",d:"Delikate Mischung aus Tomatenmark, Cashewnuessen, Sahne und Gewuerzen. Zart gewuerzt."},{t:"Bhuna",d:"Reduzierte Basis aus Tomaten, Zwiebeln und Chili mit Paprika."},{t:"Vindaloo",d:"Scharf! Kartoffel, Ingwer und Chili. Goanische Kueche."},{t:"",d:"Alle drei Kocharten in 7 Varianten: Gemuese ab 13,90 EUR bis Jhinga 21,90 EUR"}]},
-{title:"Biryani & Bestseller",desc:"Kulinarische Reis-Spezialitaeten",items:[{t:"61 Gemuese Biryani",p:"12,50 EUR"},{t:"63 Haehnchen Biryani",p:"13,50 EUR"},{t:"64 Lammfleisch Biryani",p:"18,90 EUR"},{t:"65 Prawn Biryani",p:"20,90 EUR"},{t:"67 Mix Masala Biryani",p:"20,90 EUR",d:"Lamm, Haehnchen und Hummerkrabben"}],extra:"Unsere Bestseller",items2:[{t:"Fisch Tikka",p:"24,90 EUR",d:"Im Tandoorofen mit Kokos-Currysosse"},{t:"Mutton Tikka",p:"24,90 EUR",d:"Lammfleisch im Tandoor gegrillt"},{t:"Chicken Kohlapuri",p:"18,90 EUR",d:"In wuerziger Tomaten Currysosse"},{t:"Malai Kofta",p:"19,90 EUR",d:"Frischkaese-Baellchen in Kokos-Currysosse"}]},
-{title:"Desserts & Menues",items:[{t:"91 Firni",p:"3,90 EUR",d:"Milchreispudding mit Rosenwasser und Mandeln"},{t:"92 Gajarela",p:"3,90 EUR",d:"Karotten-Milch-Pudding mit Kardamom"},{t:"93 Gulab Jamun",p:"3,90 EUR",d:"Frischkaesebaellchen in Zuckersirup"},{t:"96 Indien Eis Kulfi",p:"5,90 EUR"},{t:"100 Mango Safran Halwa (Vegan)",p:"5,90 EUR"}],extra:"Menues fuer 2 Personen",items2:[{t:"Tandoori-Mix-Platte (Menue 1)",p:"71,90 EUR"},{t:"Golden Masala-Platte (Menue 2)",p:"66,90 EUR"},{t:"Vegetarische Platte (Menue 3)",p:"65,90 EUR"},{t:"Vegan Platte (Menue 4)",p:"69,90 EUR"}]}
-];
-var menuPage=0;
-function renderMenu(){
-var pg=menuPages[menuPage];var h='<div style="text-align:center;margin-bottom:16px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#D4940E;font-weight:600;font-family:Inter,sans-serif">Golden Masala</div><h3 style="font-size:22px;color:#58585A;margin:4px 0">'+pg.title+'</h3>'+(pg.desc?'<p class="cat-desc">'+pg.desc+'</p>':'')+'</div>';
-if(pg.vars){h+='<div class="menu-var">';for(var i=0;i<pg.vars.length;i++)h+='<span><strong>'+pg.vars[i].n+'</strong><em>'+pg.vars[i].p+' &euro;</em></span>';h+='</div>';}
-if(pg.items)for(var i=0;i<pg.items.length;i++){var it=pg.items[i];if(!it.t&&it.d){h+='<p style="font-size:13px;color:#58585A;line-height:1.8;white-space:pre-line;margin:8px 0">'+it.d.replace(/\\n/g,'\\n')+'</p>'}else{h+='<div class="menu-item"><div><div class="name">'+it.t+'</div>'+(it.d?'<div class="desc">'+it.d+'</div>':'')+'</div>'+(it.p?'<div class="price">'+it.p+'</div>':'')+'</div>';}}
-if(pg.extra){h+='<h3 style="font-size:17px;color:#A0522D;margin:20px 0 8px;font-family:Playfair Display,serif">'+pg.extra+'</h3>';if(pg.items2)for(var i=0;i<pg.items2.length;i++){var it=pg.items2[i];h+='<div class="menu-item"><div><div class="name">'+it.t+'</div>'+(it.d?'<div class="desc">'+it.d+'</div>':'')+'</div>'+(it.p?'<div class="price">'+it.p+'</div>':'')+'</div>';}}
-document.getElementById('menuContent').innerHTML=h;
-document.getElementById('menuPageNum').textContent=(menuPage+1)+' / '+menuPages.length;}
-function menuGo(d){menuPage=Math.max(0,Math.min(menuPages.length-1,menuPage+d));renderMenu();}
-renderMenu();
-document.addEventListener('keydown',function(e){if(!document.getElementById('menuOverlay').classList.contains('active'))return;if(e.key==='ArrowRight')menuGo(1);if(e.key==='ArrowLeft')menuGo(-1);if(e.key==='Escape')document.getElementById('menuOverlay').classList.remove('active');});
+var pdfDoc=null,pageNum=1,pageCount=0,rendering=false;
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+function openMenu(){
+  document.getElementById('menuOverlay').classList.add('active');
+  if(!pdfDoc){
+    document.getElementById('menuPageNum').textContent='Laden...';
+    pdfjsLib.getDocument('https://pms.hotel-europa-ruesselsheim.de/speisekarte.pdf').promise.then(function(pdf){
+      pdfDoc=pdf;pageCount=pdf.numPages;pageNum=1;renderPage(pageNum);
+    }).catch(function(err){
+      document.getElementById('menuPageNum').textContent='Fehler beim Laden';
+    });
+  } else {
+    renderPage(pageNum);
+  }
+}
+
+function closeMenu(){document.getElementById('menuOverlay').classList.remove('active')}
+
+function renderPage(num){
+  if(!pdfDoc||rendering)return;
+  rendering=true;
+  pdfDoc.getPage(num).then(function(page){
+    var canvas=document.getElementById('menuCanvas');
+    var ctx=canvas.getContext('2d');
+    var maxH=window.innerHeight*0.78;
+    var vp=page.getViewport({scale:1});
+    var scale=Math.min(maxH/vp.height, (window.innerWidth*0.9)/vp.width, 2);
+    var viewport=page.getViewport({scale:scale});
+    canvas.height=viewport.height;
+    canvas.width=viewport.width;
+    page.render({canvasContext:ctx,viewport:viewport}).promise.then(function(){
+      rendering=false;
+      document.getElementById('menuPageNum').textContent=num+' / '+pageCount;
+      document.getElementById('menuPrev').style.opacity=num<=1?'0.3':'1';
+      document.getElementById('menuNext').style.opacity=num>=pageCount?'0.3':'1';
+    });
+  });
+}
+
+function menuGo(d){
+  var n=pageNum+d;
+  if(n<1||n>pageCount||rendering)return;
+  pageNum=n;renderPage(pageNum);
+}
+
+document.addEventListener('keydown',function(e){
+  if(!document.getElementById('menuOverlay').classList.contains('active'))return;
+  if(e.key==='ArrowRight')menuGo(1);
+  if(e.key==='ArrowLeft')menuGo(-1);
+  if(e.key==='Escape')closeMenu();
+});
+
+document.getElementById('menuOverlay').addEventListener('click',function(e){
+  if(e.target===this)closeMenu();
+});
 </script>
 </body></html>`;
 }
