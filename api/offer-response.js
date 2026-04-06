@@ -36,6 +36,39 @@ export default async function handler(req, res) {
       await fetch(SB_URL + "/rest/v1/reservations?offer_token=eq." + token, {
         method: "PATCH", headers, body: JSON.stringify({ status: "abgelehnt" })
       });
+
+      // Hotel benachrichtigen
+      var nights = Math.max(1, Math.round((new Date(rv.check_out) - new Date(rv.check_in)) / 86400000));
+      try {
+        await fetch("https://pms.hotel-europa-ruesselsheim.de/api/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: "info@hotel-europa-ruesselsheim.de",
+            subject: "Angebot ABGELEHNT: " + (guest?.first_name || "") + " " + (guest?.last_name || "") + " (" + fd(rv.check_in) + " - " + fd(rv.check_out) + ")",
+            html: '<table width="100%" cellspacing="0" cellpadding="0" style="background-color:#F5F3EF;font-family:Arial,sans-serif;"><tr><td align="center" style="padding:20px 10px;"><table width="580" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
+              + '<tr><td style="background:#58585A;padding:20px 30px;text-align:center;border-bottom:3px solid #EF4444"><img src="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg" width="320" style="width:100%;max-width:320px;"/></td></tr>'
+              + '<tr><td style="padding:30px 30px 10px;"><h1 style="font-size:22px;color:#DC2626;margin:0 0 6px;">Angebot abgelehnt</h1><div style="width:60px;height:3px;background:#EF4444;border-radius:2px;margin-bottom:20px;"></div></td></tr>'
+              + '<tr><td style="padding:0 30px;"><div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px;color:#991B1B;"><strong>Der Gast hat das Angebot abgelehnt.</strong></div></td></tr>'
+              + '<tr><td style="padding:0 30px 20px;"><div style="background:#F5F3EF;border-radius:10px;padding:18px;">'
+              + '<table width="100%" style="font-size:14px;color:#58585A;">'
+              + '<tr><td style="padding:5px 0;font-weight:600;width:45%;">Gast:</td><td style="padding:5px 0;">' + (guest?.salutation || "") + ' ' + (guest?.first_name || "") + ' ' + (guest?.last_name || "") + '</td></tr>'
+              + '<tr><td style="padding:5px 0;font-weight:600;">E-Mail:</td><td style="padding:5px 0;">' + (guest?.email || "-") + '</td></tr>'
+              + (guest?.phone ? '<tr><td style="padding:5px 0;font-weight:600;">Telefon:</td><td style="padding:5px 0;">' + guest.phone + '</td></tr>' : '')
+              + '<tr><td style="padding:5px 0;font-weight:600;">Zimmerkategorie:</td><td style="padding:5px 0;">' + (ut?.name || "") + '</td></tr>'
+              + '<tr><td style="padding:5px 0;font-weight:600;">Zeitraum:</td><td style="padding:5px 0;">' + fd(rv.check_in) + ' &ndash; ' + fd(rv.check_out) + ' (' + nights + ' N.)</td></tr>'
+              + '<tr><td style="padding:5px 0;font-weight:600;">Preis:</td><td style="padding:5px 0;">' + parseFloat(rv.total_price || 0).toFixed(2) + ' EUR</td></tr>'
+              + '</table></div></td></tr>'
+              + '<tr><td style="padding:0 30px 24px;font-size:13px;color:#6B7280;">Das Zimmer ist wieder frei und kann neu vergeben werden.</td></tr>'
+              + '<tr><td style="background:#ABA596;padding:14px 30px;color:#ffffff;font-size:11px;text-align:center;">Hotel Europa &middot; Marktplatz 1 &middot; 65428 Ruesselsheim</td></tr>'
+              + '</table></td></tr></table>',
+            emailType: "hotel-notification"
+          })
+        });
+      } catch (mailErr) {
+        console.error("offer-response: decline mail error:", mailErr.message);
+      }
+
       return res.status(200).send(page("Abgelehnt", "Vielen Dank fuer Ihre Rueckmeldung. Das Angebot wurde abgelehnt.", "declined"));
     }
 
