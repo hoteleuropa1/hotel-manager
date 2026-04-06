@@ -96,39 +96,52 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // EMAIL
-    let email = "";
-    for (const l of lines) {
-      if (l.includes("@guest.booking.com") || (l.includes("@") && l.includes("booking"))) {
-        email = l.trim();
-        break;
-      }
-    }
-
-    // ADDRESS
-    let address = "", city = "", zip = "";
+    // EMAIL + PHONE + ADDRESS
+    let email = "", phone = "", address = "", city = "", zip = "";
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i] === "Telefonnummer anzeigen" && i + 1 < lines.length) {
-        const addrLine = lines[i + 1];
-        if (addrLine && !addrLine.startsWith("Bevorzugte") && !addrLine.startsWith("Kanal")) {
-          const plzMatch = addrLine.match(/\b(\d{4,5})\b/);
-          if (plzMatch) {
-            zip = plzMatch[1];
-            const idx = addrLine.indexOf(zip);
-            const before = addrLine.substring(0, idx).trim();
-            const after = addrLine.substring(idx + zip.length).trim();
-            if (after) { city = after; address = before; }
-            else {
-              const words = before.split(/\s+/);
-              if (words.length >= 3) { city = words.pop(); address = words.join(" "); }
-              else address = before;
+      if (lines[i].includes("@guest.booking.com") || (lines[i].includes("@") && lines[i].includes("booking"))) {
+        email = lines[i].trim();
+        // Nach der E-Mail kommen: evtl. Telefon, dann Adresse
+        let nextIdx = i + 1;
+        // Telefonnummer? (beginnt mit + oder ist "Telefonnummer anzeigen")
+        if (nextIdx < lines.length) {
+          const nextLine = lines[nextIdx].trim();
+          if (nextLine.match(/^\+?\d[\d\s\-\/]{6,}/)) {
+            phone = nextLine;
+            nextIdx++;
+          } else if (nextLine === "Telefonnummer anzeigen") {
+            nextIdx++;
+          }
+        }
+        // Adresse parsen
+        if (nextIdx < lines.length) {
+          const addrLine = lines[nextIdx];
+          if (addrLine && !addrLine.startsWith("Bevorzugte") && !addrLine.startsWith("Kanal")) {
+            const plzMatch = addrLine.match(/\b(\d{4,5})\b/);
+            if (plzMatch) {
+              zip = plzMatch[1];
+              const idx2 = addrLine.indexOf(zip);
+              const before = addrLine.substring(0, idx2).trim();
+              const after = addrLine.substring(idx2 + zip.length).trim();
+              if (after) { city = after; address = before; }
+              else {
+                const words = before.split(/\s+/);
+                if (words.length >= 3) { city = words.pop(); address = words.join(" "); }
+                else address = before;
+              }
+            } else {
+              address = addrLine;
             }
-          } else {
-            address = addrLine;
           }
         }
         break;
       }
+    }
+
+    // ZAHLUNGSSTATUS
+    let paymentMethod = "";
+    for (const l of lines) {
+      if (l.match(/Auszahlungen?\s+per\s+(Ü|Ue?)berweisung/i)) { paymentMethod = "booking_online"; break; }
     }
 
     // BOOKING NUMBER
@@ -203,7 +216,7 @@ module.exports = async function handler(req, res) {
       if (eg2 && eg2.length) guestId = eg2[0].id;
     }
     if (!guestId) {
-      const ng = await sbPost("guests", { first_name: firstName, last_name: lastName, email, address, zip, city, country }, key);
+      const ng = await sbPost("guests", { first_name: firstName, last_name: lastName, email, phone, address, zip, city, country }, key);
       guestId = ng[0].id;
     }
 
@@ -272,6 +285,19 @@ module.exports = async function handler(req, res) {
 
       usedRoomIds.add(free.id);
       created.push({ id: nr[0].id, room: free.name, roomType: ut.name, price: rd.price });
+
+      // Zahlung anlegen wenn Booking Online
+      if (paymentMethod) {
+        try {
+          await sbPost("payments", {
+            reservation_id: nr[0].id,
+            guest_id: guestId,
+            amount: rd.price,
+            payment_method: paymentMethod,
+            status: "ausstehend"
+          }, key);
+        } catch(pe) { console.error("Payment Fehler:", pe); }
+      }
     }
 
     return res.status(200).json({
