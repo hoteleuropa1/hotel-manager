@@ -250,6 +250,7 @@ const PlanView=()=>{
 const days=Array.from({length:14},(_,i)=>addD(ws,i));
 const[modal,setModal]=useState(null);
 const[showImport,setShowImport]=useState(false);
+const[importSource,setImportSource]=useState("hrs");
 const[emailText,setEmailText]=useState("");
 const[importResult,setImportResult]=useState(null);
 const[importing,setImporting]=useState(false);
@@ -260,7 +261,7 @@ const[hoverPos,setHoverPos]=useState({x:0,y:0});
 const doImport=async()=>{
 if(!emailText.trim()){setImportError("Bitte Email-Text einfuegen");return}
 setImporting(true);setImportError("");setImportResult(null);
-try{const resp=await fetch("/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:emailText.trim()})});
+try{const resp=await fetch(importSource==="booking"?"/api/booking-import":"/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:emailText.trim()})});
 const data=await resp.json();
 if(data.success){setImportResult(data);setEmailText("");await load()}
 else{setImportError(data.error||"Import fehlgeschlagen")}}
@@ -290,7 +291,8 @@ return<div>
 <span style={{fontSize:14,fontWeight:600,marginLeft:4}}>{MONATE[ws.getMonth()]} {ws.getFullYear()}</span>
 </div>
 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-<Btn sz="sm" onClick={()=>{setShowImport(true);setImportResult(null);setImportError("")}} style={{background:"#7C3AED",color:"#fff"}}><I n="mail" s={14} c="#fff"/> HRS Import</Btn>
+<Btn sz="sm" onClick={()=>{setShowImport(true);setImportSource("hrs");setImportResult(null);setImportError("")}} style={{background:"#E4003A",color:"#fff"}}><SrcIcon source="hrs" s={14}/> HRS</Btn>
+<Btn sz="sm" onClick={()=>{setShowImport(true);setImportSource("booking");setImportResult(null);setImportError("")}} style={{background:"#003580",color:"#fff"}}><SrcIcon source="booking" s={14}/> Booking</Btn>
 </div>
 </div>
 <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>{Object.entries(SC).filter(([k])=>k!=="abgelehnt"&&k!=="storniert"&&k!=="kostenuebernahme"&&k!=="rechnung_versendet"&&k!=="bezahlt").map(([k,v])=><span key={k} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,padding:"3px 10px",borderRadius:6,background:v.bg,border:"1px solid "+v.bd,color:v.tx,fontWeight:600}}>{k==="checkedin"&&<span style={{width:10,height:10,borderRadius:5,border:"2px solid #388E3C",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:7}}>&#10003;</span>}{v.l}</span>)}</div>
@@ -318,21 +320,21 @@ return<React.Fragment key={ut.id}>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#ABA596"}}>{SOURCES[hoverRes.res.source]||hoverRes.res.source}</span><Badge s={hoverRes.res.status}/></div>
 </div></div>}
 {modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} guests={guests} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
-{showImport&&<Modal title="HRS-Buchung importieren" onClose={()=>setShowImport(false)} width={620}>
-<p style={{fontSize:13,color:"#6B7280",marginBottom:12}}>HRS-Buchungsemail oeffnen, alles markieren (Ctrl+A), kopieren (Ctrl+C) und hier einfuegen (Ctrl+V).</p>
-<textarea value={emailText} onChange={e=>setEmailText(e.target.value)} placeholder="Buchungsemail hier einfuegen..." style={{width:"100%",minHeight:220,padding:12,border:"1px solid #D1D5DB",borderRadius:8,fontSize:11,fontFamily:"monospace",outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:12}}/>
+{showImport&&<Modal title={(importSource==="booking"?"Booking.com":"HRS")+" Buchung importieren"} onClose={()=>setShowImport(false)} width={620}>
+<p style={{fontSize:13,color:"#6B7280",marginBottom:12}}>{importSource==="booking"?"Booking.com":"HRS"}-Buchung oeffnen, alles markieren (Ctrl+A), kopieren (Ctrl+C) und hier einfuegen (Ctrl+V).</p>
+<textarea value={emailText} onChange={e=>setEmailText(e.target.value)} placeholder="Buchungsdaten hier einfuegen..." style={{width:"100%",minHeight:220,padding:12,border:"1px solid #D1D5DB",borderRadius:8,fontSize:11,fontFamily:"monospace",outline:"none",resize:"vertical",boxSizing:"border-box",marginBottom:12}}/>
 {importError&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:"#DC2626"}}>{importError}</div>}
 {importResult&&<div style={{background:"#D1FAE5",border:"1px solid #A7F3D0",borderRadius:8,padding:12,marginBottom:12,fontSize:13,color:"#065F46"}}>
 <div style={{fontWeight:700,marginBottom:6}}>Buchung importiert!</div>
 <div><strong>Gast:</strong> {importResult.reservation.guest}</div>
-<div><strong>Zimmer:</strong> {importResult.reservation.room} ({importResult.reservation.roomType})</div>
 <div><strong>Zeitraum:</strong> {importResult.reservation.checkIn} - {importResult.reservation.checkOut}</div>
-<div><strong>Preis:</strong> {importResult.reservation.price} EUR</div>
-<div><strong>HRS-Nr:</strong> {importResult.reservation.hrsNr}</div>
+{importResult.reservation.rooms?importResult.reservation.rooms.map((r,i)=><div key={i}><strong>Zimmer {i+1}:</strong> {r.room} ({r.roomType}) - {r.price} EUR</div>):<div><strong>Zimmer:</strong> {importResult.reservation.room} ({importResult.reservation.roomType})</div>}
+<div><strong>Preis:</strong> {importResult.reservation.totalPrice||importResult.reservation.price} EUR</div>
+<div><strong>Nr:</strong> {importResult.reservation.bookingNr||importResult.reservation.hrsNr}</div>
 </div>}
 <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
 <Btn v="ghost" onClick={()=>setShowImport(false)}>Schliessen</Btn>
-<Btn onClick={doImport} disabled={importing||!emailText.trim()} style={{background:"#7C3AED"}}><I n="mail" s={14} c="#fff"/> {importing?"Importiere...":"Importieren"}</Btn>
+<Btn onClick={doImport} disabled={importing||!emailText.trim()} style={{background:importSource==="booking"?"#003580":"#E4003A"}}><SrcIcon source={importSource} s={14}/> {importing?"Importiere...":"Importieren"}</Btn>
 </div>
 </Modal>}
 </div>};
