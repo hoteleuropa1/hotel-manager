@@ -168,9 +168,10 @@ module.exports = async function handler(req, res) {
     // PARSE ROOMS
     const roomDefs = [];
     for (let i = 0; i < lines.length; i++) {
-      const rm = lines[i].match(/^\*\s*(\d*)\s*(Standard\s+)?(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i);
-      if (rm) {
-        const roomType = rm[3];
+      const rm = lines[i].match(/^[\*\•\-\–]?\s*(\d*)\s*(Standard\s+)?(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i);
+      if (rm || lines[i].match(/(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i)) {
+        const typeMatch = lines[i].match(/(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i);
+        const roomType = typeMatch[1];
         let roomPrice = parsePrice(lines[i]);
         if (!roomPrice && i + 1 < lines.length) roomPrice = parsePrice(lines[i + 1]);
 
