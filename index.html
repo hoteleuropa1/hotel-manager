@@ -345,13 +345,14 @@ return<React.Fragment key={ut.id}>
 {modal?.type==="detail"&&(()=>{const r=modal.res,rm=modal.room,ut2=gUT(rm,uts),g=gMap[r.guest_id];return<ResDetailModal res={r} room={rm} ut={ut2} guest={g} api={api} allProducts={products} unitTypes={uts} rooms={rms} reservations={ress} hotelInfo={hi} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>})()}
 {hoverRes&&<div style={{position:"fixed",left:Math.min(hoverPos.x,window.innerWidth-280),top:hoverPos.y,transform:"translate(-50%,-100%)",background:"#fff",borderRadius:12,padding:0,boxShadow:"0 8px 30px rgba(0,0,0,.18)",border:"1px solid #DDD9D2",zIndex:500,width:260,pointerEvents:"none",overflow:"hidden"}}>
 <div style={{background:"#58585A",padding:"8px 14px",display:"flex",alignItems:"center",gap:10}}>
-<div style={{width:32,height:32,borderRadius:16,background:"#8B7D6B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:13,fontWeight:700,flexShrink:0}}>{(hoverRes.g?.first_name||"?").charAt(0)}{(hoverRes.g?.last_name||"?").charAt(0)}</div>
+<div style={{width:32,height:32,borderRadius:16,background:"#8B7D6B",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><SrcIcon source={hoverRes.res.source} s={20}/></div>
 <div><div style={{color:"#fff",fontWeight:600,fontSize:13}}>{hoverRes.g?.first_name} {hoverRes.g?.last_name}</div>
 <div style={{color:"#ABA596",fontSize:10}}>{hoverRes.g?.country||"DE"}{hoverRes.g?.company?" | "+hoverRes.g.company:""}</div></div></div>
 <div style={{padding:"10px 14px",fontSize:12}}>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#ABA596"}}>Zimmer</span><span style={{fontWeight:600}}>{hoverRes.room.name} ({hoverRes.ut?.name})</span></div>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#ABA596"}}>{hoverRes.res.adults} Erw.{hoverRes.res.children>0?", "+hoverRes.res.children+" Kind.":""}</span><span style={{fontWeight:700,color:"#D4940E"}}>{fmt(hoverRes.res.total_price)} EUR</span></div>
-<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#ABA596"}}>{SOURCES[hoverRes.res.source]||hoverRes.res.source}</span><Badge s={hoverRes.res.status}/></div>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#ABA596"}}>{hoverRes.res.adults} Erw.{hoverRes.res.children>0?", "+hoverRes.res.children+" Kind.":""}</span><Badge s={hoverRes.res.status}/></div>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:4,paddingTop:4,borderTop:"1px solid #E5E7EB"}}><span style={{color:"#ABA596"}}>Gesamt</span><span style={{fontWeight:700,color:"#D4940E"}}>{fmt(hoverRes.res.total_price)} EUR</span></div>
+<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#ABA596"}}>Offen</span><span style={{fontWeight:700,color:hoverRes.res.status==="bezahlt"?"#059669":"#DC2626"}}>{hoverRes.res.status==="bezahlt"?"0.00":fmt(hoverRes.res.total_price)} EUR</span></div>
 </div></div>}
 {modal?.type==="new"&&<NewResForm room={modal.room} ut={gUT(modal.room,uts)} unitTypes={uts} api={api} guests={guests} allRooms={aRms} reservations={ress} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
 {showImport&&<Modal title={(importSource==="booking"?"Booking.com":"HRS")+" Buchung importieren"} onClose={()=>setShowImport(false)} width={620}>
