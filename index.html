@@ -101,12 +101,15 @@ return<Modal title={"Neu - "+selectedRooms.map(sr=>sr.room.name).join(", ")} onC
 <div style={{borderTop:"1px solid #E5E7EB",margin:"8px 0",paddingTop:12}}/>
 <div style={{marginBottom:16}}>
 <label style={{display:"block",fontSize:12,fontWeight:600,color:"#58585A",marginBottom:8}}>Zimmer ({selectedRooms.length})</label>
-{selectedRooms.map((sr,i)=><div key={sr.room.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"#F9FAFB",borderRadius:8,marginBottom:4,border:"1px solid #E5E7EB"}}>
+{selectedRooms.map((sr,i)=><div key={sr.room.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"#F9FAFB",borderRadius:8,marginBottom:4,border:"1px solid #E5E7EB",flexWrap:"wrap"}}>
 <CD color={sr.ut?.color} size={10}/>
 <span style={{fontWeight:700,fontSize:13}}>{sr.room.name}</span>
 <span style={{fontSize:12,color:"#6B7280"}}>{sr.ut?.name}</span>
-<span style={{marginLeft:"auto",fontSize:12,color:"#6B7280"}}>{nights}N. x {fmt(sr.price)}</span>
-<span style={{fontWeight:700,color:"#1E40AF",fontSize:13}}>{fmt(nights*sr.price)} EUR</span>
+<div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4}}>
+<span style={{fontSize:11,color:"#6B7280"}}>{nights}N. x</span>
+<input type="number" min={0} step={1} value={sr.price} onChange={e=>{const v=parseFloat(e.target.value)||0;setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,price:v}:s))}} style={{width:60,padding:"4px 6px",border:"1px solid #CBC6BE",borderRadius:6,fontSize:13,fontWeight:800,textAlign:"center",color:"#1E40AF",outline:"none"}}/>
+<span style={{fontWeight:700,color:"#1E40AF",fontSize:13}}>= {fmt(nights*sr.price)} EUR</span>
+</div>
 {selectedRooms.length>1&&<button onClick={()=>removeRoom(i)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444",padding:2}}><I n="x" s={14}/></button>}
 </div>)}
 <Btn v="ghost" sz="sm" onClick={()=>setShowRoomPicker(true)} style={{marginTop:6}}><I n="plus" s={14}/> Zimmer hinzufuegen</Btn>
