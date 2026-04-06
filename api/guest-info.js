@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const { token } = req.query;
   const headers = { "Content-Type": "application/json", apikey: SB_KEY, Authorization: "Bearer " + SB_KEY };
   var gn = "", ci = "", co = "", rt = "";
-  if (token) { try { const rr = await fetch(SB_URL + "/rest/v1/reservations?offer_token=eq." + token + "&select=*,guests(*),rooms(*,unit_types(*))", { headers }); const rv = (await rr.json())[0]; if (rv) { const g = rv.guests; rt = rv.rooms?.unit_types?.name || ""; gn = (g?.salutation || "") + " " + (g?.last_name || "Gast"); ci = fd(rv.check_in); co = fd(rv.check_out); } } catch (e) {} }
+  if (token) { try { const rr = await fetch(SB_URL + "/rest/v1/reservations?offer_token=eq." + token + "&select=*,guests(*),rooms(*,unit_types(*))", { headers }); const rv = (await rr.json())[0]; if (rv) { const g = rv.guests; rt = rv.rooms?.unit_types?.name || ""; gn = (g?.salutation ? g.salutation + " " : "") + (g?.last_name || "Gast"); ci = fd(rv.check_in); co = fd(rv.check_out); } } catch (e) {} }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   return res.status(200).send(buildPage(gn, ci, co, rt));
 }
@@ -82,10 +82,12 @@ h1,h2,h3{font-family:"Playfair Display",serif;color:#58585A}
 </style></head><body>
 
 <div class="hero">
-<img src="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg" alt="Hotel Europa"/>
+<div class="logo-strip"><img src="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg" alt="Hotel Europa"/></div>
+<div class="hero-text">
 <h1>Willkommen${gn ? ", " + gn : ""}</h1>
 <div class="stars">&starf; &starf; &starf;</div>
 <p>Alle Informationen fuer Ihren Aufenthalt${ci ? " vom " + ci + " bis " + co : ""}</p>
+</div>
 </div>
 
 <div class="wrap">
@@ -107,11 +109,7 @@ ${rt ? '<div class="info-grid"><div class="info-card"><div class="label">Ihr Zim
 <div class="section-label">Parken</div>
 <h2>Parkmoeglichkeiten</h2>
 <p>Rund um das Hotel gibt es mehrere Parkmoeglichkeiten:</p>
-
-<a href="https://www.google.com/maps/place/Hotel+Europa,+Marktplatz+1,+65428+R%C3%BCsselsheim/@49.9917,8.4118,16.5z" target="_blank" rel="noopener">
-<img class="map-img" src="https://maps.googleapis.com/maps/api/staticmap?center=49.9917,8.4125&zoom=16&size=700x350&scale=2&maptype=roadmap&markers=color:red%7Clabel:H%7C49.9915,8.4135&markers=color:blue%7Clabel:1%7C49.9912,8.4118&markers=color:blue%7Clabel:2%7C49.9935,8.4105&markers=color:green%7Clabel:3%7C49.9888,8.4128&style=feature:poi%7Cvisibility:off&key=" alt="Karte - Hotel Europa und Parkplaetze (klicken fuer Google Maps)"/>
-</a>
-<p style="font-size:12px;color:#ABA596;text-align:center;margin-top:-8px">Klicken Sie auf die Karte fuer Google Maps</p>
+<img class="map-img" src="https://pms.hotel-europa-ruesselsheim.de/parkplaetze-karte.png" alt="Parkplaetze rund um Hotel Europa"/>
 
 <div class="parking-list">
 <div class="parking-item"><div class="parking-icon" style="background:#8B7D6B">P1</div><div><h4>Ludwigstrasse</h4><p><strong>1 Gehminute</strong> &ndash; direkt hinter dem Hotel<br>Kostenlos: Mo&ndash;Fr 18:00&ndash;08:00, Sa &amp; So ganztaegig<br>Tagsueber: Parkschein am Automaten</p></div></div>
@@ -215,12 +213,15 @@ function renderPage(num){
   pdfDoc.getPage(num).then(function(page){
     var canvas=document.getElementById('menuCanvas');
     var ctx=canvas.getContext('2d');
+    var dpr=window.devicePixelRatio||2;
     var maxH=window.innerHeight*0.78;
     var vp=page.getViewport({scale:1});
-    var scale=Math.min(maxH/vp.height, (window.innerWidth*0.9)/vp.width, 2);
-    var viewport=page.getViewport({scale:scale});
+    var scale=Math.min(maxH/vp.height, (window.innerWidth*0.9)/vp.width);
+    var viewport=page.getViewport({scale:scale*dpr});
     canvas.height=viewport.height;
     canvas.width=viewport.width;
+    canvas.style.width=Math.round(viewport.width/dpr)+'px';
+    canvas.style.height=Math.round(viewport.height/dpr)+'px';
     page.render({canvasContext:ctx,viewport:viewport}).promise.then(function(){
       rendering=false;
       document.getElementById('menuPageNum').textContent=num+' / '+pageCount;
