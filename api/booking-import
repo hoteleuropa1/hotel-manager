@@ -1,9 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  "https://ztdtkncoyrkvdpytwuhy.supabase.co",
-  process.env.SUPABASE_SERVICE_KEY
-);
+const SUPABASE_URL = "https://ztdtkncoyrkvdpytwuhy.supabase.co";
 
 const MONTHS = {
   jan:1,feb:2,"mär":3,"märz":3,marz:3,mar:3,apr:4,mai:5,jun:6,
@@ -11,7 +6,6 @@ const MONTHS = {
 };
 
 function parseDate(str) {
-  // "Mo., 6. Apr. 2026" or "Fr., 6. März 2026"
   const c = str.replace(/\./g,"").replace(/,/g,"").trim();
   const p = c.split(/\s+/);
   let day, month, year;
@@ -29,25 +23,38 @@ function parseDate(str) {
   return `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
 }
 
-function val(lines, label) {
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith(label)) {
-      const after = lines[i].substring(label.length).trim();
-      if (after) return after;
-      if (i + 1 < lines.length) return lines[i + 1];
-    }
-  }
-  return "";
-}
-
 function parsePrice(str) {
   const m = str.match(/€\s*([\d.,]+)/);
   if (!m) return 0;
-  return parseFloat(m[1].replace(".", "").replace(",", ".")) || parseFloat(m[1].replace(",", ".")) || 0;
+  const raw = m[1];
+  if (raw.includes(",") && raw.includes(".")) {
+    return parseFloat(raw.replace(".","").replace(",",".")) || 0;
+  }
+  return parseFloat(raw.replace(",",".")) || 0;
 }
 
-export default async function handler(req, res) {
+async function sbGet(table, query, key) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    headers: { apikey: key, Authorization: "Bearer " + key }
+  });
+  return r.json();
+}
+
+async function sbPost(table, data, key) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: "Bearer " + key, Prefer: "return=representation" },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(r.status + " " + t.slice(0, 200)); }
+  return r.json();
+}
+
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!key) return res.status(500).json({ success: false, error: "SUPABASE_SERVICE_KEY fehlt" });
 
   try {
     const { emailText } = req.body;
@@ -55,7 +62,7 @@ export default async function handler(req, res) {
 
     const lines = emailText.split("\n").map(l => l.trim()).filter(Boolean);
 
-    // === CHECK-IN / CHECK-OUT ===
+    // CHECK-IN / CHECK-OUT
     let checkIn, checkOut;
     for (let i = 0; i < lines.length; i++) {
       if (lines[i] === "Check-in" && i + 1 < lines.length) checkIn = parseDate(lines[i + 1]);
@@ -63,7 +70,7 @@ export default async function handler(req, res) {
     }
     if (!checkIn || !checkOut) return res.status(400).json({ success: false, error: "Check-in/Check-out nicht erkannt" });
 
-    // === GUEST NAME ===
+    // GUEST NAME
     let guestName = "";
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].match(/^Name des Gast/)) {
@@ -79,19 +86,17 @@ export default async function handler(req, res) {
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
 
-    // === COUNTRY CODE (line after name, 2 chars like "de") ===
+    // COUNTRY CODE
     let country = "DE";
     for (let i = 0; i < lines.length; i++) {
       if (lines[i] === guestName && i + 1 < lines.length) {
         const next = lines[i + 1].trim();
-        if (next.length === 2 && /^[a-z]{2}$/i.test(next)) {
-          country = next.toUpperCase();
-        }
+        if (next.length === 2 && /^[a-z]{2}$/i.test(next)) country = next.toUpperCase();
         break;
       }
     }
 
-    // === EMAIL ===
+    // EMAIL
     let email = "";
     for (const l of lines) {
       if (l.includes("@guest.booking.com") || (l.includes("@") && l.includes("booking"))) {
@@ -100,7 +105,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // === ADDRESS (after "Telefonnummer anzeigen") ===
+    // ADDRESS
     let address = "", city = "", zip = "";
     for (let i = 0; i < lines.length; i++) {
       if (lines[i] === "Telefonnummer anzeigen" && i + 1 < lines.length) {
@@ -126,7 +131,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // === BOOKING NUMBER ===
+    // BOOKING NUMBER
     let bookingNr = "";
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].startsWith("Buchungsnummer:")) {
@@ -136,10 +141,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // === TOTAL ADULTS ===
+    // TOTAL ADULTS
     let totalAdults = 1;
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].match(/Gesamtanzahl G(ä|a)ste/)) {
+      if (lines[i].match(/Gesamtanzahl G/)) {
         const next = i + 1 < lines.length ? lines[i + 1] : lines[i];
         const am = next.match(/(\d+)\s*Erwachsene/i) || next.match(/(\d+)\s*Erwachsener/i);
         if (am) totalAdults = parseInt(am[1]);
@@ -147,22 +152,18 @@ export default async function handler(req, res) {
       }
     }
 
-    // === PARSE ROOMS ===
-    // Pattern: "* [N] [Standard] Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer"
-    // Next line: "€ XX" (room price)
+    // PARSE ROOMS
     const roomDefs = [];
     for (let i = 0; i < lines.length; i++) {
       const rm = lines[i].match(/^\*\s*(\d*)\s*(Standard\s+)?(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i);
       if (rm) {
         const roomType = rm[3];
-        // Price: check same line first, then next line
         let roomPrice = parsePrice(lines[i]);
         if (!roomPrice && i + 1 < lines.length) roomPrice = parsePrice(lines[i + 1]);
 
-        // Per-night prices: scan forward for "DD - DD Month" patterns
         const nightPrices = [];
         for (let j = i + 1; j < Math.min(i + 40, lines.length); j++) {
-          if (j > i + 2 && lines[j].match(/^\*\s/)) break; // next room
+          if (j > i + 2 && lines[j].match(/^\*\s/)) break;
           if (lines[j].match(/Zwischensumme/i)) break;
           const dateRange = lines[j].match(/(\d{2})\s*-\s*(\d{2})\s+(\w+)/);
           if (dateRange) {
@@ -175,7 +176,6 @@ export default async function handler(req, res) {
             }
           }
         }
-
         roomDefs.push({ roomType, price: roomPrice, nightPrices });
       }
     }
@@ -184,56 +184,47 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: "Keine Zimmer erkannt. Erwartet: * Standard Einzelzimmer / Doppelzimmer / etc." });
     }
 
-    // === DUPLICATE CHECK ===
+    // DUPLICATE CHECK
     if (bookingNr) {
-      const { data: dup } = await supabase
-        .from("reservations")
-        .select("id")
-        .like("notes", `%Booking.com #${bookingNr}%`)
-        .limit(1);
+      const dup = await sbGet("reservations", "notes=like.*Booking.com+%23" + bookingNr + "*&select=id&limit=1", key);
       if (dup && dup.length > 0) {
-        return res.status(400).json({ success: false, error: `Buchung ${bookingNr} bereits importiert` });
+        return res.status(400).json({ success: false, error: "Buchung " + bookingNr + " bereits importiert" });
       }
     }
 
-    // === CREATE/FIND GUEST ===
+    // CREATE/FIND GUEST
     let guestId;
     if (email) {
-      const { data: eg } = await supabase.from("guests").select("id").eq("email", email).limit(1);
+      const eg = await sbGet("guests", "email=eq." + encodeURIComponent(email) + "&select=id&limit=1", key);
       if (eg && eg.length) guestId = eg[0].id;
     }
     if (!guestId && lastName) {
-      const { data: eg2 } = await supabase
-        .from("guests").select("id")
-        .ilike("last_name", lastName).ilike("first_name", firstName).limit(1);
+      const eg2 = await sbGet("guests", "last_name=ilike." + encodeURIComponent(lastName) + "&first_name=ilike." + encodeURIComponent(firstName) + "&select=id&limit=1", key);
       if (eg2 && eg2.length) guestId = eg2[0].id;
     }
     if (!guestId) {
-      const { data: ng, error: ge } = await supabase.from("guests").insert({
-        first_name: firstName, last_name: lastName, email, address, zip, city, country
-      }).select();
-      if (ge) throw new Error("Gast: " + ge.message);
+      const ng = await sbPost("guests", { first_name: firstName, last_name: lastName, email, address, zip, city, country }, key);
       guestId = ng[0].id;
     }
 
-    // === LOAD ROOMS + RESERVATIONS FOR AVAILABILITY ===
-    const { data: unitTypes } = await supabase.from("unit_types").select("*");
-    const { data: allRooms } = await supabase.from("rooms").select("*").eq("active", true).order("name");
-    const { data: allRes } = await supabase
-      .from("reservations")
-      .select("room_id,check_in,check_out,status")
-      .not("status", "in", "(storniert,abgelehnt,checkedout)");
+    // LOAD ROOMS + UNIT TYPES + RESERVATIONS
+    const unitTypes = await sbGet("unit_types", "select=*", key);
+    const allRooms = await sbGet("rooms", "active=eq.true&order=name&select=*", key);
+    const allRes = await sbGet("reservations", "status=not.in.(storniert,abgelehnt,checkedout)&select=room_id,check_in,check_out,status", key);
 
     const usedRoomIds = new Set();
     const created = [];
+    const groupId = roomDefs.length > 1 ? Math.random().toString(16).slice(2, 10) : "";
 
-    for (const rd of roomDefs) {
+    for (let ri = 0; ri < roomDefs.length; ri++) {
+      const rd = roomDefs[ri];
+
       // Match unit type
       const ut = unitTypes.find(u => u.name.toLowerCase() === rd.roomType.toLowerCase());
       if (!ut) {
         return res.status(400).json({
           success: false,
-          error: `Kategorie "${rd.roomType}" nicht gefunden. Vorhanden: ${unitTypes.map(u => u.name).join(", ")}`
+          error: 'Kategorie "' + rd.roomType + '" nicht gefunden. Vorhanden: ' + unitTypes.map(u => u.name).join(", ")
         });
       }
 
@@ -241,35 +232,31 @@ export default async function handler(req, res) {
       const candidates = allRooms.filter(r => r.unit_type_id === ut.id);
       const free = candidates.find(r => {
         if (usedRoomIds.has(r.id)) return false;
-        return !allRes.some(rv =>
-          rv.room_id === r.id && checkIn < rv.check_out && checkOut > rv.check_in
-        );
+        return !allRes.some(rv => rv.room_id === r.id && checkIn < rv.check_out && checkOut > rv.check_in);
       });
 
       if (!free) {
         return res.status(400).json({
           success: false,
-          error: `Kein freies ${rd.roomType} fuer ${checkIn} - ${checkOut}`
+          error: "Kein freies " + rd.roomType + " fuer " + checkIn + " - " + checkOut
         });
       }
 
-      // Adults default by room type
       const adultsByType = { einzelzimmer: 1, doppelzimmer: 2, zweibettzimmer: 2, dreibettzimmer: 3 };
       const adults = adultsByType[rd.roomType.toLowerCase()] || 1;
 
-      // Build notes
       let notes = "Booking.com #" + bookingNr;
       if (rd.nightPrices.length > 0) {
         notes += " | " + rd.nightPrices.map(np => np.range + ": " + np.price + " EUR").join(", ");
       }
+      if (groupId) notes += " | Gruppe " + groupId + " (Zi " + (ri + 1) + "/" + roomDefs.length + ")";
 
-      // Generate token
       const token = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0;
         return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
       });
 
-      const { data: nr, error: re } = await supabase.from("reservations").insert({
+      const nr = await sbPost("reservations", {
         room_id: free.id,
         guest_id: guestId,
         check_in: checkIn,
@@ -281,17 +268,10 @@ export default async function handler(req, res) {
         source: "booking",
         notes,
         offer_token: token
-      }).select();
-
-      if (re) throw new Error("Reservierung: " + re.message);
+      }, key);
 
       usedRoomIds.add(free.id);
-      created.push({
-        id: nr[0].id,
-        room: free.name,
-        roomType: ut.name,
-        price: rd.price
-      });
+      created.push({ id: nr[0].id, room: free.name, roomType: ut.name, price: rd.price });
     }
 
     return res.status(200).json({
@@ -307,6 +287,7 @@ export default async function handler(req, res) {
     });
 
   } catch (e) {
+    console.error("Booking Import Fehler:", e);
     return res.status(500).json({ success: false, error: e.message });
   }
-}
+};
