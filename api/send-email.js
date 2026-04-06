@@ -1,12 +1,9 @@
-// api/send-email.js
-// Vercel Serverless Function – E-Mail über Resend API
-// Kein npm install nötig – nutzt nur fetch
+const nodemailer = require("nodemailer");
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Nur POST erlaubt" });
 
@@ -16,53 +13,46 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "to, subject und html sind erforderlich" });
     }
 
-    const apiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
-    const fromName = process.env.FROM_NAME || "Hotel Europa Rüsselsheim";
-    const ccEmail = process.env.CC_EMAIL || fromEmail;
+    const host = process.env.SMTP_HOST || "smtp.strato.de";
+    const port = parseInt(process.env.SMTP_PORT || "465");
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const fromName = process.env.FROM_NAME || "Hotel Europa";
 
-    if (!apiKey) {
-      return res.status(500).json({ error: "RESEND_API_KEY nicht konfiguriert" });
+    if (!user || !pass) {
+      return res.status(500).json({ error: "SMTP_USER oder SMTP_PASS nicht konfiguriert" });
     }
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        from: `${fromName} <${fromEmail}>`,
-        to: [to],
-        cc: [ccEmail],
-        reply_to: fromEmail,
-        subject: subject,
-        html: html
-      })
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false }
     });
 
-    const data = await response.json();
+    const info = await transporter.sendMail({
+      from: fromName + " <" + user + ">",
+      to: to,
+      cc: user,
+      replyTo: user,
+      subject: subject,
+      html: html
+    });
 
-    if (!response.ok) {
-      console.error("Resend Fehler:", data);
-      return res.status(500).json({
-        error: "E-Mail konnte nicht gesendet werden",
-        details: data.message || JSON.stringify(data)
-      });
-    }
+    console.log("E-Mail gesendet an " + to + " (" + emailType + ") ID: " + info.messageId);
 
-    console.log(`✅ E-Mail gesendet an ${to} (${emailType})`);
     return res.status(200).json({
       success: true,
-      message: `E-Mail an ${to} gesendet`,
-      id: data.id,
+      message: "E-Mail an " + to + " gesendet",
+      id: info.messageId,
       emailType: emailType || "allgemein"
     });
 
   } catch (error) {
-    console.error("Fehler:", error);
+    console.error("SMTP Fehler:", error.message);
     return res.status(500).json({
-      error: "E-Mail Fehler",
+      error: "E-Mail konnte nicht gesendet werden",
       details: error.message
     });
   }
