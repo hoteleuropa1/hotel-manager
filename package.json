@@ -1,0 +1,8 @@
+
+{
+  "name": "hotel-europa-pms",
+  "version": "1.0.0",
+  "dependencies": {
+    "nodemailer": "^6.9.0"
+  }
+}
