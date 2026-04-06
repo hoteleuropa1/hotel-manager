@@ -79,11 +79,15 @@ function parseHRSEmail(text) {
     roomType: "", rateName: "",
     totalPrice: 0, breakfast: false, breakfastPrice: 0,
     adults: 1, cancellationDeadline: "", guaranteed: false,
-    guestWishes: ""
+    guestWishes: "",
+    buchungsart: "",
+    zahlungsart: "",
+    kreditkartenInfo: "",
+    creditCardPayment: false
   };
 
   // Gastname: "NACHNAME, Vorname"
-  var nameMatch = t.match(/Anreisende\s*G[aä]ste[:\s]*([A-Z\u00C0-\u00FF][A-Z\u00C0-\u00FF\s'\-]+),\s*([A-Za-z\u00C0-\u00FF\s'\-]+)/);
+  var nameMatch = t.match(/Anreisende\s*G[aä]ste[:\s]*([A-Z\u00C0-\u00FF][A-Z\u00C0-\u00FF\s'\-]+),\s*([A-Za-z\u00C0-\u00FF'\-\s]+?)(?=Anreise|Abreise|\d|\n|$)/);
   if (nameMatch) {
     var rawLast = nameMatch[1].trim();
     result.firstName = nameMatch[2].trim();
@@ -143,6 +147,23 @@ function parseHRSEmail(text) {
   var wishMatch = t.match(/W[uü]nsche\s*an\s*das\s*Hotel\s*([\s\S]*?)(?:Mehrwertsteuer|Gesamtpreis|Gratisleistungen|$)/i);
   if (wishMatch) {
     result.guestWishes = wishMatch[1].trim().replace(/\n+/g, ", ").substring(0, 500);
+  }
+
+  // Buchungsart
+  var buchungsartMatch = t.match(/Buchungsart[:\s]*([^\n]*?)(?:Stornierung|Kreditkarten|$)/i);
+  if (buchungsartMatch) result.buchungsart = buchungsartMatch[1].trim().substring(0, 300);
+
+  // Zahlungsart
+  var zahlungsartMatch = t.match(/Zahlungsart[:\s]*([^\n]*?)(?:Rechnungsadresse|W[uü]nsche|Mehrwertsteuer|$)/i);
+  if (zahlungsartMatch) result.zahlungsart = zahlungsartMatch[1].trim().substring(0, 300);
+
+  // Kreditkarten-Angaben
+  var kkMatch = t.match(/Kreditkarten-Angaben\s*([\s\S]*?)(?:Stornierungsgeb|Zahlungsart|$)/i);
+  if (kkMatch) result.kreditkartenInfo = kkMatch[1].trim().replace(/\n+/g, " ").substring(0, 300);
+
+  // Kreditkartenzahlung erkennen
+  if (result.zahlungsart && result.zahlungsart.match(/belasten\s*Sie\s*die\s*hinterlegte\s*Kreditkarte/i)) {
+    result.creditCardPayment = true;
   }
 
   // Rechnungsadresse parsen
@@ -305,6 +326,9 @@ module.exports = async function handler(req, res) {
     if (parsed.rateName) notes += " | Tarif: " + parsed.rateName;
     if (parsed.breakfast) notes += " | Fruehstueck: " + parsed.breakfastPrice + " EUR/Pers.";
     if (parsed.cancellationDeadline) notes += " | Storno: " + parsed.cancellationDeadline;
+    if (parsed.buchungsart) notes += " | Buchungsart: " + parsed.buchungsart;
+    if (parsed.zahlungsart) notes += " | Zahlungsart: " + parsed.zahlungsart;
+    if (parsed.kreditkartenInfo) notes += " | KK-Info: " + parsed.kreditkartenInfo;
     if (parsed.guestWishes) notes += " | Wuensche: " + parsed.guestWishes;
 
     var newRes = await sbPost("reservations", {
@@ -320,6 +344,19 @@ module.exports = async function handler(req, res) {
       offer_token: otoken,
       notes: notes
     }, key);
+
+    // Zahlung anlegen wenn Kreditkarte
+    if (parsed.creditCardPayment && parsed.totalPrice > 0) {
+      try {
+        await sbPost("payments", {
+          reservation_id: newRes[0].id,
+          guest_id: guestId,
+          amount: parsed.totalPrice,
+          payment_method: "mastercard",
+          status: "ausstehend"
+        }, key);
+      } catch(pe) { console.error("Payment Fehler:", pe.message); }
+    }
 
     return res.status(200).json({
       success: true,
