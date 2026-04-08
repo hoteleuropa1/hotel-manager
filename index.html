@@ -317,7 +317,20 @@ const[planSearchOpen,setPlanSearchOpen]=useState(false);
 const planSearchRef=useRef(null);
 useEffect(()=>{const h=e=>{if(planSearchRef.current&&!planSearchRef.current.contains(e.target))setPlanSearchOpen(false)};document.addEventListener("mousedown",h);return()=>document.removeEventListener("mousedown",h)},[]);
 const searchResults=useMemo(()=>{if(planSearch.length<1)return[];const q=planSearch.toLowerCase();return ress.filter(r=>r.status!=="storniert"&&r.status!=="abgelehnt").map(r=>{const g=gMap[r.guest_id];const rm=aRms.find(x=>x.id===r.room_id);const ut2=rm?uts.find(u=>u.id===rm.unit_type_id):null;const name=(g?.first_name||"")+" "+(g?.last_name||"");const firma=g?.company||"";if(!name.toLowerCase().startsWith(q)&&!firma.toLowerCase().startsWith(q)&&!(g?.last_name||"").toLowerCase().startsWith(q))return null;return{res:r,guest:g,room:rm,ut:ut2,name,firma}}).filter(Boolean).slice(0,10)},[planSearch,ress,gMap,aRms,uts]);
-const doImport=async()=>{if(!emailText.trim()){setImportError("Bitte Email-Text einfuegen");return}setImporting(true);setImportError("");setImportResult(null);try{const resp=await fetch(importSource==="booking"?"/api/booking-import":"/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:emailText.trim()})});const data=await resp.json();if(data.success){setImportResult(data);setEmailText("");await load()}else{setImportError(data.error||"Import fehlgeschlagen")}}catch(e){setImportError(e.message)}setImporting(false)};
+const doImport=async()=>{if(!emailText.trim()){setImportError("Bitte Email-Text einfuegen");return}
+setImporting(true);setImportError("");setImportResult(null);
+const txt=emailText.trim();
+let extNr=null;
+const bkMatch=txt.match(/Buchungsnummer[:\s]*(\d{5,})/i)||txt.match(/Confirmation\s*(?:number|#)?[:\s]*(\d{5,})/i)||txt.match(/Reservierungsnummer[:\s]*(\d{5,})/i)||txt.match(/Booking\s*(?:number|#)?[:\s]*(\d{5,})/i);
+if(bkMatch)extNr=bkMatch[1];
+if(!extNr){const hrsMatch=txt.match(/HRS[- ]?(?:Nr|Nummer|number)[.:\s]*(\d{5,})/i)||txt.match(/Reservierungs(?:nummer|nr)[.:\s]*(\d{5,})/i);if(hrsMatch)extNr=hrsMatch[1]}
+if(extNr){const dupe=ress.find(r=>(r.notes||"").includes(extNr)||(r.internal_notes||"").includes(extNr));
+if(dupe){const g=gMap[dupe.guest_id];setImportError("Buchung "+extNr+" existiert bereits! Gast: "+(g?g.first_name+" "+g.last_name:"unbekannt")+" ("+fd(dupe.check_in)+" - "+fd(dupe.check_out)+")");setImporting(false);return}}
+try{const resp=await fetch(importSource==="booking"?"/api/booking-import":"/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:txt})});const data=await resp.json();
+if(data.success){setImportResult(data);setEmailText("");await load()}
+else{setImportError(data.error||"Import fehlgeschlagen")}}
+catch(e){setImportError(e.message)}
+setImporting(false)};
 const goMonth=n=>{const d=new Date(ws);d.setMonth(d.getMonth()+n);d.setDate(1);setWs(d)};
 const goYear=n=>{const d=new Date(ws);d.setFullYear(d.getFullYear()+n);d.setDate(1);setWs(d)};
 const[planDP,setPlanDP]=useState({});
