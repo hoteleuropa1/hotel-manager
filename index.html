@@ -120,7 +120,7 @@ return<Modal title={"Neu - "+selectedRooms.map(sr=>sr.room.name).join(", ")} onC
 <label style={{display:"block",fontSize:12,fontWeight:500,color:"#6B7280",marginBottom:8}}>Zimmer ({selectedRooms.length})</label>
 {selectedRooms.map((sr,i)=><div key={sr.room.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"#F9FAFB",borderRadius:8,marginBottom:4,border:"1px solid #E5E7EB",flexWrap:"wrap"}}>
 <span style={{fontWeight:600,fontSize:13}}>{sr.room.name}</span>
-<span style={{fontSize:12,color:"#6B7280"}}>{sr.ut?.name}</span>
+{(sr.room.alt_unit_type_ids||"").split(",").filter(Boolean).length>0?<select value={sr.soldAsUtId||sr.room.unit_type_id} onChange={e=>{const nid=e.target.value;const nut=unitTypes.find(u=>u.id===nid);setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,soldAsUtId:nid,ut:nut,price:nut?.base_price||s.price}:s))}} style={{padding:"3px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:12,background:"#fff"}}><option value={sr.room.unit_type_id}>{unitTypes.find(u=>u.id===sr.room.unit_type_id)?.name}</option>{(sr.room.alt_unit_type_ids||"").split(",").filter(Boolean).map(aid=><option key={aid} value={aid}>{unitTypes.find(u=>u.id===aid)?.name||aid}</option>)}</select>:<span style={{fontSize:12,color:"#6B7280"}}>{sr.ut?.name}</span>}
 <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4}}>
 <span style={{fontSize:11,color:"#6B7280"}}>{nights}N. x</span>
 <input type="number" min={0} step={1} value={sr.price} onChange={e=>{const v=parseFloat(e.target.value)||0;setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,price:v}:s))}} style={{width:60,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,fontWeight:600,textAlign:"center",color:"#D4940E",outline:"none"}}/>
