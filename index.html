@@ -292,7 +292,7 @@ const[toast,setToast]=useState(null);
 const show=(m,t="success")=>{setToast({m,t});setTimeout(()=>setToast(null),3000)};
 const[hi,setHi]=useState(null);const[uts,setUts]=useState([]);const[rms,setRms]=useState([]);
 const[ress,setRess]=useState([]);const[guests,setGuests]=useState([]);const[products,setProducts]=useState([]);
-const[ld,setLd]=useState(true);
+const[ld,setLd]=useState(true); const[riMap,setRiMap]=useState({}); const[paidMap,setPaidMap]=useState({});
 const[riMap,setRiMap]=useState({});
 const[paidMap,setPaidMap]=useState({});
 const pRef=useRef({sugg:{},load:false,err:null,lastUpd:null,comps:null,showComp:false,debug:"",period:14,selCats:{},minPrices:{},customFrom:toDS(new Date()),customTo:toDS(addD(new Date(),14)),savedPrices:{},reqLog:[],cooldown:0});
