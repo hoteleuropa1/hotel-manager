@@ -1,5 +1,5 @@
 // api/offer-response.js
-// Angebot annehmen/ablehnen - mit Buchungsbedingungen-Seite
+// Angebot annehmen/ablehnen - mit Gruppenbuchung-Support
 
 export default async function handler(req, res) {
   const SB_URL = process.env.SUPABASE_URL || "https://ztdtkncoyrkvdpytwuhy.supabase.co";
@@ -26,6 +26,57 @@ export default async function handler(req, res) {
     const room = rv.rooms;
     const ut = room?.unit_types;
 
+    // Gruppen-Reservierungen laden
+    const groupMatch = (rv.notes || "").match(/Gruppe\s+([a-f0-9]+)/);
+    const groupId = groupMatch ? groupMatch[1] : null;
+    let groupRes = [rv];
+
+    if (groupId) {
+      try {
+        const gr = await fetch(SB_URL + "/rest/v1/reservations?notes=like.*Gruppe+" + groupId + "*&select=*,rooms(*,unit_types(*))", { headers });
+        const grData = await gr.json();
+        if (grData && grData.length > 1) {
+          groupRes = grData.sort((a, b) => {
+            const na = (a.notes || "").match(/Zi (\d+)/);
+            const nb = (b.notes || "").match(/Zi (\d+)/);
+            return (na ? parseInt(na[1]) : 0) - (nb ? parseInt(nb[1]) : 0);
+          });
+        }
+      } catch (e) {}
+    }
+
+    // sold_as Kategorie ermitteln
+    const getUtName = (r) => {
+      if (r.sold_as_unit_type_id && r.rooms?.unit_types && r.sold_as_unit_type_id !== r.rooms.unit_type_id) {
+        return null; // wird per extra Query geladen
+      }
+      return r.rooms?.unit_types?.name || "";
+    };
+
+    // Unit type names laden fuer sold_as
+    const utNames = {};
+    for (const r of groupRes) {
+      const utId = r.sold_as_unit_type_id || r.rooms?.unit_type_id;
+      if (utId && !utNames[utId]) {
+        if (r.rooms?.unit_types?.id === utId) {
+          utNames[utId] = r.rooms.unit_types.name;
+        } else {
+          try {
+            const utR = await fetch(SB_URL + "/rest/v1/unit_types?id=eq." + utId + "&select=name", { headers });
+            const utD = await utR.json();
+            if (utD && utD[0]) utNames[utId] = utD[0].name;
+          } catch (e) {}
+        }
+      }
+    }
+
+    const getRoomLabel = (r) => {
+      const utId = r.sold_as_unit_type_id || r.rooms?.unit_type_id;
+      return utNames[utId] || r.rooms?.unit_types?.name || "";
+    };
+
+    const groupTotal = groupRes.reduce((s, r) => s + parseFloat(r.total_price || 0), 0);
+
     if (rv.status !== "angebot") {
       var statusText = { reservierung: "bereits angenommen", checkedin: "bereits eingecheckt", storniert: "storniert", abgelehnt: "abgelehnt" }[rv.status] || rv.status;
       return res.status(200).send(page("Angebot " + statusText, "Dieses Angebot wurde bereits bearbeitet (Status: " + statusText + ").", "info"));
@@ -33,12 +84,16 @@ export default async function handler(req, res) {
 
     // Ablehnen
     if (action === "decline") {
-      await fetch(SB_URL + "/rest/v1/reservations?offer_token=eq." + token, {
-        method: "PATCH", headers, body: JSON.stringify({ status: "abgelehnt" })
-      });
+      // Alle Gruppen-Reservierungen ablehnen
+      for (const gr of groupRes) {
+        await fetch(SB_URL + "/rest/v1/reservations?id=eq." + gr.id, {
+          method: "PATCH", headers, body: JSON.stringify({ status: "abgelehnt" })
+        });
+      }
 
-      // Hotel benachrichtigen
       var nights = Math.max(1, Math.round((new Date(rv.check_out) - new Date(rv.check_in)) / 86400000));
+      var roomRows = groupRes.map(r => '<tr><td style="padding:5px 0;padding-left:12px;">' + getRoomLabel(r) + ' (Zi. ' + (r.rooms?.name || "") + ')</td><td style="padding:5px 0;text-align:right;">' + parseFloat(r.total_price || 0).toFixed(2) + ' EUR</td></tr>').join("");
+
       try {
         await fetch("https://pms.hotel-europa-ruesselsheim.de/api/send-email", {
           method: "POST",
@@ -55,11 +110,12 @@ export default async function handler(req, res) {
               + '<tr><td style="padding:5px 0;font-weight:600;width:45%;">Gast:</td><td style="padding:5px 0;">' + (guest?.salutation || "") + ' ' + (guest?.first_name || "") + ' ' + (guest?.last_name || "") + '</td></tr>'
               + '<tr><td style="padding:5px 0;font-weight:600;">E-Mail:</td><td style="padding:5px 0;">' + (guest?.email || "-") + '</td></tr>'
               + (guest?.phone ? '<tr><td style="padding:5px 0;font-weight:600;">Telefon:</td><td style="padding:5px 0;">' + guest.phone + '</td></tr>' : '')
-              + '<tr><td style="padding:5px 0;font-weight:600;">Zimmerkategorie:</td><td style="padding:5px 0;">' + (ut?.name || "") + '</td></tr>'
               + '<tr><td style="padding:5px 0;font-weight:600;">Zeitraum:</td><td style="padding:5px 0;">' + fd(rv.check_in) + ' &ndash; ' + fd(rv.check_out) + ' (' + nights + ' N.)</td></tr>'
-              + '<tr><td style="padding:5px 0;font-weight:600;">Preis:</td><td style="padding:5px 0;">' + parseFloat(rv.total_price || 0).toFixed(2) + ' EUR</td></tr>'
+              + '<tr><td colspan="2" style="padding:10px 0 4px;font-weight:700;border-top:1px solid #DDD9D2;">' + groupRes.length + ' Zimmer:</td></tr>'
+              + roomRows
+              + '<tr><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">Gesamtpreis:</td><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;text-align:right;">' + groupTotal.toFixed(2) + ' EUR</td></tr>'
               + '</table></div></td></tr>'
-              + '<tr><td style="padding:0 30px 24px;font-size:13px;color:#6B7280;">Das Zimmer ist wieder frei und kann neu vergeben werden.</td></tr>'
+              + '<tr><td style="padding:0 30px 24px;font-size:13px;color:#6B7280;">Die Zimmer sind wieder frei und koennen neu vergeben werden.</td></tr>'
               + '<tr><td style="background:#ABA596;padding:14px 30px;color:#ffffff;font-size:11px;text-align:center;">Hotel Europa &middot; Marktplatz 1 &middot; 65428 Ruesselsheim</td></tr>'
               + '</table></td></tr></table>',
             emailType: "hotel-notification"
@@ -74,16 +130,19 @@ export default async function handler(req, res) {
 
     // Annehmen - Schritt 1: Bedingungen anzeigen
     if (action === "accept" && confirmed !== "yes") {
-      return res.status(200).send(confirmPage(rv, guest, ut, token));
+      return res.status(200).send(confirmPage(rv, guest, groupRes, groupTotal, utNames, token));
     }
 
     // Annehmen - Schritt 2: Bestaetigt
     if (action === "accept" && confirmed === "yes") {
-      await fetch(SB_URL + "/rest/v1/reservations?offer_token=eq." + token, {
-        method: "PATCH", headers, body: JSON.stringify({ status: "reservierung", confirmation_sent_at: new Date().toISOString() })
-      });
+      // Alle Gruppen-Reservierungen auf "reservierung" setzen
+      for (const gr of groupRes) {
+        await fetch(SB_URL + "/rest/v1/reservations?id=eq." + gr.id, {
+          method: "PATCH", headers, body: JSON.stringify({ status: "reservierung", confirmation_sent_at: new Date().toISOString() })
+        });
+      }
 
-      // Automatische Bestaetigungsmail an Gast
+      // Bestaetigungsmail an Gast
       if (guest?.email) {
         var nights = Math.max(1, Math.round((new Date(rv.check_out) - new Date(rv.check_in)) / 86400000));
         var greet = (guest.salutation === "Frau" ? "Sehr geehrte Frau" : guest.salutation === "Herr" ? "Sehr geehrter Herr" : "Sehr geehrte/r") + " " + (guest.last_name || "Gast");
@@ -91,19 +150,22 @@ export default async function handler(req, res) {
         var HN = "Hotel Europa";
         var infoUrl = "https://pms.hotel-europa-ruesselsheim.de/api/guest-info?token=" + token;
 
+        var roomRows = groupRes.map(r => '<tr><td style="padding:6px 0;padding-left:12px;">' + getRoomLabel(r) + '</td><td style="padding:6px 0;text-align:right;font-weight:600;">' + parseFloat(r.total_price || 0).toFixed(2) + ' EUR</td></tr>').join("");
+
         var emailHtml = '<table width="100%" cellspacing="0" cellpadding="0" style="background-color:#F5F3EF;font-family:Arial,sans-serif;"><tr><td align="center" style="padding:20px 10px;"><table width="580" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
           + '<tr><td style="background:#58585A;padding:20px 30px;text-align:center;border-bottom:3px solid #D4940E"><img src="' + LOGO + '" width="320" style="width:100%;max-width:320px;"/></td></tr>'
           + '<tr><td style="padding:30px 30px 10px;"><h1 style="font-size:22px;color:#58585A;margin:0 0 6px;">Reservierungsbestaetigung</h1><div style="width:60px;height:3px;background:#D4940E;border-radius:2px;margin-bottom:20px;"></div></td></tr>'
           + '<tr><td style="padding:0 30px;font-size:15px;color:#58585A;line-height:1.7;">' + greet + ',<br><br>vielen Dank! Ihr Angebot wurde angenommen und Ihre Reservierung ist hiermit bestaetigt.<br><br>Wir freuen uns sehr, Sie demnachst als Gast willkommen zu heissen.</td></tr>'
           + '<tr><td style="padding:20px 30px;"><div style="background:#F5F3EF;border-radius:10px;padding:18px;">'
           + '<table width="100%" style="font-size:14px;color:#58585A;">'
-          + '<tr><td style="padding:6px 0;font-weight:600;width:45%;">Zimmerkategorie:</td><td style="padding:6px 0;">' + (ut?.name || "") + '</td></tr>'
-          + '<tr><td style="padding:6px 0;font-weight:600;">Anreise:</td><td style="padding:6px 0;">' + fd(rv.check_in) + '</td></tr>'
+          + '<tr><td style="padding:6px 0;font-weight:600;width:45%;">Anreise:</td><td style="padding:6px 0;">' + fd(rv.check_in) + '</td></tr>'
           + '<tr><td style="padding:6px 0;font-weight:600;">Abreise:</td><td style="padding:6px 0;">' + fd(rv.check_out) + '</td></tr>'
           + '<tr><td style="padding:6px 0;font-weight:600;">Naechte:</td><td style="padding:6px 0;">' + nights + '</td></tr>'
           + '<tr><td style="padding:6px 0;font-weight:600;">Erwachsene:</td><td style="padding:6px 0;">' + (rv.adults || 1) + '</td></tr>'
           + (rv.children > 0 ? '<tr><td style="padding:6px 0;font-weight:600;">Kinder:</td><td style="padding:6px 0;">' + rv.children + '</td></tr>' : '')
-          + '<tr><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">Gesamtpreis:</td><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">' + parseFloat(rv.total_price || 0).toFixed(2) + ' EUR</td></tr>'
+          + '<tr><td colspan="2" style="padding:10px 0 4px;font-weight:700;border-top:1px solid #DDD9D2;">' + (groupRes.length > 1 ? groupRes.length + " Zimmer:" : "Zimmer:") + '</td></tr>'
+          + roomRows
+          + '<tr><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;">Gesamtpreis:</td><td style="padding:10px 0 6px;font-weight:700;font-size:18px;border-top:2px solid #DDD9D2;text-align:right;">' + groupTotal.toFixed(2) + ' EUR</td></tr>'
           + '</table></div></td></tr>'
           + '<tr><td style="padding:10px 30px;text-align:center;"><a href="' + infoUrl + '" style="display:inline-block;background:#8B7D6B;color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:10px;font-weight:700;font-size:16px;">Alle Infos zu Ihrem Aufenthalt</a><br><span style="font-size:12px;color:#ABA596;margin-top:8px;display:inline-block;">Check-in &middot; Parken &middot; Golden Masala Restaurant &middot; Umgebung</span></td></tr>'
           + '<tr><td style="padding:10px 30px;"><div style="background:#F5F3EF;border-radius:10px;padding:16px;font-size:12px;color:#58585A;line-height:1.7;"><strong>Wichtige Hinweise</strong><br>Check-in ab 15:00 Uhr | Check-out bis 11:00 Uhr<br>Stornierung bis 7 Tage vor Anreise: 80% Gebuehr. Ab 3 Tagen / No-Show: voller Preis.<br>Im gesamten Hotel gilt striktes Rauchverbot (Reinigungspauschale 300 EUR).</div></td></tr>'
@@ -111,30 +173,23 @@ export default async function handler(req, res) {
           + '<tr><td style="background:#ABA596;padding:18px 30px;color:#ffffff;font-size:12px;line-height:1.6;text-align:center;"><strong>' + HN + '</strong><br>Marktplatz 1 &middot; 65428 Ruesselsheim<br>Tel.: 015903081422<br>E-Mail: <a style="color:#ffffff;" href="mailto:info@hotel-europa-ruesselsheim.de">info@hotel-europa-ruesselsheim.de</a></td></tr>'
           + '</table></td></tr></table>';
 
-        // Email an Gast senden
         try {
           await fetch("https://pms.hotel-europa-ruesselsheim.de/api/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              to: guest.email,
-              subject: "Ihre Reservierungsbestaetigung - " + HN,
-              html: emailHtml,
-              emailType: "bestaetigung"
-            })
+            body: JSON.stringify({ to: guest.email, subject: "Ihre Reservierungsbestaetigung - " + HN, html: emailHtml, emailType: "bestaetigung" })
           });
         } catch (mailErr) {
           console.error("offer-response: mail error:", mailErr.message);
         }
 
-        // Kopie an Hotel
         try {
           await fetch("https://pms.hotel-europa-ruesselsheim.de/api/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               to: "info@hotel-europa-ruesselsheim.de",
-              subject: "Angebot angenommen: " + (guest.first_name || "") + " " + (guest.last_name || "") + " (" + fd(rv.check_in) + " - " + fd(rv.check_out) + ")",
+              subject: "Angebot angenommen: " + (guest.first_name || "") + " " + (guest.last_name || "") + " (" + fd(rv.check_in) + " - " + fd(rv.check_out) + ", " + groupRes.length + " Zi.)",
               html: emailHtml.replace("Reservierungsbestaetigung", "Angebot angenommen!").replace(greet + ",", "<strong>Gast hat Angebot angenommen:</strong><br>" + (guest.salutation || "") + " " + (guest.first_name || "") + " " + (guest.last_name || "") + "<br>E-Mail: " + guest.email + (guest.phone ? "<br>Tel: " + guest.phone : "") + "<br><br>"),
               emailType: "hotel-notification"
             })
@@ -142,7 +197,7 @@ export default async function handler(req, res) {
         } catch (mailErr2) {}
       }
 
-      return res.status(200).send(page("Angebot angenommen!", "Vielen Dank, " + (guest?.first_name || "") + "! Ihre Reservierung ist bestaetigt. Eine Bestaetigungsmail wurde an " + (guest?.email || "Ihre E-Mail-Adresse") + " gesendet.<br><br>Wir freuen uns auf Ihren Besuch!", "success"));
+      return res.status(200).send(page("Angebot angenommen!", "Vielen Dank, " + (guest?.first_name || "") + "! Ihre Reservierung" + (groupRes.length > 1 ? " (" + groupRes.length + " Zimmer)" : "") + " ist bestaetigt. Eine Bestaetigungsmail wurde an " + (guest?.email || "Ihre E-Mail-Adresse") + " gesendet.<br><br>Wir freuen uns auf Ihren Besuch!", "success"));
     }
 
     return res.status(400).send(page("Fehler", "Unbekannte Aktion.", "error"));
@@ -157,8 +212,18 @@ function fd(d) {
   return t.getDate().toString().padStart(2, "0") + "." + (t.getMonth() + 1).toString().padStart(2, "0") + "." + t.getFullYear();
 }
 
-function confirmPage(rv, guest, ut, token) {
+function confirmPage(rv, guest, groupRes, groupTotal, utNames, token) {
   var nights = Math.max(1, Math.round((new Date(rv.check_out) - new Date(rv.check_in)) / 86400000));
+
+  var getRoomLabel = function(r) {
+    var utId = r.sold_as_unit_type_id || r.rooms?.unit_type_id;
+    return utNames[utId] || r.rooms?.unit_types?.name || "";
+  };
+
+  var roomRows = groupRes.map(function(r) {
+    return '<tr><td style="padding:5px 0;padding-left:12px;">' + getRoomLabel(r) + '</td><td style="padding:5px 0;text-align:right;font-weight:600;">' + parseFloat(r.total_price || 0).toFixed(2) + ' EUR</td></tr>';
+  }).join("");
+
   return '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Angebot annehmen - Hotel Europa</title>'
     + '<style>'
     + '*{margin:0;padding:0;box-sizing:border-box}'
@@ -194,13 +259,14 @@ function confirmPage(rv, guest, ut, token) {
     + '<div class="body">'
     + '<div class="greeting">' + (guest?.salutation || "") + ' ' + (guest?.last_name || "Gast") + ',<br><br>vielen Dank fuer Ihr Interesse! Bitte pruefen Sie die Details Ihrer Buchung und akzeptieren Sie unsere Buchungsbedingungen.</div>'
     + '<div class="details"><table>'
-    + '<tr><td>Zimmerkategorie:</td><td>' + (ut?.name || "") + '</td></tr>'
     + '<tr><td>Anreise:</td><td>' + fd(rv.check_in) + '</td></tr>'
     + '<tr><td>Abreise:</td><td>' + fd(rv.check_out) + '</td></tr>'
     + '<tr><td>Naechte:</td><td>' + nights + '</td></tr>'
     + '<tr><td>Erwachsene:</td><td>' + (rv.adults || 1) + '</td></tr>'
     + (rv.children > 0 ? '<tr><td>Kinder:</td><td>' + rv.children + '</td></tr>' : '')
-    + '<tr><td class="total">Gesamtpreis:</td><td class="total">' + parseFloat(rv.total_price || 0).toFixed(2) + ' EUR</td></tr>'
+    + '<tr><td colspan="2" style="padding:10px 0 4px;font-weight:700;border-top:1px solid #DDD9D2;">' + (groupRes.length > 1 ? groupRes.length + " Zimmer:" : "Zimmer:") + '</td></tr>'
+    + roomRows
+    + '<tr><td class="total">Gesamtpreis:</td><td class="total" style="text-align:right;">' + groupTotal.toFixed(2) + ' EUR</td></tr>'
     + '</table></div>'
     + '<div class="conditions">'
     + '<h3>Stornierung &amp; No-Show</h3><ul>'
