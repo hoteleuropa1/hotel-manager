@@ -3,46 +3,123 @@ export default async function handler(req, res) {
   const SB_URL = process.env.SUPABASE_URL || "https://ztdtkncoyrkvdpytwuhy.supabase.co";
   const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
   const { token } = req.query;
-  const headers = { "Content-Type": "application/json", apikey: SB_KEY, Authorization: "Bearer " + SB_KEY };
+  const headers = { "Content-Type": "application/json", apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, Prefer: "return=representation" };
 
-  // POST: Gastdaten aktualisieren
+  // POST: Gastdaten oder Zimmerbelegung speichern
   if (req.method === "POST") {
     try {
-      const { guest_id, first_name, last_name, company, phone, address, zip, city } = req.body;
+      const { action, guest_id, first_name, last_name, company, phone, address, zip, city, occupants } = req.body;
+
+      // Zimmerbelegung speichern
+      if (action === "save_occupants" && Array.isArray(occupants)) {
+        for (const occ of occupants) {
+          if (!occ.reservation_id) continue;
+          if (occ.id) {
+            // Update
+            await fetch(SB_URL + "/rest/v1/room_occupants?id=eq." + occ.id, {
+              method: "PATCH", headers, body: JSON.stringify({ first_name: occ.first_name || "", last_name: occ.last_name || "", updated_at: new Date().toISOString() })
+            });
+          } else if (occ.first_name || occ.last_name) {
+            // Insert
+            await fetch(SB_URL + "/rest/v1/room_occupants", {
+              method: "POST", headers, body: JSON.stringify({ reservation_id: occ.reservation_id, occupant_number: occ.occupant_number || 1, first_name: occ.first_name || "", last_name: occ.last_name || "" })
+            });
+          }
+        }
+        return res.status(200).json({ success: true });
+      }
+
+      // Gastdaten speichern
       if (!guest_id) return res.status(400).json({ error: "guest_id fehlt" });
       const r = await fetch(SB_URL + "/rest/v1/guests?id=eq." + guest_id, {
-        method: "PATCH", headers: { ...headers, Prefer: "return=representation" },
-        body: JSON.stringify({ first_name, last_name, company, phone, address, zip, city })
+        method: "PATCH", headers, body: JSON.stringify({ first_name, last_name, company, phone, address, zip, city })
       });
       if (!r.ok) return res.status(500).json({ error: "Update fehlgeschlagen" });
       return res.status(200).json({ success: true });
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
-  var gn = "", ci = "", co = "", rt = "", guestData = null, paymentsHtml = "", balanceHtml = "", guestFormHtml = "", guestId = "";
+  var gn = "", ci = "", co = "", rt = "", guestId = "", balanceHtml = "", guestFormHtml = "", occupantHtml = "";
+
   if (token) {
     try {
       const rr = await fetch(SB_URL + "/rest/v1/reservations?offer_token=eq." + token + "&select=*,guests(*),rooms(*,unit_types(*))", { headers });
       const rv = (await rr.json())[0];
       if (rv) {
         const g = rv.guests;
-        guestData = g;
         guestId = g?.id || "";
         rt = rv.rooms?.unit_types?.name || "";
         gn = (g?.salutation ? g.salutation + " " : "") + (g?.last_name || "Gast");
         ci = fd(rv.check_in); co = fd(rv.check_out);
 
-        // Zahlungen laden
-        const pr = await fetch(SB_URL + "/rest/v1/payments?reservation_id=eq." + rv.id + "&order=created_at.desc", { headers });
-        const payments = await pr.json();
-        const totalPaid = (payments || []).filter(p => p.status === "eingegangen").reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+        // Gruppen-Reservierungen laden
+        const groupMatch = (rv.notes || "").match(/Gruppe\s+([a-f0-9]+)/);
+        const groupId = groupMatch ? groupMatch[1] : null;
+        let groupRes = [rv];
 
-        // Items laden
+        if (groupId) {
+          try {
+            const gr = await fetch(SB_URL + "/rest/v1/reservations?notes=like.*Gruppe+" + groupId + "*&select=*,rooms(*,unit_types(*))", { headers });
+            const grData = await gr.json();
+            if (grData && grData.length > 1) {
+              groupRes = grData.sort((a, b) => {
+                const na = (a.notes || "").match(/Zi (\d+)/);
+                const nb = (b.notes || "").match(/Zi (\d+)/);
+                return (na ? parseInt(na[1]) : 0) - (nb ? parseInt(nb[1]) : 0);
+              });
+            }
+          } catch (e) {}
+        }
+
+        // Unit type names fuer sold_as
+        const utNames = {};
+        for (const r of groupRes) {
+          const utId = r.sold_as_unit_type_id || r.rooms?.unit_type_id;
+          if (utId && !utNames[utId]) {
+            if (r.rooms?.unit_types?.id === utId) {
+              utNames[utId] = r.rooms.unit_types.name;
+            } else {
+              try {
+                const utR = await fetch(SB_URL + "/rest/v1/unit_types?id=eq." + utId + "&select=name", { headers });
+                const utD = await utR.json();
+                if (utD && utD[0]) utNames[utId] = utD[0].name;
+              } catch (e) {}
+            }
+          }
+        }
+
+        const getRoomLabel = (r) => {
+          const utId = r.sold_as_unit_type_id || r.rooms?.unit_type_id;
+          return utNames[utId] || r.rooms?.unit_types?.name || "";
+        };
+
+        // Bestehende Occupants laden
+        const allOccupants = {};
+        for (const r of groupRes) {
+          try {
+            const or = await fetch(SB_URL + "/rest/v1/room_occupants?reservation_id=eq." + r.id + "&order=occupant_number", { headers });
+            const od = await or.json();
+            allOccupants[r.id] = od || [];
+          } catch (e) { allOccupants[r.id] = []; }
+        }
+
+        // Kapazitaet pro Zimmer
+        const getCapacity = (r) => {
+          const utId = r.sold_as_unit_type_id || r.rooms?.unit_type_id;
+          // sold_as capacity laden oder fallback
+          if (r.rooms?.unit_types?.id === utId) return r.rooms.unit_types.capacity || 2;
+          return r.adults || 2;
+        };
+
+        // Zahlungen laden
+        const pr2 = await fetch(SB_URL + "/rest/v1/payments?reservation_id=eq." + rv.id + "&order=created_at.desc", { headers });
+        const payments = await pr2.json();
+        const totalPaid = (payments || []).filter(p => p.status === "eingegangen").reduce((s, p) => s + parseFloat(p.amount || 0), 0);
         const ir = await fetch(SB_URL + "/rest/v1/reservation_items?reservation_id=eq." + rv.id, { headers });
         const items = await ir.json();
         const itemsTotal = (items || []).filter(i => i.item_type === "product").reduce((s, i) => s + parseFloat(i.total_price || 0), 0);
-
-        const grandTotal = parseFloat(rv.total_price || 0) + itemsTotal;
+        const groupTotal = groupRes.reduce((s, r) => s + parseFloat(r.total_price || 0), 0);
+        const grandTotal = groupTotal + itemsTotal;
         const balance = grandTotal - totalPaid;
 
         balanceHtml = '<div class="section"><div class="section-label">Finanzen</div><h2>Zahlungsstatus</h2>'
@@ -51,48 +128,73 @@ export default async function handler(req, res) {
           + '<div class="info-card"><div class="label">Bezahlt</div><div class="value" style="color:#059669">' + fmt(totalPaid) + ' EUR</div></div>'
           + '</div>'
           + '<div class="info-card" style="margin:12px 0;text-align:center"><div class="label">Noch offen</div><div class="value" style="font-size:28px;color:' + (balance > 0 ? '#DC2626' : '#059669') + '">' + fmt(balance) + ' EUR</div>'
-          + (balance <= 0 ? '<div style="margin-top:8px"><span style="background:#D1FAE5;color:#065F46;padding:4px 14px;border-radius:99px;font-size:12px;font-weight:600">Vollstaendig bezahlt</span></div>' : '<div style="margin-top:8px"><span style="background:#FEF3C7;color:#92400E;padding:4px 14px;border-radius:99px;font-size:12px;font-weight:600">Zahlung offen</span></div>')
-          + '</div>';
-
-        if (payments && payments.length > 0) {
-          balanceHtml += '<div style="margin-top:16px"><div style="font-size:13px;font-weight:600;color:#58585A;margin-bottom:8px">Zahlungshistorie</div>';
-          payments.forEach(p => {
-            const methods = { bar: "Bar", ec: "EC-Karte", mastercard: "Mastercard", visa: "Visa", ueberweisung: "Ueberweisung", paypal: "PayPal", booking_online: "Booking" };
-            balanceHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff;border:1px solid #DDD9D2;border-radius:8px;margin-bottom:6px;font-size:13px">'
-              + '<div><div style="font-weight:500;color:#58585A">' + (methods[p.payment_method] || p.payment_method) + '</div><div style="font-size:11px;color:#ABA596">' + fd(p.paid_at || p.created_at) + '</div></div>'
-              + '<div style="font-weight:600;color:' + (p.status === "eingegangen" ? "#059669" : "#D97706") + '">' + fmt(p.amount) + ' EUR</div></div>';
-          });
-          balanceHtml += '</div>';
-        }
-        balanceHtml += '</div>';
+          + (balance <= 0 ? '<div style="margin-top:8px"><span style="background:#D1FAE5;color:#065F46;padding:4px 14px;border-radius:99px;font-size:12px;font-weight:600">Vollstaendig bezahlt</span></div>' : '')
+          + '</div></div>';
 
         // Gastdaten-Formular
         guestFormHtml = '<div class="section"><div class="section-label">Ihre Daten</div><h2>Daten aktualisieren</h2>'
           + '<p style="margin-bottom:16px">Bitte ueberpruefen und aktualisieren Sie Ihre Daten fuer den Meldeschein.</p>'
           + '<div id="save-success" style="display:none;background:#D1FAE5;color:#065F46;padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:12px;font-weight:500">Daten erfolgreich aktualisiert!</div>'
           + '<div class="info-grid">'
-          + '<div><label class="form-label">Vorname</label><input class="form-input" id="g_fn" value="' + (g?.first_name || '') + '"/></div>'
-          + '<div><label class="form-label">Nachname</label><input class="form-input" id="g_ln" value="' + (g?.last_name || '') + '"/></div>'
+          + '<div><label class="form-label">Vorname</label><input class="form-input" id="g_fn" value="' + esc(g?.first_name) + '"/></div>'
+          + '<div><label class="form-label">Nachname</label><input class="form-input" id="g_ln" value="' + esc(g?.last_name) + '"/></div>'
           + '</div>'
-          + '<label class="form-label">Firma</label><input class="form-input" id="g_co" value="' + (g?.company || '') + '"/>'
-          + '<label class="form-label">Telefon</label><input class="form-input" id="g_ph" value="' + (g?.phone || '') + '"/>'
-          + '<label class="form-label">Strasse und Hausnummer</label><input class="form-input" id="g_ad" value="' + (g?.address || '') + '"/>'
+          + '<label class="form-label">Firma</label><input class="form-input" id="g_co" value="' + esc(g?.company) + '"/>'
+          + '<label class="form-label">Telefon</label><input class="form-input" id="g_ph" value="' + esc(g?.phone) + '"/>'
+          + '<label class="form-label">Strasse und Hausnummer</label><input class="form-input" id="g_ad" value="' + esc(g?.address) + '"/>'
           + '<div class="info-grid">'
-          + '<div><label class="form-label">PLZ</label><input class="form-input" id="g_zip" value="' + (g?.zip || '') + '"/></div>'
-          + '<div><label class="form-label">Ort</label><input class="form-input" id="g_city" value="' + (g?.city || '') + '"/></div>'
+          + '<div><label class="form-label">PLZ</label><input class="form-input" id="g_zip" value="' + esc(g?.zip) + '"/></div>'
+          + '<div><label class="form-label">Ort</label><input class="form-input" id="g_city" value="' + esc(g?.city) + '"/></div>'
           + '</div>'
           + '<button class="btn" id="save-btn" onclick="saveGuest()" style="width:100%;justify-content:center;margin-top:8px">Daten speichern</button>'
           + '</div>';
+
+        // Zimmerbelegung-Formular
+        if (groupRes.length > 0) {
+          occupantHtml = '<div class="section"><div class="section-label">Zimmerbelegung</div><h2>Wer schlaeft wo?</h2>'
+            + '<p style="margin-bottom:20px">Bitte tragen Sie die Namen aller Gaeste ein, die in den jeweiligen Zimmern uebernachten.</p>'
+            + '<div id="occ-success" style="display:none;background:#D1FAE5;color:#065F46;padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:12px;font-weight:500">Zimmerbelegung gespeichert!</div>';
+
+          groupRes.forEach((r, ri) => {
+            const roomName = r.rooms?.name || "?";
+            const catName = getRoomLabel(r);
+            const cap = getCapacity(r);
+            const existing = allOccupants[r.id] || [];
+
+            occupantHtml += '<div style="background:#fff;border:1px solid #DDD9D2;border-radius:12px;padding:20px;margin-bottom:16px">'
+              + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+              + '<div style="width:36px;height:36px;border-radius:10px;background:#8B7D6B;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">' + roomName + '</div>'
+              + '<div><div style="font-weight:600;color:#58585A;font-size:15px">' + catName + '</div>'
+              + '<div style="font-size:12px;color:#ABA596">max. ' + cap + ' Person' + (cap > 1 ? 'en' : '') + '</div></div></div>';
+
+            for (let oi = 0; oi < cap; oi++) {
+              const occ = existing[oi] || {};
+              const prefix = 'occ_' + ri + '_' + oi;
+              occupantHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">'
+                + '<div><label class="form-label">Gast ' + (oi + 1) + ' Vorname</label>'
+                + '<input class="form-input" id="' + prefix + '_fn" value="' + esc(occ.first_name) + '" data-rid="' + r.id + '" data-oid="' + (occ.id || '') + '" data-num="' + (oi + 1) + '"/></div>'
+                + '<div><label class="form-label">Gast ' + (oi + 1) + ' Nachname</label>'
+                + '<input class="form-input" id="' + prefix + '_ln" value="' + esc(occ.last_name) + '"/></div></div>';
+            }
+
+            occupantHtml += '</div>';
+          });
+
+          occupantHtml += '<button class="btn btn-orange" onclick="saveOccupants()" id="occ-btn" style="width:100%;justify-content:center">Zimmerbelegung speichern</button></div>';
+        }
       }
-    } catch (e) {}
+    } catch (e) { console.error("guest-info error:", e.message); }
   }
+
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  return res.status(200).send(buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, guestId, token));
+  return res.status(200).send(buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, occupantHtml, guestId, token));
 }
+
 function fd(d) { var t = new Date(d); return t.getDate().toString().padStart(2, "0") + "." + (t.getMonth() + 1).toString().padStart(2, "0") + "." + t.getFullYear(); }
 function fmt(n) { return parseFloat(n || 0).toFixed(2); }
+function esc(s) { return (s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 
-function buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, guestId, token) {
+function buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, occupantHtml, guestId, token) {
 return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Ihre digitale Gaestemappe - Hotel Europa</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -166,19 +268,16 @@ h1,h2,h3{font-family:"Playfair Display",serif;color:#58585A}
 </style></head><body>
 
 <div class="hero">
-<div class="logo-strip"><img src="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg" alt="Hotel Europa"/></div>
-<div class="hero-text">
+<img src="https://pms.hotel-europa-ruesselsheim.de/logo-header.jpg" alt="Hotel Europa"/>
 <h1>Ihre digitale Gaestemappe</h1>
 <div class="stars">&starf; &starf; &starf;</div>
 <p>${gn ? "Willkommen, " + gn + " &ndash; " : ""}${ci ? ci + " bis " + co : "Alle Informationen fuer Ihren Aufenthalt"}</p>
 </div>
-</div>
 
 <div class="wrap">
-
 ${balanceHtml}
-
 ${guestFormHtml}
+${occupantHtml}
 
 <div class="section">
 <div class="section-label">Ankunft &amp; Abreise</div>
@@ -196,41 +295,21 @@ ${rt ? '<div class="info-grid"><div class="info-card"><div class="label">Ihr Zim
 <div class="section">
 <div class="section-label">Parken</div>
 <h2>Parkmoeglichkeiten</h2>
-<p>Rund um das Hotel gibt es mehrere Parkmoeglichkeiten. Tippen Sie auf die Markierungen fuer Details.</p>
+<p>Rund um das Hotel gibt es mehrere Parkmoeglichkeiten.</p>
 <div style="position:relative;border-radius:12px;overflow:hidden;border:1px solid #DDD9D2;margin:16px 0">
 <img src="https://pms.hotel-europa-ruesselsheim.de/parkplaetze-karte.png" style="width:100%;display:block" alt="Karte"/>
-<div onclick="togglePin(1)" style="position:absolute;left:40%;top:53%;transform:translate(-50%,-100%);cursor:pointer;z-index:2">
-<div style="background:#8B7D6B;color:#fff;font-weight:700;font-size:13px;padding:6px 12px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap">P1</div>
-<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #8B7D6B;margin:0 auto"></div>
+<div onclick="togglePin(1)" style="position:absolute;left:40%;top:53%;transform:translate(-50%,-100%);cursor:pointer;z-index:2"><div style="background:#8B7D6B;color:#fff;font-weight:700;font-size:13px;padding:6px 12px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.3)">P1</div><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #8B7D6B;margin:0 auto"></div></div>
+<div onclick="togglePin(2)" style="position:absolute;left:38%;top:18%;transform:translate(-50%,-100%);cursor:pointer;z-index:2"><div style="background:#A0522D;color:#fff;font-weight:700;font-size:13px;padding:6px 12px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.3)">P2</div><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #A0522D;margin:0 auto"></div></div>
+<div onclick="togglePin(3)" style="position:absolute;left:58%;top:88%;transform:translate(-50%,-100%);cursor:pointer;z-index:2"><div style="background:#6B8F5B;color:#fff;font-weight:700;font-size:13px;padding:6px 12px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.3)">P3 Kostenlos!</div><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #6B8F5B;margin:0 auto"></div></div>
+<div id="pin1" style="display:none;position:absolute;left:40%;top:53%;transform:translate(-50%,-110%) translateY(-32px);background:#fff;border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);width:220px;z-index:10;font-size:12px;color:#58585A;line-height:1.5"><button onclick="togglePin(1)" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#ABA596">&times;</button><strong style="color:#8B7D6B">P1 &ndash; Ludwigstrasse</strong><br>1 Gehminute<br><strong>Kostenlos:</strong> Mo&ndash;Fr 18&ndash;08, Sa &amp; So ganztaegig</div>
+<div id="pin2" style="display:none;position:absolute;left:38%;top:18%;transform:translate(-50%,-110%) translateY(-32px);background:#fff;border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);width:220px;z-index:10;font-size:12px;color:#58585A;line-height:1.5"><button onclick="togglePin(2)" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#ABA596">&times;</button><strong style="color:#A0522D">P2 &ndash; Dammgasse</strong><br>3 Gehminuten<br><strong>Kostenlos:</strong> Mo&ndash;Fr 18&ndash;08, Sa &amp; So ganztaegig</div>
+<div id="pin3" style="display:none;position:absolute;left:58%;top:88%;transform:translate(-50%,-110%) translateY(-32px);background:#fff;border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);width:220px;z-index:10;font-size:12px;color:#58585A;line-height:1.5"><button onclick="togglePin(3)" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#ABA596">&times;</button><strong style="color:#6B8F5B">P3 &ndash; Weisenauer Strasse</strong><br>5 Gehminuten<br><span style="color:#6B8F5B;font-weight:700">Immer kostenlos!</span></div>
 </div>
-<div onclick="togglePin(2)" style="position:absolute;left:38%;top:18%;transform:translate(-50%,-100%);cursor:pointer;z-index:2">
-<div style="background:#A0522D;color:#fff;font-weight:700;font-size:13px;padding:6px 12px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap">P2</div>
-<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #A0522D;margin:0 auto"></div>
-</div>
-<div onclick="togglePin(3)" style="position:absolute;left:58%;top:88%;transform:translate(-50%,-100%);cursor:pointer;z-index:2">
-<div style="background:#6B8F5B;color:#fff;font-weight:700;font-size:13px;padding:6px 12px;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap">P3 Kostenlos!</div>
-<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #6B8F5B;margin:0 auto"></div>
-</div>
-<div id="pin1" style="display:none;position:absolute;left:40%;top:53%;transform:translate(-50%,-110%) translateY(-32px);background:#fff;border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);width:220px;z-index:10;font-size:12px;color:#58585A;line-height:1.5">
-<button onclick="togglePin(1)" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#ABA596">&times;</button>
-<strong style="color:#8B7D6B">P1 &ndash; Ludwigstrasse</strong><br>1 Gehminute, direkt hinter dem Hotel<br><br><strong>Kostenlos:</strong> Mo&ndash;Fr 18&ndash;08 Uhr, Sa &amp; So ganztaegig<br>Tagsueber: Parkschein am Automaten
-</div>
-<div id="pin2" style="display:none;position:absolute;left:38%;top:18%;transform:translate(-50%,-110%) translateY(-32px);background:#fff;border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);width:220px;z-index:10;font-size:12px;color:#58585A;line-height:1.5">
-<button onclick="togglePin(2)" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#ABA596">&times;</button>
-<strong style="color:#A0522D">P2 &ndash; Dammgasse / Landungsplatz</strong><br>3 Gehminuten, am Mainufer<br><br><strong>Kostenlos:</strong> Mo&ndash;Fr 18&ndash;08 Uhr, Sa &amp; So ganztaegig<br>Tagsueber: Parkschein am Automaten
-</div>
-<div id="pin3" style="display:none;position:absolute;left:58%;top:88%;transform:translate(-50%,-110%) translateY(-32px);background:#fff;border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.2);width:220px;z-index:10;font-size:12px;color:#58585A;line-height:1.5">
-<button onclick="togglePin(3)" style="position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#ABA596">&times;</button>
-<strong style="color:#6B8F5B">P3 &ndash; Weisenauer Strasse</strong><br>5 Gehminuten<br><br><span style="color:#6B8F5B;font-weight:700">Immer kostenlos!</span><br>Keine Zeitbegrenzung, auch tagsueber.<br>Unser Tipp fuer Geschaeftsreisende!
-</div>
-</div>
-
 <div class="parking-list">
-<div class="parking-item"><div class="parking-icon" style="background:#8B7D6B">P1</div><div><h4>Ludwigstrasse</h4><p><strong>1 Gehminute</strong> &ndash; direkt hinter dem Hotel<br>Kostenlos: Mo&ndash;Fr 18:00&ndash;08:00, Sa &amp; So ganztaegig<br>Tagsueber: Parkschein am Automaten</p></div></div>
-<div class="parking-item"><div class="parking-icon" style="background:#A0522D">P2</div><div><h4>Dammgasse / Landungsplatz</h4><p><strong>3 Gehminuten</strong> &ndash; am Mainufer<br>Kostenlos: Mo&ndash;Fr 18:00&ndash;08:00, Sa &amp; So ganztaegig<br>Tagsueber: Parkschein am Automaten</p></div></div>
-<div class="parking-item"><div class="parking-icon" style="background:#6B8F5B">P3</div><div><h4>Weisenauer Strasse</h4><p><strong>5 Gehminuten</strong> &ndash; <strong style="color:#6B8F5B">immer kostenlos!</strong><br>Keine Zeitbegrenzung, auch tagsueber<br>Unser Tipp fuer Geschaeftsreisende</p></div></div>
+<div class="parking-item"><div class="parking-icon" style="background:#8B7D6B">P1</div><div><h4>Ludwigstrasse</h4><p><strong>1 Gehminute</strong> &ndash; Kostenlos abends &amp; Wochenende</p></div></div>
+<div class="parking-item"><div class="parking-icon" style="background:#A0522D">P2</div><div><h4>Dammgasse / Landungsplatz</h4><p><strong>3 Gehminuten</strong> &ndash; Kostenlos abends &amp; Wochenende</p></div></div>
+<div class="parking-item"><div class="parking-icon" style="background:#6B8F5B">P3</div><div><h4>Weisenauer Strasse</h4><p><strong>5 Gehminuten</strong> &ndash; <strong style="color:#6B8F5B">immer kostenlos!</strong></p></div></div>
 </div>
-<div class="tip"><strong>Tipp:</strong> Wer tagsueber kostenfrei parken moechte, findet an der Weisenauer Strasse immer einen Platz.</div>
 </div>
 
 <div class="section">
@@ -239,110 +318,94 @@ ${rt ? '<div class="info-grid"><div class="info-card"><div class="label">Ihr Zim
 <div class="restaurant-card">
 <div class="restaurant-header">
 <img src="https://pms.hotel-europa-ruesselsheim.de/golden-masala-logo.png" style="height:70px;border-radius:8px;flex-shrink:0" alt="Golden Masala" onerror="this.style.display='none'"/>
-<div>
-<h3>Golden Masala</h3>
-<p>Indian Restaurant &ndash; im Hotel Europa</p>
-</div>
+<div><h3>Golden Masala</h3><p>Indian Restaurant &ndash; im Hotel Europa</p></div>
 </div>
 <div class="restaurant-body">
-<p>Unser Restaurant verwohnt Sie mit authentischer indischer Kueche &ndash; von aromatischen Currys ueber frisch gebackenes Naan bis zu wuerzigen Tandoori-Spezialitaeten.</p>
-<dl class="restaurant-hours">
-<dt>Montag &ndash; Sonntag</dt><dd>11:00 &ndash; 14:00 &amp; 17:00 &ndash; 22:00 Uhr</dd>
-<dt>Terrasse</dt><dd>Saisonal auf dem Marktplatz</dd>
-<dt>Zum Mitnehmen</dt><dd>Alle Gerichte!</dd>
-</dl>
+<p>Authentische indische Kueche &ndash; Currys, Naan, Tandoori-Spezialitaeten.</p>
+<dl class="restaurant-hours"><dt>Montag &ndash; Sonntag</dt><dd>11:00 &ndash; 14:00 &amp; 17:00 &ndash; 22:00 Uhr</dd></dl>
 <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap">
 <button class="btn btn-orange" onclick="openMenu()">Speisekarte ansehen</button>
 <a href="https://pms.hotel-europa-ruesselsheim.de/speisekarte.pdf" download class="btn btn-outline">&#8681; PDF</a>
-</div>
-</div></div>
+</div></div></div>
 </div>
 
 <div class="section">
-<div class="section-label">Morgens</div>
-<h2>Fruehstueck</h2>
-<p>Starten Sie gestaerkt in den Tag mit unserem Fruehstuecksbuffet.</p>
+<div class="section-label">Morgens</div><h2>Fruehstueck</h2>
 <div class="info-grid">
 <div class="info-card"><div class="label">Preis</div><div class="value">14 EUR</div><div class="sub">pro Person / Nacht</div></div>
 <div class="info-card"><div class="label">Uhrzeit</div><div class="value">07:00 &ndash; 10:00</div><div class="sub">Taeglich im Restaurant</div></div>
-</div>
-</div>
+</div></div>
 
 <div class="section">
-<div class="section-label">Gut zu wissen</div>
-<h2>In der Naehe</h2>
+<div class="section-label">Gut zu wissen</div><h2>In der Naehe</h2>
 <div class="info-grid">
 <div class="info-card"><div class="label">WLAN</div><div class="value">Kostenlos</div><div class="sub">Im gesamten Hotel</div></div>
 <div class="info-card"><div class="label">Supermarkt</div><div class="value">1 Min.</div><div class="sub">REWE direkt um die Ecke</div></div>
-<div class="info-card"><div class="label">Bahnhof</div><div class="value">5 Min.</div><div class="sub">S8/S9 zum Flughafen (12 Min.)</div></div>
+<div class="info-card"><div class="label">Bahnhof</div><div class="value">5 Min.</div><div class="sub">S8/S9 zum Flughafen</div></div>
 <div class="info-card"><div class="label">Flughafen</div><div class="value">12 Min.</div><div class="sub">S-Bahn S8 oder S9</div></div>
-</div>
-</div>
+</div></div>
 </div>
 
-<!-- SPEISEKARTEN VIEWER -->
 <div class="menu-overlay" id="menuOverlay">
 <button class="menu-close" onclick="closeMenu()">&times;</button>
 <div class="menu-content" id="menuContent"></div>
-<div class="menu-nav">
-<button onclick="menuGo(-1)" id="menuPrev">&larr;</button>
-<span class="menu-page-num" id="menuPageNum">1 / 12</span>
-<button onclick="menuGo(1)" id="menuNext">&rarr;</button>
-</div>
+<div class="menu-nav"><button onclick="menuGo(-1)" id="menuPrev">&larr;</button><span class="menu-page-num" id="menuPageNum">1/9</span><button onclick="menuGo(1)" id="menuNext">&rarr;</button></div>
 </div>
 
-<div class="footer">
-<strong>Hotel Europa</strong><br>
-Marktplatz 1 &middot; 65428 Ruesselsheim<br>
-Tel.: <a href="tel:+4915903081422">015903081422</a> &middot; <a href="mailto:info@hotel-europa-ruesselsheim.de">info@hotel-europa-ruesselsheim.de</a><br>
-<a href="http://www.hotel-europa-ruesselsheim.de">www.hotel-europa-ruesselsheim.de</a>
-</div>
+<div class="footer"><strong>Hotel Europa</strong><br>Marktplatz 1 &middot; 65428 Ruesselsheim<br>Tel.: <a href="tel:+4915903081422">015903081422</a> &middot; <a href="mailto:info@hotel-europa-ruesselsheim.de">info@hotel-europa-ruesselsheim.de</a><br><a href="http://www.hotel-europa-ruesselsheim.de">www.hotel-europa-ruesselsheim.de</a></div>
 
 <script>
 function togglePin(n){for(var i=1;i<=3;i++){var el=document.getElementById('pin'+i);if(el)el.style.display=i===n&&el.style.display==='none'?'block':'none'}}
 
 async function saveGuest(){
-  var btn=document.getElementById('save-btn');
-  btn.disabled=true;btn.textContent='Speichere...';
+  var btn=document.getElementById('save-btn');btn.disabled=true;btn.textContent='Speichere...';
   try{
-    var r=await fetch(window.location.pathname+'?token=${token||""}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      guest_id:'${guestId}',
-      first_name:document.getElementById('g_fn').value,
-      last_name:document.getElementById('g_ln').value,
-      company:document.getElementById('g_co').value,
-      phone:document.getElementById('g_ph').value,
-      address:document.getElementById('g_ad').value,
-      zip:document.getElementById('g_zip').value,
-      city:document.getElementById('g_city').value
-    })});
+    var r=await fetch(window.location.pathname+'?token=${token||""}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({guest_id:'${guestId}',first_name:document.getElementById('g_fn').value,last_name:document.getElementById('g_ln').value,company:document.getElementById('g_co').value,phone:document.getElementById('g_ph').value,address:document.getElementById('g_ad').value,zip:document.getElementById('g_zip').value,city:document.getElementById('g_city').value})});
     var d=await r.json();
     if(d.success){var m=document.getElementById('save-success');m.style.display='block';setTimeout(function(){m.style.display='none'},4000)}
-    else{alert('Fehler: '+(d.error||'Unbekannt'))}
+    else alert('Fehler: '+(d.error||'Unbekannt'));
   }catch(e){alert('Fehler: '+e.message)}
   btn.disabled=false;btn.textContent='Daten speichern';
 }
 
+async function saveOccupants(){
+  var btn=document.getElementById('occ-btn');btn.disabled=true;btn.textContent='Speichere...';
+  var inputs=document.querySelectorAll('[data-rid]');
+  var occs=[];
+  inputs.forEach(function(el){
+    var rid=el.getAttribute('data-rid');
+    var oid=el.getAttribute('data-oid');
+    var num=parseInt(el.getAttribute('data-num'))||1;
+    var fn=el.value;
+    var lnEl=el.parentElement.parentElement.querySelector('[id$="_ln"]');
+    if(!lnEl){var next=el.parentElement.nextElementSibling;if(next)lnEl=next.querySelector('input')}
+    var ln=lnEl?lnEl.value:'';
+    occs.push({reservation_id:rid,id:oid||null,occupant_number:num,first_name:fn,last_name:ln});
+  });
+  try{
+    var r=await fetch(window.location.pathname+'?token=${token||""}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save_occupants',occupants:occs})});
+    var d=await r.json();
+    if(d.success){var m=document.getElementById('occ-success');m.style.display='block';setTimeout(function(){m.style.display='none'},4000)}
+    else alert('Fehler: '+(d.error||'Unbekannt'));
+  }catch(e){alert('Fehler: '+e.message)}
+  btn.disabled=false;btn.textContent='Zimmerbelegung speichern';
+}
+
 var MP=[
-{t:"Willkommen",html:'<div style="text-align:center;padding:10px 0"><h2 style="font-family:Playfair Display,serif;font-size:22px;color:#58585A;margin:0 0 16px">Golden Masala</h2></div><p style="font-size:14px;color:#58585A;line-height:1.8">Wir bieten <strong>7 spezielle indische Kocharten</strong>. Alle Varianten mit Gemuese, Fleisch, Fisch oder Kaese. Auch Vegan.<br><br>Bitte waehlen Sie: <strong>scharf, mittelscharf oder mild</strong>.<br><br>Ohne Natrium-Glutamat. <strong>Alle Gerichte auch zum Mitnehmen!</strong></p>'},
-{t:"Getraenke",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Alkoholfreie Getraenke</h3><div class="menu-item"><div><div class="name">Coca-Cola, Zero, Fanta, Sprite</div><div class="desc">0,33l</div></div><div class="price">3,20 &euro;</div></div><div class="menu-item"><div><div class="name">Apfelsaft / Orangensaft</div><div class="desc">0,2l / 0,4l</div></div><div class="price">2,20 / 3,50 &euro;</div></div><div class="menu-item"><div><div class="name">Fachingen Edelwasser</div><div class="desc">0,25l / 0,75l</div></div><div class="price">2,50 / 5,90 &euro;</div></div><div class="menu-item"><div><div class="name">Lassi suess oder sauer</div><div class="desc">0,1l / 0,3l</div></div><div class="price">1,30 / 3,30 &euro;</div></div><div class="menu-item"><div><div class="name">Indischer Eistee</div><div class="desc">0,5l</div></div><div class="price">5,90 &euro;</div></div><h3 style="font-family:Playfair Display,serif;font-size:18px;color:#A0522D;margin:18px 0 10px">Warme Getraenke</h3><div class="menu-item"><div><div class="name">Indischer Chai</div></div><div class="price">4,90 &euro;</div></div><div class="menu-item"><div><div class="name">Kaffee / Espresso</div></div><div class="price">2,90 &euro;</div></div><div class="menu-item"><div><div class="name">Cappuccino</div></div><div class="price">3,10 &euro;</div></div>'},
-{t:"Weine & Biere",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Weine (offen, 0,2l)</h3><div class="menu-item"><div><div class="name">Riesling / Chardonnay</div></div><div class="price">ab 4,70 &euro;</div></div><div class="menu-item"><div><div class="name">Dornfelder / Spaetburgunder</div></div><div class="price">ab 4,40 &euro;</div></div><div class="menu-item"><div><div class="name">Indischer Wein (Angoori)</div></div><div class="price">5,70 &euro;</div></div><h3 style="font-family:Playfair Display,serif;font-size:18px;color:#A0522D;margin:18px 0 10px">Biere</h3><div class="menu-item"><div><div class="name">Kingfisher (indisch)</div><div class="desc">0,33l</div></div><div class="price">3,90 &euro;</div></div><div class="menu-item"><div><div class="name">Krombacher Pils vom Fass</div><div class="desc">0,3l / 0,5l</div></div><div class="price">3,50 / 4,90 &euro;</div></div>'},
-{t:"Vorspeisen",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Suppen &amp; Vorspeisen</h3><div class="menu-item"><div><div class="name">Linsensuppe (Shorba Atlas)</div></div><div class="price">4,50 &euro;</div></div><div class="menu-item"><div><div class="name">Huehnersuppe mit Kokos</div></div><div class="price">4,90 &euro;</div></div><div class="menu-item"><div><div class="name">Samosa (Gemuese)</div></div><div class="price">3,90 &euro;</div></div><div class="menu-item"><div><div class="name">Samosa Teller mit Salat</div></div><div class="price">9,90 &euro;</div></div><div class="menu-item"><div><div class="name">Pakorasa Mix</div></div><div class="price">7,90 &euro;</div></div>'},
-{t:"Currys",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 6px">Currys</h3><p style="font-size:13px;color:#8B7D6B;margin-bottom:14px">Mit Basmati-Reis. Spezial mit Mango, Spinat oder Kichererbsen +2,90 &euro;</p><div class="menu-var"><span><strong>Gemuese</strong><em>12,90&euro;</em></span><span><strong>Paneer</strong><em>13,90&euro;</em></span><span><strong>Chicken</strong><em>14,90&euro;</em></span><span><strong>Lamm</strong><em>17,90&euro;</em></span><span><strong>Garnelen</strong><em>18,90&euro;</em></span></div>'},
-{t:"Tandoori & Karahi",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 6px">Tandoori</h3><p style="font-size:13px;color:#8B7D6B;margin-bottom:14px">Im Lehmofen gegrillt, auf der Grillplatte serviert.</p><div class="menu-var"><span><strong>Gemuese</strong><em>17,90&euro;</em></span><span><strong>Chicken</strong><em>19,90&euro;</em></span><span><strong>Lamm</strong><em>20,90&euro;</em></span><span><strong>Garnelen</strong><em>21,90&euro;</em></span></div><h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:20px 0 6px">Karahi</h3><p style="font-size:13px;color:#8B7D6B;margin-bottom:14px">In der Gusseisenpfanne mit Tomaten und Ingwer.</p><div class="menu-var"><span><strong>Gemuese</strong><em>14,90&euro;</em></span><span><strong>Chicken</strong><em>20,90&euro;</em></span><span><strong>Lamm</strong><em>17,90&euro;</em></span></div>'},
-{t:"Biryani & Bestseller",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Biryani</h3><div class="menu-item"><div><div class="name">Gemuese Biryani</div></div><div class="price">12,50 &euro;</div></div><div class="menu-item"><div><div class="name">Haehnchen Biryani</div></div><div class="price">13,50 &euro;</div></div><div class="menu-item"><div><div class="name">Lamm Biryani</div></div><div class="price">18,90 &euro;</div></div><div class="menu-item"><div><div class="name">Mix Masala Biryani</div></div><div class="price">20,90 &euro;</div></div><h3 style="font-family:Playfair Display,serif;font-size:18px;color:#D4940E;margin:20px 0 10px">&#9733; Bestseller</h3><div class="menu-item"><div><div class="name">Tandoori Mix Platte</div></div><div class="price">24,90 &euro;</div></div><div class="menu-item"><div><div class="name">Chicken Kohlapuri</div></div><div class="price">18,90 &euro;</div></div><div class="menu-item"><div><div class="name">Malai Kofta</div></div><div class="price">19,90 &euro;</div></div>'},
-{t:"Desserts",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Desserts</h3><div class="menu-item"><div><div class="name">Firni (Milchreispudding)</div></div><div class="price">3,90 &euro;</div></div><div class="menu-item"><div><div class="name">Gulab Jamun</div></div><div class="price">3,90 &euro;</div></div><div class="menu-item"><div><div class="name">Kulfi (Indisches Eis)</div></div><div class="price">5,90 &euro;</div></div><div class="menu-item"><div><div class="name">Mango Safran Halwa (Vegan)</div></div><div class="price">5,90 &euro;</div></div>'},
-{t:"Menues",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Menues fuer 2 Personen</h3><div style="background:#F5F3EF;border-radius:10px;padding:16px;margin-bottom:14px"><h4 style="color:#D4940E;margin:0 0 8px">Tandoori-Mix &ndash; 71,90 &euro;</h4><p style="font-size:13px;color:#58585A;line-height:1.7;margin:0">Suppe, Pakoras, Salat, Naan, Tandoori Mix-Platte, Biryani, Dessert</p></div><div style="background:#F5F3EF;border-radius:10px;padding:16px;margin-bottom:14px"><h4 style="color:#D4940E;margin:0 0 8px">Golden Masala &ndash; 66,90 &euro;</h4><p style="font-size:13px;color:#58585A;line-height:1.7;margin:0">Suppe, Mix Pakoras, Salat, Naan, Makhni Masala, Biryani, Dessert</p></div><div style="background:#F5F3EF;border-radius:10px;padding:16px"><h4 style="color:#D4940E;margin:0 0 8px">Vegan &ndash; 69,90 &euro;</h4><p style="font-size:13px;color:#58585A;line-height:1.7;margin:0">Suppe, Tofu Pakoras, Salat, Naan, Mango Kokos Curry, Biryani, Halwa</p></div>'}
+{t:"Willkommen",html:'<div style="text-align:center"><h2 style="font-family:Playfair Display,serif;font-size:22px;color:#58585A;margin:0 0 16px">Golden Masala</h2></div><p style="font-size:14px;color:#58585A;line-height:1.8"><strong>7 spezielle indische Kocharten.</strong> Alle Varianten mit Gemuese, Fleisch, Fisch oder Kaese. Auch Vegan.<br><br>Scharf, mittelscharf oder mild. Ohne Glutamat. <strong>Alle Gerichte zum Mitnehmen!</strong></p>'},
+{t:"Getraenke",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Getraenke</h3><div class="menu-item"><div><div class="name">Cola, Zero, Fanta, Sprite</div><div class="desc">0,33l</div></div><div class="price">3,20&euro;</div></div><div class="menu-item"><div><div class="name">Apfelsaft / Orangensaft</div><div class="desc">0,2l / 0,4l</div></div><div class="price">2,20 / 3,50&euro;</div></div><div class="menu-item"><div><div class="name">Lassi suess/sauer</div><div class="desc">0,1l / 0,3l</div></div><div class="price">1,30 / 3,30&euro;</div></div><div class="menu-item"><div><div class="name">Indischer Chai</div></div><div class="price">4,90&euro;</div></div><div class="menu-item"><div><div class="name">Kingfisher Bier</div><div class="desc">0,33l</div></div><div class="price">3,90&euro;</div></div><div class="menu-item"><div><div class="name">Krombacher vom Fass</div><div class="desc">0,3l / 0,5l</div></div><div class="price">3,50 / 4,90&euro;</div></div>'},
+{t:"Vorspeisen",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Vorspeisen</h3><div class="menu-item"><div><div class="name">Linsensuppe</div></div><div class="price">4,50&euro;</div></div><div class="menu-item"><div><div class="name">Samosa (Gemuese)</div></div><div class="price">3,90&euro;</div></div><div class="menu-item"><div><div class="name">Samosa Teller mit Salat</div></div><div class="price">9,90&euro;</div></div><div class="menu-item"><div><div class="name">Pakorasa Mix</div></div><div class="price">7,90&euro;</div></div>'},
+{t:"Currys",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 6px">Currys</h3><p style="font-size:13px;color:#8B7D6B;margin-bottom:14px">Mit Basmati-Reis. Spezial +2,90&euro;</p><div class="menu-var"><span><strong>Gemuese</strong><em>12,90&euro;</em></span><span><strong>Paneer</strong><em>13,90&euro;</em></span><span><strong>Chicken</strong><em>14,90&euro;</em></span><span><strong>Lamm</strong><em>17,90&euro;</em></span><span><strong>Garnelen</strong><em>18,90&euro;</em></span></div>'},
+{t:"Tandoori",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 6px">Tandoori</h3><p style="font-size:13px;color:#8B7D6B;margin-bottom:14px">Im Lehmofen gegrillt.</p><div class="menu-var"><span><strong>Gemuese</strong><em>17,90&euro;</em></span><span><strong>Chicken</strong><em>19,90&euro;</em></span><span><strong>Lamm</strong><em>20,90&euro;</em></span><span><strong>Garnelen</strong><em>21,90&euro;</em></span></div>'},
+{t:"Biryani",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Biryani</h3><div class="menu-item"><div><div class="name">Gemuese Biryani</div></div><div class="price">12,50&euro;</div></div><div class="menu-item"><div><div class="name">Haehnchen Biryani</div></div><div class="price">13,50&euro;</div></div><div class="menu-item"><div><div class="name">Lamm Biryani</div></div><div class="price">18,90&euro;</div></div><div class="menu-item"><div><div class="name">Mix Masala Biryani</div></div><div class="price">20,90&euro;</div></div>'},
+{t:"Bestseller",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#D4940E;margin:0 0 14px">&#9733; Bestseller</h3><div class="menu-item"><div><div class="name">Tandoori Mix Platte</div></div><div class="price">24,90&euro;</div></div><div class="menu-item"><div><div class="name">Chicken Kohlapuri</div></div><div class="price">18,90&euro;</div></div><div class="menu-item"><div><div class="name">Malai Kofta</div></div><div class="price">19,90&euro;</div></div>'},
+{t:"Desserts",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Desserts</h3><div class="menu-item"><div><div class="name">Gulab Jamun</div></div><div class="price">3,90&euro;</div></div><div class="menu-item"><div><div class="name">Kulfi</div></div><div class="price">5,90&euro;</div></div><div class="menu-item"><div><div class="name">Mango Halwa (Vegan)</div></div><div class="price">5,90&euro;</div></div>'},
+{t:"Menues",html:'<h3 style="font-family:Playfair Display,serif;font-size:20px;color:#A0522D;margin:0 0 14px">Menues fuer 2</h3><div style="background:#F5F3EF;border-radius:10px;padding:16px;margin-bottom:14px"><h4 style="color:#D4940E;margin:0 0 8px">Tandoori-Mix &ndash; 71,90&euro;</h4><p style="font-size:13px;color:#58585A;line-height:1.7;margin:0">Suppe, Pakoras, Salat, Naan, Tandoori Mix, Biryani, Dessert</p></div><div style="background:#F5F3EF;border-radius:10px;padding:16px;margin-bottom:14px"><h4 style="color:#D4940E;margin:0 0 8px">Golden Masala &ndash; 66,90&euro;</h4><p style="font-size:13px;color:#58585A;line-height:1.7;margin:0">Suppe, Pakoras, Salat, Naan, Makhni Masala, Biryani, Dessert</p></div><div style="background:#F5F3EF;border-radius:10px;padding:16px"><h4 style="color:#D4940E;margin:0 0 8px">Vegan &ndash; 69,90&euro;</h4><p style="font-size:13px;color:#58585A;line-height:1.7;margin:0">Suppe, Tofu Pakoras, Salat, Naan, Mango Kokos Curry, Biryani, Halwa</p></div>'}
 ];
 var menuPage=0;
 function openMenu(){document.getElementById('menuOverlay').classList.add('active');renderMenu()}
 function closeMenu(){document.getElementById('menuOverlay').classList.remove('active')}
-function renderMenu(){
-  document.getElementById('menuContent').innerHTML='<div style="text-align:center;margin-bottom:12px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#D4940E;font-weight:600">Golden Masala</div></div>'+MP[menuPage].html;
-  document.getElementById('menuPageNum').textContent=(menuPage+1)+' / '+MP.length;
-  document.getElementById('menuPrev').style.opacity=menuPage<=0?'0.3':'1';
-  document.getElementById('menuNext').style.opacity=menuPage>=MP.length-1?'0.3':'1';
-  document.getElementById('menuContent').scrollTop=0;
-}
+function renderMenu(){document.getElementById('menuContent').innerHTML='<div style="text-align:center;margin-bottom:12px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#D4940E;font-weight:600">Golden Masala</div></div>'+MP[menuPage].html;document.getElementById('menuPageNum').textContent=(menuPage+1)+'/'+MP.length;document.getElementById('menuPrev').style.opacity=menuPage<=0?'0.3':'1';document.getElementById('menuNext').style.opacity=menuPage>=MP.length-1?'0.3':'1';document.getElementById('menuContent').scrollTop=0}
 function menuGo(d){var n=menuPage+d;if(n<0||n>=MP.length)return;menuPage=n;renderMenu()}
 document.addEventListener('keydown',function(e){if(!document.getElementById('menuOverlay').classList.contains('active'))return;if(e.key==='ArrowRight')menuGo(1);if(e.key==='ArrowLeft')menuGo(-1);if(e.key==='Escape')closeMenu()});
 document.getElementById('menuOverlay').addEventListener('click',function(e){if(e.target===this)closeMenu()});
