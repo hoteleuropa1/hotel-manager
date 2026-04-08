@@ -87,12 +87,12 @@ export default async function handler(req, res) {
     } catch (e) {}
   }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  return res.status(200).send(buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, guestId));
+  return res.status(200).send(buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, guestId, token));
 }
 function fd(d) { var t = new Date(d); return t.getDate().toString().padStart(2, "0") + "." + (t.getMonth() + 1).toString().padStart(2, "0") + "." + t.getFullYear(); }
 function fmt(n) { return parseFloat(n || 0).toFixed(2); }
 
-function buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, guestId) {
+function buildPage(gn, ci, co, rt, balanceHtml, guestFormHtml, guestId, token) {
 return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Ihre digitale Gaestemappe - Hotel Europa</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -305,7 +305,7 @@ async function saveGuest(){
   var btn=document.getElementById('save-btn');
   btn.disabled=true;btn.textContent='Speichere...';
   try{
-    var r=await fetch(window.location.pathname+'?token=${token}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    var r=await fetch(window.location.pathname+'?token=${token||""}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       guest_id:'${guestId}',
       first_name:document.getElementById('g_fn').value,
       last_name:document.getElementById('g_ln').value,
