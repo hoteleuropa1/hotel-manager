@@ -405,8 +405,10 @@ return<React.Fragment key={ut.id}>
 <div style={{padding:"10px 14px",fontSize:12}}>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#9CA3AF"}}>Zimmer</span><span style={{fontWeight:500}}>{hoverRes.room.name} ({hoverRes.ut?.name})</span></div>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#9CA3AF"}}>{hoverRes.res.adults} Erw.</span><Badge s={hoverRes.res.status}/></div>
-<div style={{display:"flex",justifyContent:"space-between",paddingTop:4,borderTop:"0.5px solid #E5E7EB"}}><span style={{color:"#9CA3AF"}}>Gesamt</span><span style={{fontWeight:500,color:"#111"}}>{fmt(parseFloat(hoverRes.res.total_price||0)+(riMap[hoverRes.res.id]||0))} EUR</span></div>
-{(()=>{const gt=parseFloat(hoverRes.res.total_price||0)+(riMap[hoverRes.res.id]||0);const pd=paidMap[hoverRes.res.id]||0;const of2=gt-pd;return of2>0?<div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{color:"#9CA3AF"}}>Offen</span><span style={{fontWeight:600,color:"#DC2626"}}>{fmt(of2)} EUR</span></div>:<div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{color:"#9CA3AF"}}>Offen</span><span style={{fontWeight:600,color:"#059669"}}>0.00 EUR</span></div>})()}
+<div style={{paddingTop:6,borderTop:"0.5px solid #E5E7EB"}}>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{color:"#9CA3AF"}}>Gesamt</span><span style={{fontWeight:600,color:"#111"}}>{fmt(parseFloat(hoverRes.res.total_price||0)+(riMap[hoverRes.res.id]||0))} EUR</span></div>
+<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#9CA3AF"}}>Offen</span><span style={{fontWeight:600,color:(parseFloat(hoverRes.res.total_price||0)+(riMap[hoverRes.res.id]||0)-(paidMap[hoverRes.res.id]||0))>0?"#DC2626":"#059669"}}>{fmt(parseFloat(hoverRes.res.total_price||0)+(riMap[hoverRes.res.id]||0)-(paidMap[hoverRes.res.id]||0))} EUR</span></div>
+</div>
 </div></div>}
 {(modal?.type==="new"||modal?.type==="newGlobal")&&<NewResForm room={modal.room||aRms[0]} ut={gUT(modal.room||aRms[0],uts)} unitTypes={uts} api={api} guests={guests} allRooms={aRms} reservations={ress} products={products} onClose={()=>setModal(null)} onRefresh={load} showToast={show}/>}
 {showImport&&<Modal title={(importSource==="booking"?"Booking.com":"HRS")+" importieren"} onClose={()=>setShowImport(false)} width={620}>
