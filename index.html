@@ -55,7 +55,7 @@ const gP=(r,uts)=>r.price_override!=null?r.price_override:(uts.find(u=>u.id===r.
 const gUT=(r,uts)=>uts.find(u=>u.id===r.unit_type_id);
 const fmt=n=>parseFloat(n||0).toFixed(2);
 const MONATE=["Jan","Feb","Marz","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-const WTAG=["So","Mo","Di","Mi","Do","Fr","Sa"];
+const WTAG=["So","Mo","Di","Mi","Do","Fr","Sa"]; const roomInCat=(r,tid)=>r.unit_type_id==tid||(r.alt_unit_type_ids||"").split(",").filter(Boolean).includes(String(tid));
 
 function useAPI(url,key,token){
 const h=useCallback(()=>{const hd={"Content-Type":"application/json",Prefer:"return=representation"};hd.apikey=key;hd.Authorization="Bearer "+(token||key);return hd},[key,token]);
