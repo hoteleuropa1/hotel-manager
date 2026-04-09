@@ -125,7 +125,7 @@ return<Modal title={"Neu - "+selectedRooms.map(sr=>sr.room.name).join(", ")} onC
 <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4}}>
 <span style={{fontSize:11,color:"#6B7280"}}>{nights}N. x</span>
 <input type="number" min={0} step={1} value={sr.price} onChange={e=>{const v=parseFloat(e.target.value)||0;setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,price:v}:s))}} style={{width:60,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,fontWeight:600,textAlign:"center",color:"#D4940E",outline:"none"}}/>
-<span style={{fontWeight:600,color:"#D4940E",fontSize:13}}>= {fmt(nights*sr.price)} EUR</span>
+<span style={{fontWeight:600,color:"#D4940E",fontSize:13}}>= </span><input type="number" min={0} step={1} value={Math.round(nights*sr.price)} onChange={e=>{const total=parseFloat(e.target.value)||0;const pp=nights>0?Math.round(total/nights):total;setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,price:pp}:s))}} style={{width:70,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,fontWeight:600,textAlign:"center",color:"#D4940E",outline:"none"}}/><span style={{fontWeight:600,color:"#D4940E",fontSize:13}}> EUR</span>
 </div>
 {selectedRooms.length>1&&<button onClick={()=>removeRoom(i)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444",padding:2}}><I n="x" s={14}/></button>}
 </div>)}
