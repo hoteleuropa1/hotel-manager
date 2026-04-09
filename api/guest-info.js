@@ -26,6 +26,19 @@ export default async function handler(req, res) {
             });
           }
         }
+        // Hauptgast mit erstem Occupant aktualisieren
+        const firstOcc = occupants.find(o => o.occupant_number === 1 || o.reservation_id);
+        if (firstOcc && (firstOcc.first_name || firstOcc.last_name)) {
+          try {
+            const rr = await fetch(SB_URL + "/rest/v1/reservations?offer_token=eq." + (req.query.token || "") + "&select=guest_id", { headers });
+            const rd = await rr.json();
+            if (rd && rd[0] && rd[0].guest_id) {
+              await fetch(SB_URL + "/rest/v1/guests?id=eq." + rd[0].guest_id, {
+                method: "PATCH", headers, body: JSON.stringify({ first_name: firstOcc.first_name || "", last_name: firstOcc.last_name || "" })
+              });
+            }
+          } catch (e2) {}
+        }
         return res.status(200).json({ success: true });
       }
 
