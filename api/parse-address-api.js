@@ -1,6 +1,7 @@
 // api/parse-address.js – Vercel Serverless Function
 // Erkennt automatisch: Firma, Anrede, Name, Straße, PLZ, Ort, Land
 // Nutzt Gemini 2.0 Flash (wie bei der Preisberechnung)
+// Upload nach api/parse-address.js im GitHub Repo
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
