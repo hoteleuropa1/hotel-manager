@@ -76,7 +76,7 @@ module.exports = async function handler(req, res) {
         " " +
         (guest.last_name || "Gast");
 
-      const roomName = (ut?.name || "") + " (Zi. " + (room?.name || "") + ")";
+      const roomName = ut?.name || "";
       const infoUrl = BASE_URL + "/api/guest-info?token=" + rv.offer_token;
 
       const subj = "Willkommen im Hotel Europa - Infos zu Ihrem Aufenthalt";
@@ -174,6 +174,7 @@ function buildEmail(greet, rv, roomName, infoUrl) {
     '<tr><td style="padding:6px 0;font-weight:600;">Anreise:</td><td style="padding:6px 0;">' + fmtDE(rv.check_in) + '</td></tr>' +
     '<tr><td style="padding:6px 0;font-weight:600;">Abreise:</td><td style="padding:6px 0;">' + fmtDE(rv.check_out) + '</td></tr>' +
     '<tr><td style="padding:6px 0;font-weight:600;">Zimmer:</td><td style="padding:6px 0;">' + roomName + '</td></tr>' +
+    '<tr><td style="padding:6px 0;font-weight:600;">WLAN:</td><td style="padding:6px 0;font-family:monospace;letter-spacing:1px;">Hotelguest2023</td></tr>' +
     '</table></div></td></tr>' +
     '<tr><td style="padding:10px 30px 10px;font-size:14px;color:#374151;line-height:1.7;">' +
     'In Ihrer digitalen Gaestemappe finden Sie alles Wichtige:<br>' +
