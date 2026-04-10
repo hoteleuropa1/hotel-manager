@@ -401,7 +401,7 @@ return<React.Fragment key={ut.id}>
 <div style={{padding:"10px 14px",borderBottom:"0.5px solid #E5E7EB",display:"flex",alignItems:"center",gap:10}}>
 <SrcIcon source={hoverRes.res.source} s={20}/>
 <div><div style={{fontWeight:500,fontSize:13,color:"#111"}}>{hoverRes.g?.company?hoverRes.g.company:(hoverRes.g?.first_name+" "+hoverRes.g?.last_name)}</div>{hoverRes.g?.company&&<div style={{fontSize:10,color:"#6B7280"}}>{hoverRes.g?.first_name} {hoverRes.g?.last_name}</div>}
-<div style={{color:"#9CA3AF",fontSize:10}}>{hoverRes.g?.country||"DE"}{hoverRes.g?.companyhoverRes.g?.salutation!=="Firma"&&<div</div></div>
+<div style={{color:"#9CA3AF",fontSize:10}}>{hoverRes.g?.country||"DE"}{hoverRes.g?.salutation!=="Firma"&&<div>{hoverRes.g?.salutation}</div>}</div>
 <div style={{padding:"10px 14px",fontSize:12}}>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#9CA3AF"}}>Zimmer</span><span style={{fontWeight:500}}>{hoverRes.room.name} ({hoverRes.ut?.name})</span></div>
 <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#9CA3AF"}}>{hoverRes.res.adults} Erw.</span><Badge s={hoverRes.res.status}/></div>
