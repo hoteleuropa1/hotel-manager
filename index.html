@@ -345,7 +345,7 @@ if(!extNr){const hrsMatch=txt.match(/HRS[- ]?(?:Nr|Nummer|number)[.:\s]*(\d{5,})
 if(extNr){const dupe=ress.find(r=>(r.notes||"").includes(extNr)||(r.internal_notes||"").includes(extNr));
 if(dupe){const g=gMap[dupe.guest_id];setImportError("Buchung "+extNr+" existiert bereits! Gast: "+(g?g.first_name+" "+g.last_name:"unbekannt")+" ("+fd(dupe.check_in)+" - "+fd(dupe.check_out)+")");setImporting(false);return}}
 try{const resp=await fetch(importSource==="booking"?"/api/booking-import":"/api/hrs-import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({emailText:txt})});const data=await resp.json();
-if(data.success){setImportResult(data);setEmailText("");await load()}
+if(data.success){setImportResult(data);setEmailText("");await load();try{const bkRes=await api.get("reservations","source=in.(booking,hrs)&status=eq.angebot&order=created_at.desc&limit=5");for(const br of bkRes){await api.patch("reservations",br.id,{status:"reservierung"})};await load()}catch(e2){}}
 else{setImportError(data.error||"Import fehlgeschlagen")}}
 catch(e){setImportError(e.message)}
 setImporting(false)};
