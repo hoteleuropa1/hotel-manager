@@ -119,16 +119,25 @@ return<Modal title={"Neu - "+selectedRooms.map(sr=>sr.room.name).join(", ")} onC
 <div style={{borderTop:"1px solid #E5E7EB",margin:"8px 0",paddingTop:12}}/>
 <div style={{marginBottom:16}}>
 <label style={{display:"block",fontSize:12,fontWeight:500,color:"#6B7280",marginBottom:8}}>Zimmer ({selectedRooms.length})</label>
-{selectedRooms.map((sr,i)=><div key={sr.room.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"#F9FAFB",borderRadius:8,marginBottom:4,border:"1px solid #E5E7EB",flexWrap:"wrap"}}>
+{selectedRooms.map((sr,i)=>{const srN=Math.max(1,dBet(sr.checkIn||fm.check_in,sr.checkOut||fm.check_out));const srTotal=srN*sr.price;return<div key={sr.room.id} style={{padding:"10px 12px",background:"#F9FAFB",borderRadius:8,marginBottom:4,border:"1px solid #E5E7EB"}}>
+<div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
 <span style={{fontWeight:600,fontSize:13}}>{sr.room.name}</span>
 {(sr.room.alt_unit_type_ids||"").split(",").filter(Boolean).length>0?<select value={sr.soldAsUtId||sr.room.unit_type_id} onChange={e=>{const nid=e.target.value;const nut=unitTypes.find(u=>u.id===nid);setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,soldAsUtId:nid,ut:nut,price:nut?.base_price||s.price}:s))}} style={{padding:"3px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:12,background:"#fff"}}><option value={sr.room.unit_type_id}>{unitTypes.find(u=>u.id===sr.room.unit_type_id)?.name}</option>{(sr.room.alt_unit_type_ids||"").split(",").filter(Boolean).map(aid=><option key={aid} value={aid}>{unitTypes.find(u=>u.id===aid)?.name||aid}</option>)}</select>:<span style={{fontSize:12,color:"#6B7280"}}>{sr.ut?.name}</span>}
 <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4}}>
-<span style={{fontSize:11,color:"#6B7280"}}>{Math.max(1,dBet(sr.checkIn||fm.check_in,sr.checkOut||fm.check_out))}N. x</span>
+<span style={{fontSize:11,color:"#6B7280"}}>{srN}N. x</span>
 <input type="number" min={0} step={1} value={sr.price} onChange={e=>{const v=parseFloat(e.target.value)||0;setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,price:v}:s))}} style={{width:60,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,fontWeight:600,textAlign:"center",color:"#D4940E",outline:"none"}}/>
-<span style={{fontWeight:600,color:"#D4940E",fontSize:13}}>= </span><input type="number" min={0} step={1} value={Math.round(nights*sr.price)} onChange={e=>{const total=parseFloat(e.target.value)||0;const pp=nights>0?Math.round(total/nights):total;setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,price:pp}:s))}} style={{width:70,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,fontWeight:600,textAlign:"center",color:"#D4940E",outline:"none"}}/><span style={{fontWeight:600,color:"#D4940E",fontSize:13}}> EUR</span>
+<span style={{fontWeight:600,color:"#D4940E",fontSize:13}}>= </span><input type="number" min={0} step={1} value={Math.round(srTotal)} onChange={e=>{const total=parseFloat(e.target.value)||0;const pp=srN>0?Math.round(total/srN):total;setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,price:pp}:s))}} style={{width:70,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:13,fontWeight:600,textAlign:"center",color:"#D4940E",outline:"none"}}/><span style={{fontWeight:600,color:"#D4940E",fontSize:13}}> EUR</span>
 </div>
 {selectedRooms.length>1&&<button onClick={()=>removeRoom(i)} style={{background:"none",border:"none",cursor:"pointer",color:"#EF4444",padding:2}}><I n="x" s={14}/></button>}
-</div>)}
+</div>
+{selectedRooms.length>1&&<div style={{display:"flex",gap:8,alignItems:"center",marginTop:6,paddingTop:6,borderTop:"1px solid #E5E7EB"}}>
+<span style={{fontSize:11,color:"#9CA3AF",whiteSpace:"nowrap"}}>Zeitraum:</span>
+<input type="date" value={sr.checkIn||fm.check_in} onChange={e=>setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,checkIn:e.target.value}:s))} style={{flex:1,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:12,outline:"none"}}/>
+<span style={{fontSize:11,color:"#9CA3AF"}}>bis</span>
+<input type="date" value={sr.checkOut||fm.check_out} onChange={e=>setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,checkOut:e.target.value}:s))} style={{flex:1,padding:"4px 6px",border:"1px solid #D1D5DB",borderRadius:6,fontSize:12,outline:"none"}}/>
+{(sr.checkIn||sr.checkOut)&&<button onClick={()=>setSelectedRooms(prev=>prev.map((s,j)=>j===i?{...s,checkIn:null,checkOut:null}:s))} title="Auf Hauptdatum zuruecksetzen" style={{background:"none",border:"none",cursor:"pointer",color:"#9CA3AF",padding:2,fontSize:11}}><I n="refresh" s={12}/></button>}
+</div>}
+</div>})}
 <Btn v="ghost" sz="sm" onClick={()=>setShowRoomPicker(true)} style={{marginTop:6}}><I n="plus" s={14}/> Zimmer hinzufuegen</Btn>
 </div>
 {(allProducts||[]).filter(p=>p.active).length>0&&<div style={{marginBottom:16}}>
