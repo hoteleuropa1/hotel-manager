@@ -57,18 +57,20 @@ module.exports = async function handler(req, res) {
     // Token
     var otoken = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { var r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16); });
 
-    // Notizen mit Kreditkarte
+    // Notizen: Expedia-Nr + PRE-PAID Status
     var notes = "Expedia " + (p.reservationId || "");
-    if (p.cardNumber) {
-      notes += " | VCC: " + p.cardNumber;
-      if (p.cardExpiry) notes += " Exp: " + p.cardExpiry;
-      if (p.cardCvv) notes += " CVV: " + p.cardCvv;
-      if (p.cardHolder) notes += " (" + p.cardHolder + ")";
-    }
+    if (p.prePaid) notes += " | Guest has PRE-PAID";
     if (p.specialRequest) notes += " | " + p.specialRequest;
 
+    // Interne Notizen: Kreditkarte + Zahlungsanweisung
     var intNotes = "";
-    if (p.paymentInstructions) intNotes = p.paymentInstructions;
+    if (p.cardNumber) {
+      intNotes = "VCC: " + p.cardNumber;
+      if (p.cardExpiry) intNotes += " Exp: " + p.cardExpiry;
+      if (p.cardCvv) intNotes += " CVV: " + p.cardCvv;
+      if (p.cardHolder) intNotes += " (" + p.cardHolder + ")";
+    }
+    if (p.paymentInstructions) intNotes += (intNotes ? " | " : "") + p.paymentInstructions;
     if (p.rateCode) intNotes += (intNotes ? " | " : "") + "Rate: " + p.rateCode;
     if (p.discount) intNotes += " | " + p.discount;
 
@@ -101,15 +103,32 @@ module.exports = async function handler(req, res) {
   } catch (e) { return res.status(500).json({ error: e.message }); }
 };
 
-function parseExpedia(text) {
+function parseExpedia(rawText) {
+  // Text normalisieren: Sonderzeichen, HTML, unsichtbare Zeichen entfernen
+  var text = rawText
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[\u00A0\u2000-\u200F\u2028\u2029\uFEFF]/g, " ")
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\t/g, " ")
+    .replace(/ {3,}/g, "  ");
+
   var r = { reservationId: "", firstName: "", lastName: "", email: "",
     checkIn: "", checkOut: "", adults: 1, children: 0,
     roomTypeCode: "", roomTypeName: "", nightlyRate: 0, totalPrice: 0,
     rateCode: "", discount: "", specialRequest: "", paymentInstructions: "",
-    cardNumber: "", cardExpiry: "", cardCvv: "", cardHolder: "" };
+    cardNumber: "", cardExpiry: "", cardCvv: "", cardHolder: "", prePaid: false };
 
   var MM = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
   var m;
+
+  // PRE-PAID erkennen
+  if (text.match(/PRE-PAID|PRE\s*PAID|prepaid/i)) r.prePaid = true;
 
   // Reservation ID: __2437027238__
   m = text.match(/Reservation\s*ID[:\s]*_*(\d+)_*/i);
@@ -135,10 +154,10 @@ function parseExpedia(text) {
   m = text.match(/Room\s*Type\s*Name[:\s]+(.+?)(?:\n|Pricing|$)/i);
   if (m) r.roomTypeName = m[1].trim();
 
-  // Check-In / Check-Out (nach "Check-InCheck-Out")
-  var cicoM = text.match(/Check-In\s*Check-Out/i);
+  // Check-In / Check-Out
+  var cicoM = text.match(/Check[\s\-]*In[\s\-]*Check[\s\-]*Out/i);
   if (cicoM) {
-    var after = text.substring(cicoM.index, cicoM.index + 300);
+    var after = text.substring(cicoM.index, cicoM.index + 400);
     var dates = [];
     var dp = /([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/g;
     var dm;
@@ -148,25 +167,39 @@ function parseExpedia(text) {
     if (dates.length >= 2) { r.checkIn = dates[0]; r.checkOut = dates[1]; }
   }
 
-  // Fallback: alle Daten (1.=Booked on, 2.=CheckIn, 3.=CheckOut)
+  // Fallback 1: Check-In und Check-Out getrennt
+  if (!r.checkIn) {
+    var ciM = text.match(/Check[\s\-]*In[:\s]*([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/i);
+    var coM = text.match(/Check[\s\-]*Out[:\s]*([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/i);
+    if (ciM && coM && MM[ciM[1]] && MM[coM[1]]) {
+      r.checkIn = ciM[3] + "-" + MM[ciM[1]] + "-" + ciM[2].padStart(2, "0");
+      r.checkOut = coM[3] + "-" + MM[coM[1]] + "-" + coM[2].padStart(2, "0");
+    }
+  }
+
+  // Fallback 2: alle Daten sammeln (1.=Booked, 2.=CheckIn, 3.=CheckOut)
   if (!r.checkIn) {
     var allD = [], adp = /([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/g, adm;
     while ((adm = adp.exec(text)) !== null) {
       if (MM[adm[1]]) allD.push(adm[3] + "-" + MM[adm[1]] + "-" + adm[2].padStart(2, "0"));
     }
+    // Entferne Duplikate
+    allD = [...new Set(allD)];
     if (allD.length >= 3) { r.checkIn = allD[1]; r.checkOut = allD[2]; }
     else if (allD.length >= 2) { r.checkIn = allD[0]; r.checkOut = allD[1]; }
   }
 
-  // Adults: nach den Check-Out Daten, Format "2026101" -> 1 adult, 0 kids
-  m = text.match(/\d{4}\s*(\d)\s*(\d)\s*(\d)/);
-  if (m && cicoM) {
-    // Suche spezifisch nach der Zeile mit Adults
-    var adLine = text.match(/(?:Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar)\s+\d{1,2},?\s+\d{4}(?:.*?)(\d{4})\s*(\d+)\s*(\d+)\s*(\d+)/);
-    if (adLine) {
-      r.adults = parseInt(adLine[2]) || 1;
-      r.children = parseInt(adLine[3]) || 0;
-    }
+  // Fallback 3: ISO-Datumsformat (2026-04-18)
+  if (!r.checkIn) {
+    var isoD = text.match(/(\d{4}-\d{2}-\d{2})/g);
+    if (isoD && isoD.length >= 2) { r.checkIn = isoD[0]; r.checkOut = isoD[1]; }
+  }
+
+  // Adults: suche nach Zahl direkt nach CheckOut-Datum
+  var adLine = text.match(/\d{4}\s*(\d)\s*(\d)/);
+  if (adLine) {
+    r.adults = parseInt(adLine[1]) || 1;
+    r.children = parseInt(adLine[2]) || 0;
   }
 
   // Daily Rate - 45.13 EUR
