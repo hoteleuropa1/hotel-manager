@@ -1,6 +1,4 @@
 // api/expedia-import.js
-// Vercel Serverless Function — Expedia Buchungsimport
-
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -12,288 +10,193 @@ module.exports = async function handler(req, res) {
   if (!SB_KEY) return res.status(500).json({ error: "SUPABASE_SERVICE_KEY fehlt" });
 
   const SB_URL = "https://ztdtkncoyrkvdpytwuhy.supabase.co";
-  const headers = {
-    "Content-Type": "application/json",
-    apikey: SB_KEY,
-    Authorization: "Bearer " + SB_KEY,
-    Prefer: "return=representation",
-  };
+  const hdrs = { "Content-Type": "application/json", apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, Prefer: "return=representation" };
+  const hdrsR = { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY };
 
   try {
-    var emailText = "";
-    if (req.body && req.body.emailText) emailText = req.body.emailText;
-    else if (typeof req.body === "string") emailText = req.body;
+    var emailText = req.body?.emailText || (typeof req.body === "string" ? req.body : "");
+    if (!emailText || emailText.length < 50) return res.status(400).json({ error: "Kein Buchungstext empfangen" });
 
-    if (!emailText || emailText.length < 50) {
-      return res.status(400).json({ error: "Kein Buchungstext empfangen" });
+    var p = parseExpedia(emailText);
+    if (!p.checkIn || !p.checkOut) return res.status(400).json({ error: "Check-In/Out nicht erkannt", parsed: p });
+    if (!p.lastName) return res.status(400).json({ error: "Gastname nicht erkannt", parsed: p });
+
+    // Duplikat
+    if (p.reservationId) {
+      var dd = await (await fetch(SB_URL + "/rest/v1/reservations?notes=like.*" + p.reservationId + "*&select=id", { headers: hdrsR })).json();
+      if (dd && dd.length > 0) return res.status(400).json({ error: "Buchung " + p.reservationId + " existiert bereits!" });
     }
 
-    var parsed = parseExpedia(emailText);
+    // Zimmertypen + Zimmer laden
+    var unitTypes = await (await fetch(SB_URL + "/rest/v1/unit_types?order=sort_order", { headers: hdrsR })).json();
+    var allRooms = await (await fetch(SB_URL + "/rest/v1/rooms?active=eq.true&order=name", { headers: hdrsR })).json();
 
-    if (!parsed.checkIn || !parsed.checkOut) {
-      return res.status(400).json({ error: "Konnte An-/Abreise nicht erkennen", parsed: parsed });
-    }
-    if (!parsed.lastName) {
-      return res.status(400).json({ error: "Konnte Gastname nicht erkennen", parsed: parsed });
-    }
-
-    // Duplikat-Check
-    if (parsed.reservationId) {
-      var dupResp = await fetch(
-        SB_URL + "/rest/v1/reservations?notes=like.*" + parsed.reservationId + "*&select=id",
-        { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } }
-      );
-      var dups = await dupResp.json();
-      if (dups && dups.length > 0) {
-        return res.status(400).json({
-          error: "Buchung " + parsed.reservationId + " existiert bereits!",
-          parsed: parsed,
-        });
-      }
-    }
-
-    // Zimmertyp-Mapping
-    var utResp = await fetch(SB_URL + "/rest/v1/unit_types?order=sort_order", {
-      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY },
-    });
-    var unitTypes = await utResp.json();
-
-    var roomResp = await fetch(SB_URL + "/rest/v1/rooms?active=eq.true&order=name", {
-      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY },
-    });
-    var allRooms = await roomResp.json();
-
-    // Zimmertyp erkennen
+    // Einzelbett/Single/Twin -> Einzelzimmer, Double/Queen/King -> Doppelzimmer
     var utId = null;
-    var rtLower = (parsed.roomType || "").toLowerCase();
-    if (rtLower.match(/single|einzel|einzelbett|twin/)) {
-      utId = unitTypes.find(function (u) { return u.name.toLowerCase().indexOf("einzel") >= 0; });
-    } else if (rtLower.match(/double|doppel|queen|king/)) {
-      utId = unitTypes.find(function (u) { return u.name.toLowerCase().indexOf("doppel") >= 0; });
-    } else if (rtLower.match(/triple|drei/)) {
-      utId = unitTypes.find(function (u) { return u.name.toLowerCase().indexOf("drei") >= 0; });
-    }
-    if (utId) utId = utId.id;
-    else if (unitTypes.length > 0) utId = unitTypes[0].id;
+    var rtL = (p.roomTypeCode + " " + p.roomTypeName).toLowerCase();
+    if (rtL.match(/single|einzel|einzelbett|twin/)) utId = unitTypes.find(u => u.name.toLowerCase().indexOf("einzel") >= 0);
+    else if (rtL.match(/double|doppel|queen|king/)) utId = unitTypes.find(u => u.name.toLowerCase().indexOf("doppel") >= 0);
+    else if (rtL.match(/triple|drei/)) utId = unitTypes.find(u => u.name.toLowerCase().indexOf("drei") >= 0);
+    utId = utId ? utId.id : (unitTypes[0]?.id || null);
 
-    // Freies Zimmer finden
-    var rvResp = await fetch(
-      SB_URL + "/rest/v1/reservations?check_in=lt." + parsed.checkOut + "&check_out=gt." + parsed.checkIn + "&status=not.in.(storniert,abgelehnt,checkedout,bezahlt,noshow)&select=room_id",
-      { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } }
-    );
-    var occupied = (await rvResp.json()).map(function (r) { return r.room_id; });
-    var freeRoom = allRooms.find(function (r) {
-      return r.unit_type_id === utId && occupied.indexOf(r.id) === -1;
-    });
-    if (!freeRoom) {
-      freeRoom = allRooms.find(function (r) {
-        return occupied.indexOf(r.id) === -1;
-      });
-    }
-    if (!freeRoom) {
-      return res.status(400).json({ error: "Kein freies Zimmer gefunden", parsed: parsed });
-    }
+    // Belegte Zimmer
+    var occ = await (await fetch(SB_URL + "/rest/v1/reservations?check_in=lt." + p.checkOut + "&check_out=gt." + p.checkIn + "&status=not.in.(storniert,abgelehnt,checkedout,bezahlt,noshow)&select=room_id", { headers: hdrsR })).json();
+    var occIds = (occ || []).map(r => r.room_id);
+    var freeRoom = allRooms.find(r => r.unit_type_id === utId && occIds.indexOf(r.id) === -1) || allRooms.find(r => occIds.indexOf(r.id) === -1);
+    if (!freeRoom) return res.status(400).json({ error: "Kein freies Zimmer gefunden", parsed: p });
 
     // Gast anlegen/finden
-    var guestResp = await fetch(
-      SB_URL + "/rest/v1/guests?last_name=ilike." + encodeURIComponent(parsed.lastName) + "&first_name=ilike." + encodeURIComponent(parsed.firstName) + "&limit=1",
-      { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } }
-    );
-    var existingGuests = await guestResp.json();
+    var eg = await (await fetch(SB_URL + "/rest/v1/guests?last_name=ilike." + encodeURIComponent(p.lastName) + "&first_name=ilike." + encodeURIComponent(p.firstName) + "&limit=1", { headers: hdrsR })).json();
     var guestId;
-
-    if (existingGuests && existingGuests.length > 0) {
-      guestId = existingGuests[0].id;
-    } else {
-      var newGuestResp = await fetch(SB_URL + "/rest/v1/guests", {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify({
-          salutation: parsed.salutation || "",
-          first_name: parsed.firstName || "",
-          last_name: parsed.lastName || "",
-          email: parsed.email || "",
-          country: parsed.country || "DE",
-        }),
-      });
-      var newGuest = await newGuestResp.json();
-      guestId = newGuest[0].id;
+    if (eg && eg.length > 0) { guestId = eg[0].id; }
+    else {
+      var ng = await (await fetch(SB_URL + "/rest/v1/guests", { method: "POST", headers: hdrs, body: JSON.stringify({ salutation: "", first_name: p.firstName, last_name: p.lastName, email: p.email, country: "DE" }) })).json();
+      guestId = ng[0].id;
     }
 
-    // Token generieren
-    var otoken = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-      var r = (Math.random() * 16) | 0;
-      return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-    });
+    // Token
+    var otoken = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { var r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16); });
 
-    // Kreditkarten-Info in Notizen
-    var notes = "Expedia " + (parsed.reservationId || "");
-    if (parsed.cardNumber) {
-      notes += " | VCC: " + parsed.cardNumber;
-      if (parsed.cardExpiry) notes += " Exp: " + parsed.cardExpiry;
-      if (parsed.cardCvv) notes += " CVV: " + parsed.cardCvv;
-      if (parsed.cardHolder) notes += " (" + parsed.cardHolder + ")";
+    // Notizen mit Kreditkarte
+    var notes = "Expedia " + (p.reservationId || "");
+    if (p.cardNumber) {
+      notes += " | VCC: " + p.cardNumber;
+      if (p.cardExpiry) notes += " Exp: " + p.cardExpiry;
+      if (p.cardCvv) notes += " CVV: " + p.cardCvv;
+      if (p.cardHolder) notes += " (" + p.cardHolder + ")";
     }
-    if (parsed.specialRequest) notes += " | " + parsed.specialRequest;
+    if (p.specialRequest) notes += " | " + p.specialRequest;
 
-    // Interne Notizen mit Zahlungsanweisung
-    var internalNotes = "";
-    if (parsed.paymentInstructions) internalNotes = parsed.paymentInstructions;
+    // Interne Notizen
+    var intNotes = "";
+    if (p.paymentInstructions) intNotes = p.paymentInstructions;
+    if (p.rateCode) intNotes += (intNotes ? " | " : "") + "Rate: " + p.rateCode;
+    if (p.discount) intNotes += " | " + p.discount;
+
+    // Naechte + Preis
+    var nights = Math.round((new Date(p.checkOut) - new Date(p.checkIn)) / 86400000);
+    var totalPrice = p.totalPrice || (p.nightlyRate * nights) || 0;
 
     // Reservierung anlegen
-    var resResp = await fetch(SB_URL + "/rest/v1/reservations", {
-      method: "POST",
-      headers: headers,
+    var rr = await fetch(SB_URL + "/rest/v1/reservations", {
+      method: "POST", headers: hdrs,
       body: JSON.stringify({
-        room_id: freeRoom.id,
-        guest_id: guestId,
-        check_in: parsed.checkIn,
-        check_out: parsed.checkOut,
-        status: "reservierung",
-        adults: parsed.adults || 1,
-        children: parsed.children || 0,
-        total_price: parsed.totalPrice || 0,
-        notes: notes,
-        internal_notes: internalNotes,
-        source: "expedia",
-        offer_token: otoken,
-        sold_as_unit_type_id: utId,
-      }),
+        room_id: freeRoom.id, guest_id: guestId,
+        check_in: p.checkIn, check_out: p.checkOut,
+        status: "reservierung", adults: p.adults || 1, children: p.children || 0,
+        total_price: totalPrice, notes: notes, internal_notes: intNotes,
+        source: "expedia", offer_token: otoken, sold_as_unit_type_id: utId
+      })
     });
-
-    if (!resResp.ok) {
-      var errBody = await resResp.text();
-      return res.status(500).json({ error: "Reservierung fehlgeschlagen: " + errBody.slice(0, 300) });
-    }
+    if (!rr.ok) { var eb = await rr.text(); return res.status(500).json({ error: "Fehler: " + eb.slice(0, 300) }); }
 
     return res.status(200).json({
       success: true,
       reservation: {
-        guest: parsed.firstName + " " + parsed.lastName,
-        checkIn: parsed.checkIn,
-        checkOut: parsed.checkOut,
-        room: freeRoom.name,
-        totalPrice: parsed.totalPrice,
-        reservationId: parsed.reservationId,
-        cardNumber: parsed.cardNumber ? "****" + parsed.cardNumber.slice(-4) : null,
-      },
+        guest: p.firstName + " " + p.lastName,
+        checkIn: p.checkIn, checkOut: p.checkOut,
+        room: freeRoom.name, totalPrice: totalPrice,
+        nightlyRate: p.nightlyRate, nights: nights,
+        reservationId: p.reservationId,
+        cardNumber: p.cardNumber ? "****" + p.cardNumber.slice(-4) : null
+      }
     });
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
-  }
+  } catch (e) { return res.status(500).json({ error: e.message }); }
 };
 
 function parseExpedia(text) {
-  var result = {
-    reservationId: "",
-    firstName: "",
-    lastName: "",
-    salutation: "",
-    email: "",
-    checkIn: "",
-    checkOut: "",
-    adults: 1,
-    children: 0,
-    roomType: "",
-    totalPrice: 0,
-    specialRequest: "",
-    paymentInstructions: "",
-    cardNumber: "",
-    cardExpiry: "",
-    cardCvv: "",
-    cardHolder: "",
-    country: "DE",
-  };
+  var r = { reservationId: "", firstName: "", lastName: "", email: "",
+    checkIn: "", checkOut: "", adults: 1, children: 0,
+    roomTypeCode: "", roomTypeName: "", nightlyRate: 0, totalPrice: 0,
+    rateCode: "", discount: "", specialRequest: "", paymentInstructions: "",
+    cardNumber: "", cardExpiry: "", cardCvv: "", cardHolder: "" };
 
-  // Reservation ID
-  var resIdMatch = text.match(/Reservation\s*ID[:\s]*_*(\d+)_*/i);
-  if (resIdMatch) result.reservationId = resIdMatch[1];
+  var MM = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
 
-  // Guest name
-  var guestMatch = text.match(/Guest[:\s]+([A-Za-z\u00C0-\u00FF\-]+)\s+([A-Za-z\u00C0-\u00FF\-]+)/i);
-  if (guestMatch) {
-    result.firstName = guestMatch[1].trim();
-    result.lastName = guestMatch[2].trim();
+  // Reservation ID: __2437028016__
+  var m = text.match(/Reservation\s*ID[:\s]*_*(\d+)_*/i);
+  if (m) r.reservationId = m[1];
+
+  // Guest: Gerald Tieg
+  m = text.match(/Guest[:\s]+([A-Za-z\u00C0-\u00FF\-]+)\s+([A-Za-z\u00C0-\u00FF\-]+)/i);
+  if (m) { r.firstName = m[1].trim(); r.lastName = m[2].trim(); }
+
+  // Guest Email
+  m = text.match(/Guest\s*Email[:\s]+([^\s,]+@[^\s,]+)/i);
+  if (m) r.email = m[1].trim();
+
+  // Room Type Code + Name
+  m = text.match(/Room\s*Type\s*Code[:\s]+(.+?)(?:\n|Room\s*Type|$)/i);
+  if (m) r.roomTypeCode = m[1].trim();
+  m = text.match(/Room\s*Type\s*Name[:\s]+(.+?)(?:\n|Pricing|$)/i);
+  if (m) r.roomTypeName = m[1].trim();
+
+  // Check-In / Check-Out (nach "Check-InCheck-Out" oder "Check-In Check-Out")
+  var cicoM = text.match(/Check-In\s*Check-Out/i);
+  if (cicoM) {
+    var after = text.substring(cicoM.index, cicoM.index + 300);
+    var dates = [];
+    var dp = /([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/g;
+    var dm;
+    while ((dm = dp.exec(after)) !== null) {
+      if (MM[dm[1]]) dates.push(dm[3] + "-" + MM[dm[1]] + "-" + dm[2].padStart(2, "0"));
+    }
+    if (dates.length >= 2) { r.checkIn = dates[0]; r.checkOut = dates[1]; }
+
+    // Adults nach dem zweiten Datum
+    var numM = after.match(/\d{4}\s+(\d+)\s+(\d+)/);
+    if (numM) { r.adults = parseInt(numM[1]) || 1; r.children = parseInt(numM[2]) || 0; }
   }
 
-  // Email
-  var emailMatch = text.match(/Guest\s*Email[:\s]+([^\s,]+@[^\s,]+)/i);
-  if (emailMatch) result.email = emailMatch[1].trim();
-
-  // Room type
-  var rtMatch = text.match(/Room\s*Type\s*(?:Code|Name)[:\s]+(.+?)(?:\n|Pricing|Payment|$)/i);
-  if (rtMatch) result.roomType = rtMatch[1].trim();
-  var rtNameMatch = text.match(/Room\s*Type\s*Name[:\s]+(.+?)(?:\n|Pricing|$)/i);
-  if (rtNameMatch) result.roomType = rtNameMatch[1].trim();
-
-  // Check-in / Check-out
-  var datePattern = /([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/g;
-  var dates = [];
-  var dm;
-  while ((dm = datePattern.exec(text)) !== null) {
-    var monthMap = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
-    var m = monthMap[dm[1]];
-    if (m) {
-      var d = dm[2].padStart(2, "0");
-      dates.push(dm[3] + "-" + m + "-" + d);
+  // Fallback: alle Daten sammeln (1. = Booked on, 2. = Check-In, 3. = Check-Out)
+  if (!r.checkIn) {
+    var allD = [], adp = /([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/g, adm;
+    while ((adm = adp.exec(text)) !== null) {
+      if (MM[adm[1]]) allD.push(adm[3] + "-" + MM[adm[1]] + "-" + adm[2].padStart(2, "0"));
     }
+    if (allD.length >= 3) { r.checkIn = allD[1]; r.checkOut = allD[2]; }
+    else if (allD.length >= 2) { r.checkIn = allD[0]; r.checkOut = allD[1]; }
   }
 
-  // Check-In/Check-Out stehen nach den Labels
-  var cicoMatch = text.match(/Check-In\s*Check-Out\s*Adults\s*Kids/i);
-  if (cicoMatch) {
-    var afterCico = text.substring(cicoMatch.index + cicoMatch[0].length);
-    var cicoDatePattern = /([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/g;
-    var cicoDates = [];
-    var cdm;
-    while ((cdm = cicoDatePattern.exec(afterCico)) !== null) {
-      var mm = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
-      var mo = mm[cdm[1]];
-      if (mo) cicoDates.push(cdm[3] + "-" + mo + "-" + cdm[2].padStart(2, "0"));
-    }
-    if (cicoDates.length >= 2) {
-      result.checkIn = cicoDates[0];
-      result.checkOut = cicoDates[1];
-    }
+  // Daily Rate - 45.13 EUR
+  m = text.match(/Daily\s*Rate\s*[-:]\s*([\d,.]+)\s*EUR/i);
+  if (m) r.nightlyRate = parseFloat(m[1].replace(",", ".")) || 0;
 
-    // Adults/Kids
-    var adMatch = afterCico.match(/(\d+)\s*(\d+)\s*(\d+)/);
-    if (adMatch) {
-      result.adults = parseInt(adMatch[1]) || 1;
-      result.children = parseInt(adMatch[2]) || 0;
-    }
-  }
+  // Total Cost: 45.13 EUR
+  m = text.match(/Total\s*Cost[:\s]*([\d,.]+)\s*EUR/i);
+  if (m) r.totalPrice = parseFloat(m[1].replace(",", ".")) || 0;
 
-  // Fallback: use first two unique dates
-  if (!result.checkIn && dates.length >= 2) {
-    result.checkIn = dates[0];
-    result.checkOut = dates[1];
-  }
+  // Rate Code: RO
+  m = text.match(/Rate\s*Code[:\s]+(\S+)/i);
+  if (m) r.rateCode = m[1].trim();
 
-  // Total cost
-  var totalMatch = text.match(/Total\s*Cost[:\s]*([\d,.]+)\s*EUR/i);
-  if (totalMatch) result.totalPrice = parseFloat(totalMatch[1].replace(",", ".")) || 0;
+  // Discount
+  m = text.match(/Discount[:\s]+(.+?)(?:\n|Extra|$)/i);
+  if (m) r.discount = m[1].trim();
 
-  // Special request
-  var specialMatch = text.match(/Special\s*Request\s*(.+?)(?:\n|Daily|$)/i);
-  if (specialMatch) result.specialRequest = specialMatch[1].trim();
+  // Special Request
+  m = text.match(/Special\s*Request\s*(.+?)(?:\n|Daily|$)/i);
+  if (m) r.specialRequest = m[1].trim();
 
-  // Payment instructions
-  var payMatch = text.match(/Payment\s*Instructions[:\s]+(.+?)(?:\n|Check|$)/i);
-  if (payMatch) result.paymentInstructions = payMatch[1].trim();
+  // Payment Instructions
+  m = text.match(/Payment\s*Instructions[:\s]+(.+?)(?:\n|Check|$)/i);
+  if (m) r.paymentInstructions = m[1].trim();
 
-  // Credit card
-  var cardNumMatch = text.match(/Card\s*Number\s*(\d[\d\-]+\d)/i);
-  if (cardNumMatch) result.cardNumber = cardNumMatch[1].replace(/-/g, "").trim();
-  
-  var expMatch = text.match(/Expiration\s*Date\s*([A-Za-z]+\s*\d{4})/i);
-  if (expMatch) result.cardExpiry = expMatch[1].trim();
+  // Card Number 5570-9305-7135-6481
+  m = text.match(/Card\s*Number\s*(\d[\d\-]+\d)/i);
+  if (m) r.cardNumber = m[1].replace(/-/g, "");
 
-  var cvvMatch = text.match(/Validation\s*Code\s*(\d{3,4})/i);
-  if (cvvMatch) result.cardCvv = cvvMatch[1].trim();
+  // Expiration Date Apr 2029 oder Mar 2031
+  m = text.match(/Expiration\s*Date\s*([A-Za-z]+\s*\d{4})/i);
+  if (m) r.cardExpiry = m[1].trim();
 
-  var holderMatch = text.match(/Card\s*Holder\s*Name\s*(.+?)(?:Billing|Card\s*Number|\n)/i);
-  if (holderMatch) result.cardHolder = holderMatch[1].trim();
+  // Validation Code 548
+  m = text.match(/Validation\s*Code\s*(\d{3,4})/i);
+  if (m) r.cardCvv = m[1];
 
-  return result;
+  // Card Holder Name
+  m = text.match(/Card\s*Holder\s*Name\s*(.+?)(?:Billing|Card\s*Number|\n)/i);
+  if (m) r.cardHolder = m[1].trim();
+
+  return r;
 }
