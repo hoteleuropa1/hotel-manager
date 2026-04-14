@@ -31,7 +31,7 @@ module.exports = async function handler(req, res) {
     var unitTypes = await (await fetch(SB_URL + "/rest/v1/unit_types?order=sort_order", { headers: hdrsR })).json();
     var allRooms = await (await fetch(SB_URL + "/rest/v1/rooms?active=eq.true&order=name", { headers: hdrsR })).json();
 
-    // Einzelbett/Single/Twin -> Einzelzimmer, Double/Queen/King -> Doppelzimmer
+    // Einzelbett/Single/Twin -> Einzelzimmer
     var utId = null;
     var rtL = (p.roomTypeCode + " " + p.roomTypeName).toLowerCase();
     if (rtL.match(/single|einzel|einzelbett|twin/)) utId = unitTypes.find(u => u.name.toLowerCase().indexOf("einzel") >= 0);
@@ -67,17 +67,14 @@ module.exports = async function handler(req, res) {
     }
     if (p.specialRequest) notes += " | " + p.specialRequest;
 
-    // Interne Notizen
     var intNotes = "";
     if (p.paymentInstructions) intNotes = p.paymentInstructions;
     if (p.rateCode) intNotes += (intNotes ? " | " : "") + "Rate: " + p.rateCode;
     if (p.discount) intNotes += " | " + p.discount;
 
-    // Naechte + Preis
     var nights = Math.round((new Date(p.checkOut) - new Date(p.checkIn)) / 86400000);
     var totalPrice = p.totalPrice || (p.nightlyRate * nights) || 0;
 
-    // Reservierung anlegen
     var rr = await fetch(SB_URL + "/rest/v1/reservations", {
       method: "POST", headers: hdrs,
       body: JSON.stringify({
@@ -112,26 +109,33 @@ function parseExpedia(text) {
     cardNumber: "", cardExpiry: "", cardCvv: "", cardHolder: "" };
 
   var MM = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
+  var m;
 
-  // Reservation ID: __2437028016__
-  var m = text.match(/Reservation\s*ID[:\s]*_*(\d+)_*/i);
+  // Reservation ID: __2437027238__
+  m = text.match(/Reservation\s*ID[:\s]*_*(\d+)_*/i);
   if (m) r.reservationId = m[1];
 
-  // Guest: Gerald Tieg
-  m = text.match(/Guest[:\s]+([A-Za-z\u00C0-\u00FF\-]+)\s+([A-Za-z\u00C0-\u00FF\-]+)/i);
-  if (m) { r.firstName = m[1].trim(); r.lastName = m[2].trim(); }
+  // Guest: Marion TiegBooked -> Name zwischen "Guest:" und "Booked"
+  m = text.match(/Guest:\s*(.+?)Booked/i);
+  if (m) {
+    var parts = m[1].trim().split(/\s+/);
+    r.firstName = parts[0] || "";
+    r.lastName = parts.slice(1).join(" ") || "";
+  }
 
-  // Guest Email
-  m = text.match(/Guest\s*Email[:\s]+([^\s,]+@[^\s,]+)/i);
+  // Guest Email: xxx@xxx.comRoom -> Email bis .com/.de/.net/.org
+  m = text.match(/Guest\s*Email[:\s]+(\S+@\S+?\.(?:com|de|net|org|co|io|eu))/i);
   if (m) r.email = m[1].trim();
 
-  // Room Type Code + Name
+  // Room Type Code: Einzelbett
   m = text.match(/Room\s*Type\s*Code[:\s]+(.+?)(?:\n|Room\s*Type|$)/i);
   if (m) r.roomTypeCode = m[1].trim();
+
+  // Room Type Name
   m = text.match(/Room\s*Type\s*Name[:\s]+(.+?)(?:\n|Pricing|$)/i);
   if (m) r.roomTypeName = m[1].trim();
 
-  // Check-In / Check-Out (nach "Check-InCheck-Out" oder "Check-In Check-Out")
+  // Check-In / Check-Out (nach "Check-InCheck-Out")
   var cicoM = text.match(/Check-In\s*Check-Out/i);
   if (cicoM) {
     var after = text.substring(cicoM.index, cicoM.index + 300);
@@ -142,13 +146,9 @@ function parseExpedia(text) {
       if (MM[dm[1]]) dates.push(dm[3] + "-" + MM[dm[1]] + "-" + dm[2].padStart(2, "0"));
     }
     if (dates.length >= 2) { r.checkIn = dates[0]; r.checkOut = dates[1]; }
-
-    // Adults nach dem zweiten Datum
-    var numM = after.match(/\d{4}\s+(\d+)\s+(\d+)/);
-    if (numM) { r.adults = parseInt(numM[1]) || 1; r.children = parseInt(numM[2]) || 0; }
   }
 
-  // Fallback: alle Daten sammeln (1. = Booked on, 2. = Check-In, 3. = Check-Out)
+  // Fallback: alle Daten (1.=Booked on, 2.=CheckIn, 3.=CheckOut)
   if (!r.checkIn) {
     var allD = [], adp = /([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(\d{4})/g, adm;
     while ((adm = adp.exec(text)) !== null) {
@@ -158,11 +158,22 @@ function parseExpedia(text) {
     else if (allD.length >= 2) { r.checkIn = allD[0]; r.checkOut = allD[1]; }
   }
 
+  // Adults: nach den Check-Out Daten, Format "2026101" -> 1 adult, 0 kids
+  m = text.match(/\d{4}\s*(\d)\s*(\d)\s*(\d)/);
+  if (m && cicoM) {
+    // Suche spezifisch nach der Zeile mit Adults
+    var adLine = text.match(/(?:Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar)\s+\d{1,2},?\s+\d{4}(?:.*?)(\d{4})\s*(\d+)\s*(\d+)\s*(\d+)/);
+    if (adLine) {
+      r.adults = parseInt(adLine[2]) || 1;
+      r.children = parseInt(adLine[3]) || 0;
+    }
+  }
+
   // Daily Rate - 45.13 EUR
   m = text.match(/Daily\s*Rate\s*[-:]\s*([\d,.]+)\s*EUR/i);
   if (m) r.nightlyRate = parseFloat(m[1].replace(",", ".")) || 0;
 
-  // Total Cost: 45.13 EUR
+  // Total Cost:45.13 EUR
   m = text.match(/Total\s*Cost[:\s]*([\d,.]+)\s*EUR/i);
   if (m) r.totalPrice = parseFloat(m[1].replace(",", ".")) || 0;
 
@@ -182,20 +193,20 @@ function parseExpedia(text) {
   m = text.match(/Payment\s*Instructions[:\s]+(.+?)(?:\n|Check|$)/i);
   if (m) r.paymentInstructions = m[1].trim();
 
-  // Card Number 5570-9305-7135-6481
+  // Card Number5427-3214-3596-7470
   m = text.match(/Card\s*Number\s*(\d[\d\-]+\d)/i);
   if (m) r.cardNumber = m[1].replace(/-/g, "");
 
-  // Expiration Date Apr 2029 oder Mar 2031
-  m = text.match(/Expiration\s*Date\s*([A-Za-z]+\s*\d{4})/i);
+  // Expiration DateApr 2029
+  m = text.match(/Expiration\s*Date\s*([A-Z][a-z]{2}\s*\d{4})/i);
   if (m) r.cardExpiry = m[1].trim();
 
-  // Validation Code 548
+  // Validation Code548
   m = text.match(/Validation\s*Code\s*(\d{3,4})/i);
   if (m) r.cardCvv = m[1];
 
-  // Card Holder Name
-  m = text.match(/Card\s*Holder\s*Name\s*(.+?)(?:Billing|Card\s*Number|\n)/i);
+  // Card Holder NameExpedia VirtualCard
+  m = text.match(/Card\s*Holder\s*Name\s*(.+?)(?:Billing|Card\s*Number)/i);
   if (m) r.cardHolder = m[1].trim();
 
   return r;
