@@ -29,7 +29,7 @@ module.exports = async function handler(req, res) {
 
     // Zimmertypen + Zimmer laden
     var unitTypes = await (await fetch(SB_URL + "/rest/v1/unit_types?order=sort_order", { headers: hdrsR })).json();
-    var allRooms = await (await fetch(SB_URL + "/rest/v1/rooms?active=eq.true&order=name", { headers: hdrsR })).json();
+    var allRooms = await (await fetch(SB_URL + "/rest/v1/rooms?active=eq.true&order=name&select=*", { headers: hdrsR })).json();
 
     // Einzelbett/Single/Twin -> Einzelzimmer
     var utId = null;
@@ -39,10 +39,13 @@ module.exports = async function handler(req, res) {
     else if (rtL.match(/triple|drei/)) utId = unitTypes.find(u => u.name.toLowerCase().indexOf("drei") >= 0);
     utId = utId ? utId.id : (unitTypes[0]?.id || null);
 
+    // Helper: prüft ob Zimmer zur Kategorie passt (inkl. flexible Zimmer)
+    var roomInCat = function(r, tid) { return r.unit_type_id === tid || (r.alt_unit_type_ids || "").split(",").filter(Boolean).indexOf(tid) >= 0; };
+
     // Belegte Zimmer
     var occ = await (await fetch(SB_URL + "/rest/v1/reservations?check_in=lt." + p.checkOut + "&check_out=gt." + p.checkIn + "&status=not.in.(storniert,abgelehnt,checkedout,bezahlt,noshow)&select=room_id", { headers: hdrsR })).json();
     var occIds = (occ || []).map(r => r.room_id);
-    var freeRoom = allRooms.find(r => r.unit_type_id === utId && occIds.indexOf(r.id) === -1) || allRooms.find(r => occIds.indexOf(r.id) === -1);
+    var freeRoom = allRooms.find(r => roomInCat(r, utId) && occIds.indexOf(r.id) === -1) || allRooms.find(r => occIds.indexOf(r.id) === -1);
     if (!freeRoom) return res.status(400).json({ error: "Kein freies Zimmer gefunden", parsed: p });
 
     // Gast anlegen/finden
