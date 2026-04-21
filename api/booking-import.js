@@ -242,8 +242,8 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Find free room
-      const candidates = allRooms.filter(r => r.unit_type_id === ut.id);
+      // Find free room (inkl. flexible Zimmer mit alt_unit_type_ids)
+      const candidates = allRooms.filter(r => r.unit_type_id === ut.id || (r.alt_unit_type_ids || "").split(",").filter(Boolean).includes(ut.id));
       const free = candidates.find(r => {
         if (usedRoomIds.has(r.id)) return false;
         return !allRes.some(rv => rv.room_id === r.id && checkIn < rv.check_out && checkOut > rv.check_in);
@@ -281,7 +281,8 @@ module.exports = async function handler(req, res) {
         total_price: rd.price,
         source: "booking",
         notes,
-        offer_token: token
+        offer_token: token,
+        sold_as_unit_type_id: ut.id
       }, key);
 
       usedRoomIds.add(free.id);
