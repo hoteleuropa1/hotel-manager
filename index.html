@@ -309,7 +309,7 @@ function App(){const[token,setToken]=useState(()=>{try{return window.sessionStor
 
 function MainApp({sb,token,onLogout}){
 const api=useAPI(sb.url,sb.key,token);
-const[view,setView]=useState("plan");
+const[view,setView]=useState("plan");const[aTab,setATab]=useState("checkinout");
 const[ws,setWs]=useState(new Date(new Date().setHours(0,0,0,0)));
 const show=(m,t="success")=>{const el=document.createElement("div");el.textContent=m;el.style.cssText="position:fixed;bottom:24px;right:24px;background:"+(t==="success"?"#059669":"#EF4444")+";color:#fff;padding:12px 20px;border-radius:12px;font-weight:500;font-size:14px;box-shadow:0 10px 25px rgba(0,0,0,.12);z-index:2000;animation:slideIn .3s ease;font-family:system-ui";document.body.appendChild(el);setTimeout(()=>{el.remove()},3000)};
 const[hi,setHi]=useState(null);const[uts,setUts]=useState([]);const[rms,setRms]=useState([]);
@@ -495,7 +495,7 @@ return<div>
 </div>};
 
 // AUFGABEN & ZAHLUNGEN
-const AufgabenView=()=>{const[aTab,setATab]=useState("checkinout");const[newTask,setNewTask]=useState("");const[newDue,setNewDue]=useState("");const[selRes,setSelRes]=useState(null);const[selRes2,setSelRes2]=useState(null);const[addPayModal,setAddPayModal]=useState(null);const[editPayModal,setEditPayModal]=useState(null);const[cicoDate,setCicoDate]=useState(toDS(new Date()));
+const AufgabenView=()=>{const[newTask,setNewTask]=useState("");const[newDue,setNewDue]=useState("");const[selRes,setSelRes]=useState(null);const[selRes2,setSelRes2]=useState(null);const[addPayModal,setAddPayModal]=useState(null);const[editPayModal,setEditPayModal]=useState(null);const[cicoDate,setCicoDate]=useState(toDS(new Date()));
 const openManual=tasks.filter(t=>!t.completed_at);const doneManual=tasks.filter(t=>t.completed_at);
 const addTask=async()=>{if(!newTask.trim())return;try{await api.post("tasks",{title:newTask.trim(),due_date:newDue||null});setNewTask("");setNewDue("");load();show("Aufgabe erstellt")}catch(e){show(e.message,"error")}};
 const toggleTask=async(t)=>{try{await api.patch("tasks",t.id,{completed_at:t.completed_at?null:new Date().toISOString()});load()}catch(e){show(e.message,"error")}};
