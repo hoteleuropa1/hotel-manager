@@ -1,8 +1,8 @@
 const SUPABASE_URL = "https://ztdtkncoyrkvdpytwuhy.supabase.co";
 
 const MONTHS = {
-  jan:1,feb:2,"mär":3,"märz":3,marz:3,mar:3,apr:4,mai:5,jun:6,
-  jul:7,aug:8,sep:9,okt:10,nov:11,dez:12
+  jan:1,feb:2,"mär":3,"märz":3,marz:3,mar:3,apr:4,mai:5,may:5,jun:6,june:6,
+  jul:7,july:7,aug:8,sep:9,sept:9,okt:10,oct:10,nov:11,dez:12,dec:12
 };
 
 function parseDate(str) {
@@ -31,6 +31,28 @@ function parsePrice(str) {
     return parseFloat(raw.replace(".","").replace(",",".")) || 0;
   }
   return parseFloat(raw.replace(",",".")) || 0;
+}
+
+// ---------------------------------------------------------------------------
+// Zimmertyp-Zuordnung (Booking.com-Kategorie DE/EN -> Name in deiner unit_types-Tabelle)
+// WICHTIG: Die "unitType"-Werte rechts muessen EXAKT den Namen in deiner
+// unit_types-Tabelle entsprechen. Booking-Kategorien wie "Standard Twin Room"
+// oder "Classic Triple Room" werden ueber die "match"-Regex erkannt und auf
+// deinen internen Kategorienamen abgebildet. Passe die rechte Seite bei Bedarf an!
+// ---------------------------------------------------------------------------
+const ROOM_TYPE_MAP = [
+  { match: /einzelzimmer|single\s*room|\bsingle\b/i,   unitType: "Einzelzimmer" },
+  { match: /zweibettzimmer|twin\s*room|\btwin\b/i,     unitType: "Zweibettzimmer" },
+  { match: /doppelzimmer|double\s*room|\bdouble\b/i,   unitType: "Doppelzimmer" },
+  { match: /dreibettzimmer|triple\s*room|\btriple\b/i, unitType: "Dreibettzimmer" }
+];
+
+// Erkennt eine echte Zimmer-Kopfzeile und liefert den internen Kategorienamen.
+// Zeilen wie "Max occupancy ...", "Room Photo" o.ae. werden ausgeschlossen.
+function detectRoomType(line) {
+  if (/occupancy|belegung|photo|foto|preis pro nacht|price per night/i.test(line)) return null;
+  for (const r of ROOM_TYPE_MAP) if (r.match.test(line)) return r.unitType;
+  return null;
 }
 
 async function sbGet(table, query, key) {
@@ -62,22 +84,24 @@ module.exports = async function handler(req, res) {
 
     const lines = emailText.split("\n").map(l => l.trim()).filter(Boolean);
 
-    // CHECK-IN / CHECK-OUT
+    // CHECK-IN / CHECK-OUT (Label DE+EN identisch: "Check-in" / "Check-out")
     let checkIn, checkOut;
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i] === "Check-in" && i + 1 < lines.length) checkIn = parseDate(lines[i + 1]);
-      if (lines[i] === "Check-out" && i + 1 < lines.length) checkOut = parseDate(lines[i + 1]);
+      if (/^Check.?in$/i.test(lines[i]) && i + 1 < lines.length) checkIn = parseDate(lines[i + 1]);
+      if (/^Check.?out$/i.test(lines[i]) && i + 1 < lines.length) checkOut = parseDate(lines[i + 1]);
     }
     if (!checkIn || !checkOut) return res.status(400).json({ success: false, error: "Check-in/Check-out nicht erkannt" });
 
-    // GUEST NAME
+    // GUEST NAME (DE: "Name des Gastes", EN: "Guest name")
+    // Platzhalter fuer fehlende Namen (z.B. Zusatzzimmer einer Gruppenbuchung) werden uebersprungen.
+    const PLACEHOLDER_NAME = /didn'?t add a name|hat keinen Namen/i;
     let guestName = "";
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].match(/^Name des Gast/)) {
+      if (/^(Name des Gast|Guest name)/i.test(lines[i])) {
         const colon = lines[i].indexOf(":");
-        const after = colon >= 0 ? lines[i].substring(colon + 1).trim() : "";
-        guestName = after || (i + 1 < lines.length ? lines[i + 1] : "");
-        break;
+        let after = colon >= 0 ? lines[i].substring(colon + 1).trim() : "";
+        if (!after && i + 1 < lines.length) after = lines[i + 1].trim();
+        if (after && !PLACEHOLDER_NAME.test(after)) { guestName = after; break; }
       }
     }
     if (!guestName) return res.status(400).json({ success: false, error: "Gastname nicht erkannt" });
@@ -86,7 +110,7 @@ module.exports = async function handler(req, res) {
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
 
-    // COUNTRY CODE
+    // COUNTRY CODE (zweistelliger Code direkt unter dem Gastnamen)
     let country = "DE";
     for (let i = 0; i < lines.length; i++) {
       if (lines[i] === guestName && i + 1 < lines.length) {
@@ -101,22 +125,23 @@ module.exports = async function handler(req, res) {
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes("@guest.booking.com") || (lines[i].includes("@") && lines[i].includes("booking"))) {
         email = lines[i].trim();
-        // Nach der E-Mail kommen: evtl. Telefon, dann Adresse
         let nextIdx = i + 1;
-        // Telefonnummer? (beginnt mit + oder ist "Telefonnummer anzeigen")
+        // Telefonnummer? (beginnt mit + / Ziffern) oder "Telefonnummer anzeigen" / "Show phone number"
         if (nextIdx < lines.length) {
           const nextLine = lines[nextIdx].trim();
           if (nextLine.match(/^\+?\d[\d\s\-\/]{6,}/)) {
             phone = nextLine;
             nextIdx++;
-          } else if (nextLine === "Telefonnummer anzeigen") {
+          } else if (nextLine === "Telefonnummer anzeigen" || /^Show phone number/i.test(nextLine)) {
             nextIdx++;
           }
         }
         // Adresse parsen
         if (nextIdx < lines.length) {
           const addrLine = lines[nextIdx];
-          if (addrLine && !addrLine.startsWith("Bevorzugte") && !addrLine.startsWith("Kanal")) {
+          if (addrLine
+              && !addrLine.startsWith("Bevorzugte") && !addrLine.startsWith("Kanal")
+              && !/^Preferred|^Channel|^Show phone number/i.test(addrLine)) {
             const plzMatch = addrLine.match(/\b(\d{4,5})\b/);
             if (plzMatch) {
               zip = plzMatch[1];
@@ -137,65 +162,68 @@ module.exports = async function handler(req, res) {
         break;
       }
     }
-
-    // ZAHLUNGSSTATUS
-    let paymentMethod = "";
-    for (const l of lines) {
-      if (l.match(/Auszahlungen?\s+per\s+(Ü|Ue?)berweisung/i)) { paymentMethod = "booking_online"; break; }
+    // EN-Adressformat "Strasse Ort PLZ" (PLZ am Ende) korrigieren:
+    // Wenn city rein numerisch ist und zip nicht-numerischen Rest enthaelt, wurde falsch getrennt.
+    if (city && /^\d{4,5}$/.test(city) && address) {
+      // "Schwabenstr. 6 Schramberg 78713" -> before-Logik hat evtl. city=Ort, zip=PLZ korrekt; nichts zu tun
     }
 
-    // BOOKING NUMBER
+    // ZAHLUNGSSTATUS (DE: "Auszahlung per Ueberweisung", EN: "Bank transfer payout" / "Payments by Booking.com")
+    let paymentMethod = "";
+    for (const l of lines) {
+      if (l.match(/Auszahlungen?\s+per\s+(Ü|Ue?)berweisung/i)
+          || /Bank transfer payout/i.test(l)
+          || /Payments by Booking\.com/i.test(l)) { paymentMethod = "booking_online"; break; }
+    }
+
+    // BOOKING NUMBER (DE: "Buchungsnummer:", EN: "Booking number:")
     let bookingNr = "";
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startsWith("Buchungsnummer:")) {
-        bookingNr = lines[i].replace("Buchungsnummer:", "").trim();
+      if (/^(Buchungsnummer|Booking number)\s*:/i.test(lines[i])) {
+        bookingNr = lines[i].replace(/^(Buchungsnummer|Booking number)\s*:/i, "").trim();
         if (!bookingNr && i + 1 < lines.length) bookingNr = lines[i + 1];
         break;
       }
     }
 
-    // TOTAL ADULTS
+    // TOTAL ADULTS (DE: "Gesamtanzahl Gaeste", EN: "Total guests")
     let totalAdults = 1;
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].match(/Gesamtanzahl G/)) {
+      if (lines[i].match(/Gesamtanzahl G/) || /^Total guests/i.test(lines[i])) {
         const next = i + 1 < lines.length ? lines[i + 1] : lines[i];
-        const am = next.match(/(\d+)\s*Erwachsene/i) || next.match(/(\d+)\s*Erwachsener/i);
+        const am = next.match(/(\d+)\s*Erwachsene[rn]?/i) || next.match(/(\d+)\s*adults?/i);
         if (am) totalAdults = parseInt(am[1]);
         break;
       }
     }
 
-    // PARSE ROOMS
+    // PARSE ROOMS (DE + EN)
     const roomDefs = [];
     for (let i = 0; i < lines.length; i++) {
-      const rm = lines[i].match(/^[\*\•\-\–]?\s*(\d*)\s*(Standard\s+)?(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i);
-      if (rm || lines[i].match(/(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i)) {
-        const typeMatch = lines[i].match(/(Einzelzimmer|Doppelzimmer|Zweibettzimmer|Dreibettzimmer)/i);
-        const roomType = typeMatch[1];
-        let roomPrice = parsePrice(lines[i]);
-        if (!roomPrice && i + 1 < lines.length) roomPrice = parsePrice(lines[i + 1]);
+      const roomType = detectRoomType(lines[i]);
+      if (!roomType) continue;
 
-        const nightPrices = [];
-        for (let j = i + 1; j < Math.min(i + 40, lines.length); j++) {
-          if (j > i + 2 && lines[j].match(/^\*\s/)) break;
-          if (lines[j].match(/Zwischensumme/i)) break;
-          const dateRange = lines[j].match(/(\d{2})\s*-\s*(\d{2})\s+(\w+)/);
-          if (dateRange) {
-            for (let k = j + 1; k < Math.min(j + 4, lines.length); k++) {
-              const np = parsePrice(lines[k]);
-              if (np) {
-                nightPrices.push({ range: lines[j].trim(), price: np });
-                break;
-              }
-            }
+      let roomPrice = parsePrice(lines[i]);
+      if (!roomPrice && i + 1 < lines.length) roomPrice = parsePrice(lines[i + 1]);
+
+      const nightPrices = [];
+      for (let j = i + 1; j < Math.min(i + 60, lines.length); j++) {
+        // naechste Zimmer-Kopfzeile -> Block beenden
+        if (j > i + 1 && detectRoomType(lines[j])) break;
+        if (/^(Zwischensumme|Subtotal|Total room price|Gesamtpreis|Rate includes|Inklusive)/i.test(lines[j])) break;
+        const dateRange = lines[j].match(/(\d{1,2})\s*-\s*(\d{1,2})\s+(\w+)/);
+        if (dateRange) {
+          for (let k = j + 1; k < Math.min(j + 4, lines.length); k++) {
+            const np = parsePrice(lines[k]);
+            if (np) { nightPrices.push({ range: lines[j].trim(), price: np }); break; }
           }
         }
-        roomDefs.push({ roomType, price: roomPrice, nightPrices });
       }
+      roomDefs.push({ roomType, price: roomPrice, nightPrices });
     }
 
     if (roomDefs.length === 0) {
-      return res.status(400).json({ success: false, error: "Keine Zimmer erkannt. Erwartet: * Standard Einzelzimmer / Doppelzimmer / etc." });
+      return res.status(400).json({ success: false, error: "Keine Zimmer erkannt. Erwartet z.B.: Standard Einzelzimmer / Doppelzimmer / Twin Room / Triple Room" });
     }
 
     // DUPLICATE CHECK
@@ -238,7 +266,7 @@ module.exports = async function handler(req, res) {
       if (!ut) {
         return res.status(400).json({
           success: false,
-          error: 'Kategorie "' + rd.roomType + '" nicht gefunden. Vorhanden: ' + unitTypes.map(u => u.name).join(", ")
+          error: 'Kategorie "' + rd.roomType + '" nicht gefunden. Vorhanden: ' + unitTypes.map(u => u.name).join(", ") + ' (ggf. ROOM_TYPE_MAP anpassen)'
         });
       }
 
