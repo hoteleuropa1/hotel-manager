@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -25,8 +24,9 @@ table{border-spacing:0}
 .pms-toolbar-left,.pms-toolbar-right{width:100%;justify-content:center!important}
 .pms-legend{display:none!important}
 .pms-content{padding:8px!important}
-.pms-modal-inner{width:100vw!important;max-width:100vw!important;max-height:100vh!important;border-radius:0!important;margin:0!important}
+.pms-modal-inner{width:100vw!important;max-width:100vw!important;height:100dvh!important;max-height:100dvh!important;border-radius:0!important;margin:0!important;padding-bottom:env(safe-area-inset-bottom)!important}
 .pms-modal-inner>div:first-child{border-radius:0!important}
+div:has(>.pms-modal-inner){align-items:flex-start!important}
 .pms-grid-2{grid-template-columns:1fr!important}
 .pms-grid-3{grid-template-columns:1fr!important}
 .pms-grid-4{grid-template-columns:1fr 1fr!important}
