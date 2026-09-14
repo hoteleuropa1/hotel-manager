@@ -59,6 +59,19 @@ function groupNightPrices(nightPrices) {
   return segs.map(s => (s.count > 1 ? s.count + "x " : "") + s.price + " EUR").join(", ");
 }
 
+// n-ter Werktag (Mo-Fr, Bankarbeitstage) NACH dem angegebenen Datum (YYYY-MM-DD).
+// Feiertage werden nicht beruecksichtigt. Fuer Werktage inkl. Samstag: 6 aus der Bedingung entfernen.
+function nthBusinessDayAfter(dateStr, n) {
+  const d = new Date(dateStr + "T12:00:00Z");
+  let added = 0;
+  while (added < n) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const g = d.getUTCDay(); // 0=So, 6=Sa
+    if (g !== 0 && g !== 6) added++;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 async function sbGet(table, query, key) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: { apikey: key, Authorization: "Bearer " + key }
@@ -393,7 +406,8 @@ module.exports = async function handler(req, res) {
           try {
             await sbPost("payments", {
               reservation_id: nr[0].id, guest_id: guestId, amount: price,
-              payment_method: paymentMethod, status: "ausstehend"
+              payment_method: paymentMethod, status: "eingegangen",
+              paid_at: nthBusinessDayAfter(checkOut, 2)
             }, key);
           } catch (pe) { console.error("Payment Fehler:", pe); }
         }
