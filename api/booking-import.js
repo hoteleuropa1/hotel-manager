@@ -86,10 +86,25 @@ function expandNightPrices(nightPrices) {
 }
 
 async function sbGet(table, query, key) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-    headers: { apikey: key, Authorization: "Bearer " + key }
-  });
-  return r.json();
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+        headers: { apikey: key, Authorization: "Bearer " + key }
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok) {
+        const why = data && (data.message || data.hint || data.error) ? (data.message || data.hint || data.error) : JSON.stringify(data);
+        throw new Error(r.status + " " + why);
+      }
+      if (!Array.isArray(data)) throw new Error("kein Array zurueck: " + JSON.stringify(data).slice(0, 150));
+      return data;
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) await new Promise(res => setTimeout(res, 350));
+    }
+  }
+  throw new Error("Laden von '" + table + "' fehlgeschlagen: " + lastErr.message);
 }
 
 async function sbPost(table, data, key) {
