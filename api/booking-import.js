@@ -72,6 +72,19 @@ function nthBusinessDayAfter(dateStr, n) {
   return d.toISOString().slice(0, 10);
 }
 
+// Expandiert die geparsten Nächtepreis-Zeilen in eine Liste EIN Preis pro Nacht.
+// "12 - 14 September: 93" (2 Naechte) -> [93, 93]; einzelne Zeilen -> je 1 Wert.
+function expandNightPrices(nightPrices) {
+  const out = [];
+  for (const np of nightPrices) {
+    const m = (np.range || "").match(/(\d{1,2})\s*-\s*(\d{1,2})/);
+    let n = 1;
+    if (m) { const a = parseInt(m[1]), b = parseInt(m[2]); if (b > a) n = b - a; }
+    for (let i = 0; i < n; i++) out.push(np.price);
+  }
+  return out;
+}
+
 async function sbGet(table, query, key) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: { apikey: key, Authorization: "Bearer " + key }
@@ -82,6 +95,16 @@ async function sbGet(table, query, key) {
 async function sbPost(table, data, key) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: "POST",
+    headers: { "Content-Type": "application/json", apikey: key, Authorization: "Bearer " + key, Prefer: "return=representation" },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(r.status + " " + t.slice(0, 200)); }
+  return r.json();
+}
+
+async function sbPatch(table, id, data, key) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json", apikey: key, Authorization: "Bearer " + key, Prefer: "return=representation" },
     body: JSON.stringify(data)
   });
@@ -401,6 +424,13 @@ module.exports = async function handler(req, res) {
 
         created.push({ id: nr[0].id, room: room.name, roomType: roomUt.name, price });
         roomCounter++;
+
+        if (k === 1) {
+          const expanded = expandNightPrices(rd.nightPrices);
+          if (expanded.length > 0) {
+            try { await sbPatch("reservations", nr[0].id, { night_prices: expanded }, key); } catch (npe) { console.error("night_prices Patch:", npe.message); }
+          }
+        }
 
         if (paymentMethod) {
           try {
