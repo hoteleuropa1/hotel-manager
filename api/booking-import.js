@@ -397,8 +397,9 @@ module.exports = async function handler(req, res) {
     }
 
     const totalRooms = flatRoomIds.length;
-    const groupId = totalRooms > 1 ? Math.random().toString(16).slice(2, 10) : "";
+    const groupId = totalRooms > 1 ? Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join("") : "";
     const created = [];
+    const paymentWarnings = [];
     let roomCounter = 0;
 
     for (let i = 0; i < roomDefs.length; i++) {
@@ -447,14 +448,16 @@ module.exports = async function handler(req, res) {
           }
         }
 
-        if (paymentMethod) {
-          try {
-            await sbPost("payments", {
-              reservation_id: nr[0].id, guest_id: guestId, amount: price,
-              payment_method: paymentMethod, status: "eingegangen",
-              paid_at: nthBusinessDayAfter(checkOut, 2)
-            }, key);
-          } catch (pe) { console.error("Payment Fehler:", pe); }
+        // Bei Booking-Importen IMMER eine Zahlung als "eingegangen" anlegen,
+        // datiert auf den 2. Werktag nach Abreise (unabhaengig von der Text-Erkennung).
+        try {
+          await sbPost("payments", {
+            reservation_id: nr[0].id, guest_id: guestId, amount: price,
+            payment_method: "booking_online", status: "eingegangen",
+            paid_at: nthBusinessDayAfter(checkOut, 2)
+          }, key);
+        } catch (pe) {
+          paymentWarnings.push("Zimmer " + room.name + ": Zahlung nicht angelegt (" + pe.message + ")");
         }
       }
     }
@@ -465,7 +468,8 @@ module.exports = async function handler(req, res) {
         guest: guestName, bookingNr, checkIn, checkOut,
         totalPrice: roomDefs.reduce((s, r) => s + r.price, 0),
         rooms: created
-      }
+      },
+      warnings: paymentWarnings.length ? paymentWarnings : undefined
     });
 
   } catch (e) {
