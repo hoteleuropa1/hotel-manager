@@ -47,6 +47,18 @@ function detectRoomType(line) {
   return null;
 }
 
+// Fasst aufeinanderfolgende gleiche Naechtepreise zu "Nx PREIS EUR" zusammen.
+// Beispiel: [100, 93, 93] -> "100 EUR, 2x 93 EUR"
+function groupNightPrices(nightPrices) {
+  const segs = [];
+  for (const np of nightPrices) {
+    const last = segs[segs.length - 1];
+    if (last && last.price === np.price) last.count++;
+    else segs.push({ price: np.price, count: 1 });
+  }
+  return segs.map(s => (s.count > 1 ? s.count + "x " : "") + s.price + " EUR").join(", ");
+}
+
 async function sbGet(table, query, key) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     headers: { apikey: key, Authorization: "Bearer " + key }
@@ -360,7 +372,7 @@ module.exports = async function handler(req, res) {
         const price = ci === 0 ? first : per;
 
         let notes = "Booking.com #" + bookingNr;
-        if (rd.nightPrices.length > 0) notes += " | " + rd.nightPrices.map(np => np.range + ": " + np.price + " EUR").join(", ");
+        if (rd.nightPrices.length > 0) notes += " | " + groupNightPrices(rd.nightPrices);
         if (roomUt.id !== rd.ut.id || k > 1) notes += " | Ersatz fuer " + rd.ut.name + (k > 1 ? " (Aufteilung " + (ci + 1) + "/" + k + ")" : "");
         if (groupId) notes += " | Gruppe " + groupId + " (Zi " + (roomCounter + 1) + "/" + totalRooms + ")";
 
