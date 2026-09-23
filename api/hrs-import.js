@@ -22,7 +22,7 @@ function freeRoomsForType(ut, allRooms, allRes, checkIn, checkOut, usedRoomIds){
   var cands = allRooms.filter(function(r){ return r.unit_type_id===ut.id || (r.alt_unit_type_ids||"").split(",").filter(Boolean).indexOf(ut.id)>=0; });
   return cands.filter(function(r){
     if (usedRoomIds.has(r.id)) return false;
-    return !allRes.some(function(rv){ return rv.room_id===r.id && checkIn<rv.check_out && checkOut>rv.check_in; });
+    return !allRes.some(function(rv){ return rv.room_id===r.id && checkIn<rv.check_out && checkOut>rv.check_in && rv.check_out > rv.check_in; });
   });
 }
 
@@ -346,7 +346,7 @@ module.exports = async function handler(req, res) {
     for (var cvi=0; cvi<roomIds.length; cvi++) {
       var rmv = allRooms.find(function(r){ return r.id===roomIds[cvi]; });
       if (!rmv) return res.status(400).json({ success:false, error:"Unbekanntes Zimmer in der Auswahl" });
-      var conf = existingRes.some(function(rv){ return rv.room_id===roomIds[cvi] && parsed.checkIn<rv.check_out && parsed.checkOut>rv.check_in; });
+      var conf = existingRes.some(function(rv){ return rv.room_id===roomIds[cvi] && parsed.checkIn<rv.check_out && parsed.checkOut>rv.check_in && rv.check_out > rv.check_in; });
       if (conf) return res.status(409).json({ success:false, error:"Zimmer "+rmv.name+" ist inzwischen belegt. Bitte erneut pruefen." });
     }
 
