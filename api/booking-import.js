@@ -243,7 +243,7 @@ function freeRoomsForType(ut, allRooms, allRes, checkIn, checkOut, usedRoomIds) 
     r.unit_type_id === ut.id || (r.alt_unit_type_ids || "").split(",").filter(Boolean).includes(ut.id));
   return candidates.filter(r => {
     if (usedRoomIds.has(r.id)) return false;
-    return !allRes.some(rv => rv.room_id === r.id && checkIn < rv.check_out && checkOut > rv.check_in);
+    return !allRes.some(rv => rv.room_id === r.id && checkIn < rv.check_out && checkOut > rv.check_in && rv.check_out > rv.check_in);
   });
 }
 
@@ -377,7 +377,7 @@ module.exports = async function handler(req, res) {
     for (const id of flatRoomIds) {
       const room = allRooms.find(r => r.id === id);
       if (!room) return res.status(400).json({ success: false, error: "Unbekanntes Zimmer in der Auswahl" });
-      const conflict = allRes.some(rv => rv.room_id === id && checkIn < rv.check_out && checkOut > rv.check_in);
+      const conflict = allRes.some(rv => rv.room_id === id && checkIn < rv.check_out && checkOut > rv.check_in && rv.check_out > rv.check_in);
       if (conflict) return res.status(409).json({ success: false, error: "Zimmer " + room.name + " ist inzwischen belegt. Bitte erneut pruefen." });
     }
 
