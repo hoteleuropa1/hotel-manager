@@ -1,10 +1,29 @@
 const SB_URL = "https://ztdtkncoyrkvdpytwuhy.supabase.co";
 
 async function sbGet(table, query, key) {
-  const r = await fetch(SB_URL + "/rest/v1/" + table + "?" + query, {
-    headers: { apikey: key, Authorization: "Bearer " + key }
+  var lastErr;
+  for (var attempt = 0; attempt < 2; attempt++) {
+    try {
+      var r = await fetch(SB_URL + "/rest/v1/" + table + "?" + query, {
+        headers: { apikey: key, Authorization: "Bearer " + key }
+      });
+      var data = await r.json().catch(function(){ return null; });
+      if (!r.ok) { var why = data && (data.message||data.hint||data.error) ? (data.message||data.hint||data.error) : JSON.stringify(data); throw new Error(r.status + " " + why); }
+      if (!Array.isArray(data)) throw new Error("kein Array zurueck: " + JSON.stringify(data).slice(0,150));
+      return data;
+    } catch (e) { lastErr = e; if (attempt === 0) await new Promise(function(res){ setTimeout(res, 350); }); }
+  }
+  throw new Error("Laden von '" + table + "' fehlgeschlagen: " + lastErr.message);
+}
+
+var ADULTS_BY_TYPE = { einzelzimmer:1, doppelzimmer:2, zweibettzimmer:2, dreibettzimmer:3 };
+function capOf(ut){ return (ut && (ut.capacity || ADULTS_BY_TYPE[(ut.name||"").toLowerCase()])) || 1; }
+function freeRoomsForType(ut, allRooms, allRes, checkIn, checkOut, usedRoomIds){
+  var cands = allRooms.filter(function(r){ return r.unit_type_id===ut.id || (r.alt_unit_type_ids||"").split(",").filter(Boolean).indexOf(ut.id)>=0; });
+  return cands.filter(function(r){
+    if (usedRoomIds.has(r.id)) return false;
+    return !allRes.some(function(rv){ return rv.room_id===r.id && checkIn<rv.check_out && checkOut>rv.check_in; });
   });
-  return r.json();
 }
 
 async function sbPost(table, data, key) {
@@ -251,6 +270,9 @@ module.exports = async function handler(req, res) {
     else if (req.body && req.body.emailText) emailText = req.body.emailText;
     else if (typeof req.body === "string") emailText = req.body;
 
+    var mode = req.body && req.body.mode;
+    var assignments = req.body && req.body.assignments;
+
     if (!emailText || emailText.length < 50) {
       return res.status(400).json({ error: "Kein Email-Text empfangen" });
     }
@@ -278,21 +300,54 @@ module.exports = async function handler(req, res) {
     if (!matchedUT) {
       return res.status(400).json({ error: "Zimmertyp nicht zugeordnet: " + parsed.roomType, availableTypes: unitTypes.map(function(u) { return u.name; }) });
     }
+    var reqCap = capOf(matchedUT);
 
-    // Freies Zimmer finden
-    var rooms = await sbGet("rooms", "unit_type_id=eq." + matchedUT.id + "&active=eq.true&order=name&select=*", key);
-    var existingRes = await sbGet("reservations", "status=not.in.(storniert,abgelehnt,checkedout)&select=id,room_id,check_in,check_out", key);
+    var allRooms = await sbGet("rooms", "active=eq.true&order=name&select=*", key);
+    var existingRes = await sbGet("reservations", "status=not.in.(storniert,abgelehnt,checkedout)&select=id,room_id,check_in,check_out,status", key);
 
-    var freeRoom = null;
-    for (var i = 0; i < rooms.length; i++) {
-      var conflict = existingRes.some(function(r) {
-        return r.room_id === rooms[i].id && parsed.checkIn < r.check_out && parsed.checkOut > r.check_in;
-      });
-      if (!conflict) { freeRoom = rooms[i]; break; }
+    // ===================== PHASE plan (Frontend-Vorschau) =====================
+    if (mode === "plan") {
+      var freeMatch = freeRoomsForType(matchedUT, allRooms, existingRes, parsed.checkIn, parsed.checkOut, new Set());
+      var slot;
+      if (freeMatch.length > 0) {
+        slot = { index:0, requestedType:matchedUT.name, requestedCapacity:reqCap, price:parsed.totalPrice||0,
+          auto:{ roomId:freeMatch[0].id, roomName:freeMatch[0].name, unitTypeId:matchedUT.id, unitTypeName:matchedUT.name }, alternatives:[] };
+      } else {
+        var singles=[], splits=[];
+        for (var ai=0; ai<unitTypes.length; ai++) {
+          var ut2=unitTypes[ai];
+          if (ut2.id===matchedUT.id) continue;
+          var f=freeRoomsForType(ut2, allRooms, existingRes, parsed.checkIn, parsed.checkOut, new Set());
+          if (!f.length) continue;
+          var cap=capOf(ut2);
+          if (cap>=reqCap) singles.push({ kind:"single", unitTypeId:ut2.id, unitTypeName:ut2.name, capacity:cap, rooms:[{roomId:f[0].id, roomName:f[0].name}] });
+          else { var need=Math.ceil(reqCap/cap); if (f.length>=need) splits.push({ kind:"split", unitTypeId:ut2.id, unitTypeName:ut2.name, capacityEach:cap, count:need, rooms:f.slice(0,need).map(function(r){return {roomId:r.id, roomName:r.name};}) }); }
+        }
+        slot={ index:0, requestedType:matchedUT.name, requestedCapacity:reqCap, price:parsed.totalPrice||0, auto:null, alternatives: singles.concat(splits) };
+      }
+      return res.status(200).json({ success:true, plan:{ needsChoice: !slot.auto, guest:(parsed.firstName+" "+parsed.lastName).trim(), bookingNr:parsed.hrsBuchungsNr, checkIn:parsed.checkIn, checkOut:parsed.checkOut, totalPrice:parsed.totalPrice||0, slots:[slot] } });
     }
 
-    if (!freeRoom) {
-      return res.status(400).json({ error: "Kein freies " + matchedUT.name + " fuer " + parsed.checkIn + " - " + parsed.checkOut });
+    // ===================== LEGACY / Webhook (ohne mode): automatisch anlegen wie bisher =====================
+    if (mode !== "commit") {
+      var autoFree = freeRoomsForType(matchedUT, allRooms, existingRes, parsed.checkIn, parsed.checkOut, new Set());
+      if (autoFree.length === 0) {
+        return res.status(400).json({ error: "Kein freies " + matchedUT.name + " fuer " + parsed.checkIn + " - " + parsed.checkOut });
+      }
+      assignments = [{ roomIds: [autoFree[0].id] }];
+    }
+
+    // ===================== PHASE commit =====================
+    if (!Array.isArray(assignments) || !assignments.length || !assignments[0] || !Array.isArray(assignments[0].roomIds) || !assignments[0].roomIds.length) {
+      return res.status(400).json({ success:false, error:"Ungueltige Zuordnung (assignments)" });
+    }
+    var roomIds = assignments[0].roomIds;
+    if (new Set(roomIds).size !== roomIds.length) return res.status(400).json({ success:false, error:"Ein Zimmer wurde mehrfach ausgewaehlt. Bitte Auswahl korrigieren." });
+    for (var cvi=0; cvi<roomIds.length; cvi++) {
+      var rmv = allRooms.find(function(r){ return r.id===roomIds[cvi]; });
+      if (!rmv) return res.status(400).json({ success:false, error:"Unbekanntes Zimmer in der Auswahl" });
+      var conf = existingRes.some(function(rv){ return rv.room_id===roomIds[cvi] && parsed.checkIn<rv.check_out && parsed.checkOut>rv.check_in; });
+      if (conf) return res.status(409).json({ success:false, error:"Zimmer "+rmv.name+" ist inzwischen belegt. Bitte erneut pruefen." });
     }
 
     // Gast anlegen oder finden
@@ -303,76 +358,62 @@ module.exports = async function handler(req, res) {
     }
     if (!guestId) {
       var ng = await sbPost("guests", {
-        salutation: parsed.salutation || "",
-        first_name: parsed.firstName || "",
-        last_name: parsed.lastName || "",
-        email: parsed.email || "",
-        phone: parsed.phone || "",
-        company: parsed.company || "",
-        address: parsed.address || "",
-        zip: parsed.zip || "",
-        city: parsed.city || "",
-        country: parsed.country || "DE"
+        salutation: parsed.salutation || "", first_name: parsed.firstName || "", last_name: parsed.lastName || "",
+        email: parsed.email || "", phone: parsed.phone || "", company: parsed.company || "",
+        address: parsed.address || "", zip: parsed.zip || "", city: parsed.city || "", country: parsed.country || "DE"
       }, key);
       guestId = ng[0].id;
     }
 
-    // Reservierung anlegen
-    var otoken = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
-      var r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
-    });
+    var k = roomIds.length;
+    var groupId = k>1 ? Array.from({length:8},function(){return Math.floor(Math.random()*16).toString(16);}).join("") : "";
+    var per = Math.round(((parsed.totalPrice||0)/k)*100)/100;
+    var firstP = Math.round(((parsed.totalPrice||0)-per*(k-1))*100)/100;
+    var created=[];
+    var paymentWarnings=[];
 
-    var notes = "HRS #" + (parsed.hrsBuchungsNr || "-");
-    if (parsed.rateName) notes += " | Tarif: " + parsed.rateName;
-    if (parsed.breakfast) notes += " | Fruehstueck: " + parsed.breakfastPrice + " EUR/Pers.";
-    if (parsed.cancellationDeadline) notes += " | Storno: " + parsed.cancellationDeadline;
-    if (parsed.buchungsart) notes += " | Buchungsart: " + parsed.buchungsart;
-    if (parsed.zahlungsart) notes += " | Zahlungsart: " + parsed.zahlungsart;
-    if (parsed.kreditkartenInfo) notes += " | KK-Info: " + parsed.kreditkartenInfo;
-    if (parsed.guestWishes) notes += " | Wuensche: " + parsed.guestWishes;
+    for (var ri=0; ri<roomIds.length; ri++) {
+      var room = allRooms.find(function(r){ return r.id===roomIds[ri]; });
+      var roomUt = unitTypes.find(function(u){ return u.id===room.unit_type_id; }) || matchedUT;
+      var price = ri===0 ? firstP : per;
+      var otoken = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+      });
 
-    var newRes = await sbPost("reservations", {
-      room_id: freeRoom.id,
-      guest_id: guestId,
-      check_in: parsed.checkIn,
-      check_out: parsed.checkOut,
-      status: "reservierung",
-      adults: parsed.adults || 1,
-      children: 0,
-      total_price: parsed.totalPrice || 0,
-      source: "hrs",
-      offer_token: otoken,
-      notes: notes
-    }, key);
+      var notes = "HRS #" + (parsed.hrsBuchungsNr || "-");
+      if (parsed.rateName) notes += " | Tarif: " + parsed.rateName;
+      if (parsed.breakfast) notes += " | Fruehstueck: " + parsed.breakfastPrice + " EUR/Pers.";
+      if (parsed.cancellationDeadline) notes += " | Storno: " + parsed.cancellationDeadline;
+      if (parsed.buchungsart) notes += " | Buchungsart: " + parsed.buchungsart;
+      if (parsed.zahlungsart) notes += " | Zahlungsart: " + parsed.zahlungsart;
+      if (parsed.kreditkartenInfo) notes += " | KK-Info: " + parsed.kreditkartenInfo;
+      if (parsed.guestWishes) notes += " | Wuensche: " + parsed.guestWishes;
+      if (roomUt.id !== matchedUT.id || k>1) notes += " | Ersatz fuer " + matchedUT.name + (k>1 ? " (Aufteilung "+(ri+1)+"/"+k+")" : "");
+      if (groupId) notes += " | Gruppe " + groupId + " (Zi "+(ri+1)+"/"+k+")";
 
-    // Zahlung anlegen wenn Kreditkarte
-    if (parsed.creditCardPayment && parsed.totalPrice > 0) {
-      try {
-        await sbPost("payments", {
-          reservation_id: newRes[0].id,
-          guest_id: guestId,
-          amount: parsed.totalPrice,
-          payment_method: "mastercard",
-          status: "ausstehend"
-        }, key);
-      } catch(pe) { console.error("Payment Fehler:", pe.message); }
+      var adults = k>1 ? capOf(roomUt) : (parsed.adults || 1);
+
+      var newRes = await sbPost("reservations", {
+        room_id: room.id, guest_id: guestId, check_in: parsed.checkIn, check_out: parsed.checkOut,
+        status: "reservierung", adults: adults, children: 0, total_price: price,
+        source: "hrs", offer_token: otoken, notes: notes, sold_as_unit_type_id: roomUt.id
+      }, key);
+      created.push({ id:newRes[0].id, room:room.name, roomType:roomUt.name, price:price });
+
+      if (parsed.creditCardPayment && price>0) {
+        try {
+          await sbPost("payments", { reservation_id:newRes[0].id, guest_id:guestId, amount:price, payment_method:"mastercard", status:"ausstehend" }, key);
+        } catch(pe) { paymentWarnings.push("Zimmer "+room.name+": Zahlung nicht angelegt ("+pe.message+")"); }
+      }
     }
 
     return res.status(200).json({
-      success: true,
-      message: "HRS-Buchung importiert",
+      success: true, message: "HRS-Buchung importiert",
       reservation: {
-        id: newRes[0].id,
-        number: newRes[0].reservation_number || newRes[0].id,
-        room: freeRoom.name,
-        roomType: matchedUT.name,
-        guest: (parsed.firstName + " " + parsed.lastName).trim(),
-        checkIn: parsed.checkIn,
-        checkOut: parsed.checkOut,
-        price: parsed.totalPrice,
-        hrsNr: parsed.hrsBuchungsNr
+        guest: (parsed.firstName + " " + parsed.lastName).trim(), hrsNr: parsed.hrsBuchungsNr,
+        checkIn: parsed.checkIn, checkOut: parsed.checkOut, totalPrice: parsed.totalPrice || 0, rooms: created
       },
-      parsed: parsed
+      warnings: paymentWarnings.length ? paymentWarnings : undefined
     });
 
   } catch (err) {
